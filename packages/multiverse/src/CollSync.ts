@@ -29,6 +29,9 @@ export class CollSync<RecordType, KeyType = string>
     this.schema = schema;
     this.#universe = universe;
     this.#engine = (sunF ?? memorySunF)(this);
+    if (universe) {
+      universe.add(this);
+    }
   }
 
   #engine: SunIF<RecordType, KeyType>;
