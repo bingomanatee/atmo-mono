@@ -1,0 +1,76 @@
+{
+  "snake_case": {
+    "universal": {
+      "id": "id",
+      "fullName": "full_name",
+      "homeAddress": "home_address",
+      "phoneNumber": "phone_number"
+    }
+  },
+  "dash-case": {
+    "universal": {
+      "id": "id",
+      "fullName": "full-name",
+      "homeAddress": "home-address",
+      "phoneNumber": "phone-number"
+    }
+  },
+  "universal": {
+    "snake_case": {
+      "id": "id",
+      "full_name": "fullName",
+      "home_address": "homeAddress",
+      "phone_number": "phoneNumber"
+    },
+    "dash-case": {
+      "id": "id",
+      "full-name": "fullName",
+      "home-address": "homeAddress",
+      "phone-number": "phoneNumber"
+    }
+  },
+  "testRecords": {
+    "camelCase": {
+      "record1": {
+        "id": 1,
+        "fullName": "John Doe",
+        "homeAddress": "123 Main St",
+        "phoneNumber": "555-1234"
+      },
+      "record2": {
+        "id": 2,
+        "fullName": "Jane Smith",
+        "homeAddress": "456 Oak St",
+        "phoneNumber": "555-5678"
+      }
+    },
+    "snake_case": {
+      "record1": {
+        "id": 1,
+        "full_name": "John Doe",
+        "home_address": "123 Main St",
+        "phone_number": "555-1234"
+      },
+      "record2": {
+        "id": 2,
+        "full_name": "Jane Smith",
+        "home_address": "456 Oak St",
+        "phone_number": "555-5678"
+      }
+    },
+    "dash-case": {
+      "record1": {
+        "id": 1,
+        "full-name": "John Doe",
+        "home-address": "123 Main St",
+        "phone-number": "555-1234"
+      },
+      "record2": {
+        "id": 2,
+        "full-name": "Jane Smith",
+        "home-address": "456 Oak St",
+        "phone-number": "555-5678"
+      }
+    }
+  }
+}

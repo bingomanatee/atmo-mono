@@ -1,36 +1,60 @@
 import type {
-  CollEngineIF,
-  CollIF,
-  CollIFSync,
-  CollSchema,
+  CollBaseIF,
+  SunIF,
+  UniverseIF,
+  UniverseName,
 } from './types.multiverse';
+import memorySunF from './suns/MemorySunF';
+import type { CollSchemaIF } from './type.schema';
+import type { CollIF, CollSyncIF } from './types.coll';
 
 type CollParms<RecordType, KeyType = string> = {
   name: string;
-  schema: CollSchema;
-  engineF: (
-    coll: CollIF<RecordType, KeyType>,
-  ) => CollEngineIF<RecordType, KeyType>;
+  schema: CollSchemaIF;
+  universe: UniverseIF;
+  sunF?: (coll: CollIF<RecordType, KeyType>) => SunIF<RecordType, KeyType>; // will default to memorySunF
 };
-export class CollSync<RecordType, KeyType = string> implements CollIFSync {
+
+export class CollSync<RecordType, KeyType = string>
+  implements CollSyncIF<RecordType, KeyType>
+{
   name: string;
-  schema: CollSchema;
+  #universe: UniverseIF;
+  schema: CollSchemaIF;
   isAsync: false = false;
 
   constructor(params: CollParms<RecordType, KeyType>) {
-    const { name, engineF, schema } = params;
+    const { name, sunF, schema, universe } = params;
     this.name = name;
     this.schema = schema;
-    this.#engine = engineF(this);
+    this.#universe = universe;
+    this.#engine = (sunF ?? memorySunF)(this);
   }
 
-  #engine: CollEngineIF<RecordType, KeyType>;
+  #engine: SunIF<RecordType, KeyType>;
 
-  get(identity: KeyType): RecordType {
+  get(identity: KeyType): RecordType | undefined {
     return this.#engine.get(identity);
   }
 
   has(key: KeyType): boolean {
     return this.#engine.has(key);
+  }
+
+  set(key: KeyType, value: RecordType): void {
+    this.#engine.set(key, value);
+  }
+
+  send(key: KeyType, target: UniverseName): void {
+    if (!this.#universe.multiverse) {
+      throw new Error(
+        'CollSync.send: multiverse not set on universe ' + this.#universe.name,
+      );
+    }
+    const multiverse = this.#universe.multiverse;
+    if (!this.has(key)) throw new Error(this.name + 'does not have key ' + key);
+    const record = this.get(key);
+    const universal = multiverse.toUniversal(record, this as CollBaseIF);
+    this.#universe.multiverse.send(key, universal, target);
   }
 }
