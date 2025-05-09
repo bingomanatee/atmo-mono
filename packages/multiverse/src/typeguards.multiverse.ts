@@ -1,10 +1,10 @@
-import type { SchemaFieldBaseIF } from './type.schema';
+import type { FieldBaseIF } from './type.schema';
 
 export function isObj(value: unknown): value is object {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-export function isSchemaField(value: unknown): value is SchemaFieldBaseIF {
+export function isField(value: unknown): value is FieldBaseIF {
   if (!isObj(value)) {
     return false;
   }

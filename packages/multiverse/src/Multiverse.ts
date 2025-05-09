@@ -3,7 +3,7 @@ import type {
   CollBaseIF,
   DataRecord,
   MultiverseIF,
-  SchemaLocalFieldIF,
+  FieldLocalIF,
   UniverseIF,
   UniverseName,
   UnivSchemaMap,
@@ -93,12 +93,12 @@ export class Multiverse implements MultiverseIF {
       );
     }
     for (const universalName of Object.keys(univSchema.fields)) {
-      const collectionSchemaField = (Array.from(
+      const collectionField = (Array.from(
         Object.values(collection.schema.fields),
       ).find((f) => f.universalName == universalName) ??
-        collection.schema.fields[universalName]) as SchemaLocalFieldIF;
+        collection.schema.fields[universalName]) as FieldLocalIF;
 
-      if (!collectionSchemaField) {
+      if (!collectionField) {
         console.error(
           'cannot find ',
           universalName,
@@ -109,11 +109,11 @@ export class Multiverse implements MultiverseIF {
           `collection ${collection.name} does not have an equivalent field for universal field ${universalName}`,
         );
       }
-      if (!collectionSchemaField.name) {
-        console.error('no name in ', collectionSchemaField);
+      if (!collectionField.name) {
+        console.error('no name in ', collectionField);
         throw new Error('bad schema');
       }
-      mappings[collectionSchemaField.name] = universalName;
+      mappings[collectionField.name] = universalName;
     }
 
     this.#localToUnivCache.set(collKey, mappings);

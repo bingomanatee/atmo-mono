@@ -18,12 +18,27 @@ export function validateField(
   value: unknown,
   key: string,
   schema: SchemaBaseIF,
+  record: unknown,
 ) {
   const fieldSchema = schema.fields[key];
   if (!fieldSchema) {
     throw new Error(`Field ${key} not found in schema`);
   }
-  const { type: fieldType } = fieldSchema;
+  const { type: fieldType, validator: fieldValidator } = fieldSchema;
+  if (fieldValidator) {
+    const msg = fieldValidator(value, {
+      field: schema.fields[key],
+      record,
+      schema,
+    });
+    if (msg) return msg;
+  }
+
+  // @ts-ignore
+  if ([FIELD_TYPES.any, FIELD_TYPES.custom].includes(fieldType)) {
+    return false;
+  }
+
   const validator = validatorMap.get(fieldType as FieldTypeValue);
   if (!validator) {
     return false;

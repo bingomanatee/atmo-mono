@@ -26,12 +26,14 @@ export type FieldAnnotation = {
 /**
  * the base collection field definition; also, the universal schema field definition
  */
-export interface SchemaFieldBaseIF<RecordType = DataRecord> {
+export interface FieldBaseIF<RecordType = DataRecord> {
   name?: FieldName; // maay be interpolated by containing collection
   type: string;
   meta?: FieldAnnotation;
   validator?: ValidatorFn<RecordType>;
 }
+
+export interface FieldUnivIF<RecordType> extends FieldBaseIF<RecordType> {}
 
 export type ValidatorFn<RecordType = DataRecord> = (
   value: any,
@@ -39,12 +41,12 @@ export type ValidatorFn<RecordType = DataRecord> = (
 ) => string | void;
 
 type ValidatorParams<RecordType = DataRecord> = {
-  field: SchemaFieldBaseIF;
+  field: FieldBaseIF;
   schema: SchemaBaseIF;
   record: RecordType;
 };
 
-export type SchemaLocalFieldIF<T = any> = SchemaFieldBaseIF & {
+export type FieldLocalIF<T = any> = FieldBaseIF & {
   name: string;
   universalName?: string;
   isLocal?: boolean; // if true, this field is not in the universal schema
@@ -52,26 +54,26 @@ export type SchemaLocalFieldIF<T = any> = SchemaFieldBaseIF & {
   // this is called immediately before writing to update or generate the field
 };
 
-export type SchemaLocalFieldInputIF = SchemaLocalFieldIF | FieldTypeValue;
-export type SchemaFieldBaseInputIF = SchemaBaseInputIF | FieldTypeValue;
-export type LocalFieldRecord = Record<string, SchemaLocalFieldIF>;
+export type FieldLocalInputIF = FieldLocalIF | FieldTypeValue;
+export type FieldBaseInputIF = SchemaBaseInputIF | FieldTypeValue;
+export type LocalFieldRecord = Record<string, FieldLocalIF>;
 
 // ------------------- schema nodes -------------------
 
 export interface SchemaBaseIF {
   name?: CollName;
-  fields: Record<FieldName, SchemaFieldBaseIF>;
+  fields: Record<FieldName, FieldBaseIF>;
 }
 
 export interface SchemaBaseInputIF {
   name?: CollName;
-  fields: Record<FieldName, SchemaLocalFieldInputIF>;
+  fields: Record<FieldName, FieldLocalInputIF>;
   filterRecord?: (params: PostParams) => DataRecord;
 }
 
 export interface SchemaLocalIF<RecordType = DataRecord> extends SchemaBaseIF {
   name?: CollName; // name may be inferred from container
-  fields: Record<FieldName, SchemaLocalFieldIF>;
+  fields: Record<FieldName, FieldLocalIF>;
   filterRecord?: (params: PostParams) => RecordType; // used to add local fields,
   // or to encase the record in a new class instance
 }
@@ -82,7 +84,7 @@ export interface SchemaLocalIF<RecordType = DataRecord> extends SchemaBaseIF {
 export interface SchemaUnivIF extends SchemaBaseIF {
   // name may be inferred from container
   name?: CollName;
-  fields: Record<FieldName, SchemaFieldBaseIF>;
+  fields: Record<FieldName, FieldBaseIF>;
 }
 
 export type PostParams = {
@@ -91,7 +93,7 @@ export type PostParams = {
   inputRecord: any;
   currentValue?: any;
   newValue?: any;
-  field?: SchemaFieldBaseIF;
+  field?: FieldBaseIF;
 };
 
 export type UnivSchemaMap = Map<CollName, SchemaUnivIF>;

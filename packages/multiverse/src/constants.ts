@@ -6,6 +6,8 @@ export const FIELD_TYPES = {
   object: 'Object',
   array: 'Array',
   function: 'Function',
+  custom: 'custom',
+  any: '*',
 } as const;
 
 export type FieldTypeName = keyof typeof FIELD_TYPES; // 'string' | 'number' | ...

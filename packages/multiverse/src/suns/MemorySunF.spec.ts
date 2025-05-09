@@ -5,7 +5,7 @@ import type { CollSyncIF } from '../types.coll';
 import { SchemaLocal } from '../SchemaLocal';
 import { CollSync } from '../CollSync';
 import { Universe } from '../Universe';
-import type { PostParams, SchemaLocalFieldIF } from '../type.schema';
+import type { PostParams, FieldLocalIF } from '../type.schema';
 
 type User = { id: number; name: string; age?: number; email?: string };
 

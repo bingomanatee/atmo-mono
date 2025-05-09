@@ -1,6 +1,6 @@
 import type {
-  SchemaLocalFieldIF,
-  SchemaLocalFieldInputIF,
+  FieldLocalIF,
+  FieldLocalInputIF,
   SchemaLocalIF,
   DataRecord,
   FieldAnnotation,
@@ -11,7 +11,7 @@ import type {
 import { isObj } from './typeguards.multiverse';
 import { inputToSchema } from './utils/inputToSchema';
 
-function arrayToFields(fieldDef: SchemaLocalFieldIF[]) {
+function arrayToFields(fieldDef: FieldLocalIF[]) {
   return fieldDef.reduce(
     (acc, field) => {
       if (!('name' in field)) {
@@ -22,11 +22,11 @@ function arrayToFields(fieldDef: SchemaLocalFieldIF[]) {
       acc[field.name as string] = field;
       return acc;
     },
-    {} as Record<string, SchemaLocalFieldIF>,
+    {} as Record<string, FieldLocalIF>,
   );
 }
 
-class LocalCollField<T = any> implements SchemaLocalFieldIF<T> {
+class LocalCollField<T = any> implements FieldLocalIF<T> {
   constructor(
     params: LocalCollAddParams<T>,
     private coll: SchemaLocal,
@@ -66,13 +66,13 @@ export class SchemaLocal<RecordType = DataRecord>
 {
   constructor(
     public name: string,
-    fieldDef: Record<string, SchemaLocalFieldInputIF> | SchemaLocalFieldIF[],
+    fieldDef: Record<string, FieldLocalInputIF> | FieldLocalIF[],
     public filterRecord?: (params: PostParams) => RecordType,
   ) {
     if (Array.isArray(fieldDef)) {
       this.fields = arrayToFields(fieldDef);
     } else {
-      this.fields = inputToSchema<SchemaLocalFieldIF, SchemaLocalFieldInputIF>(
+      this.fields = inputToSchema<FieldLocalIF, FieldLocalInputIF>(
         fieldDef,
         LocalCollField,
       );

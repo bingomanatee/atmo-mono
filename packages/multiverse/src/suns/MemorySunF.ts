@@ -1,12 +1,14 @@
-import type { SchemaLocalFieldIF, SunIF } from '../types.multiverse';
+import type { FieldLocalIF, SunIF } from '../types.multiverse';
 import { CollSyncIF } from '../types.coll';
-import { isObj, isSchemaField } from '../typeguards.multiverse';
+import { isObj, isField } from '../typeguards.multiverse';
 import { validateField } from '../utils/validateField';
+import { SunBase } from './SunFBase.ts';
 
-export class MemorySunF<R, K> implements SunIF<R, K> {
+export class MemorySunF<R, K> extends SunBase<R, K> implements SunIF<R, K> {
   #data: Map<K, R>;
 
-  constructor(private coll: CollSyncIF<R, K>) {
+  constructor(protected coll: CollSyncIF<R, K>) {
+    super();
     this.#data = new Map();
   }
 
@@ -22,7 +24,7 @@ export class MemorySunF<R, K> implements SunIF<R, K> {
     let existing = this.#data.get(key);
     const input = isObj(record) ? { ...record } : record;
 
-    this.#validateInput(input);
+    this.validateInput(input);
 
     for (const fieldName of Object.keys(this.coll.schema.fields)) {
       const field = this.coll.schema.fields[fieldName];
@@ -60,40 +62,6 @@ export class MemorySunF<R, K> implements SunIF<R, K> {
 
   clear() {
     this.#data.clear();
-  }
-
-  #eachSchemaField(
-    callback: (field: SchemaLocalFieldIF, ...rest: any[]) => void,
-    ...args: any[]
-  ) {
-    for (const fieldName in this.coll.schema.fields) {
-      const field = this.coll.schema.fields[fieldName];
-      callback(field, fieldName, ...args);
-    }
-  }
-
-  #validateInput(input: any) {
-    if (!isObj(input)) {
-      throw new Error(
-        'MemorySunF.set: input must be an object. ' + JSON.stringify(input),
-      );
-    }
-
-    const inputObj = input as Record<string, any>;
-    this.#eachSchemaField((_field, fieldName) => {
-      if (_field.meta?.optional && inputObj[fieldName] === undefined) {
-        return;
-      }
-
-      const result = validateField(
-        inputObj[fieldName],
-        fieldName,
-        this.coll.schema,
-      );
-      if (result) {
-        throw new Error(`\`validation error: ${fieldName}, ${result}`);
-      }
-    });
   }
 }
 

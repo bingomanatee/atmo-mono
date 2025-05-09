@@ -4,17 +4,17 @@ import type {
   FieldTypeValue,
   LocalFieldRecord,
   PostParams,
-  SchemaFieldBaseIF,
-  SchemaFieldBaseInputIF,
-  SchemaLocalFieldIF,
-  SchemaLocalFieldInputIF,
+  FieldBaseIF,
+  FieldBaseInputIF,
+  FieldLocalIF,
+  FieldLocalInputIF,
   SchemaLocalIF,
   SchemaUnivIF,
 } from './type.schema';
 import { isObj } from './typeguards.multiverse';
 import { inputToSchema } from './utils/inputToSchema';
 
-function arrayToFields(fieldDef: SchemaFieldBaseIF[]) {
+function arrayToFields(fieldDef: FieldBaseIF[]) {
   return fieldDef.reduce(
     (acc, field) => {
       if (!('name' in field)) {
@@ -25,11 +25,11 @@ function arrayToFields(fieldDef: SchemaFieldBaseIF[]) {
       acc[field.name as string] = field;
       return acc;
     },
-    {} as Record<string, SchemaLocalFieldIF>,
+    {} as Record<string, FieldLocalIF>,
   );
 }
 
-export class UnivCollField<T = any> implements SchemaFieldBaseIF<T> {
+export class UnivCollField<T = any> implements FieldBaseIF<T> {
   constructor(
     params: LocalCollAddParams<T>,
     private coll: SchemaLocal,
@@ -67,9 +67,7 @@ export class SchemaUniversal<RecordType = DataRecord>
 {
   constructor(
     public name: string,
-    fieldDef:
-      | Record<string, SchemaFieldBaseInputIF | FieldTypeValue>
-      | SchemaFieldBaseIF[],
+    fieldDef: Record<string, FieldBaseInputIF | FieldTypeValue> | FieldBaseIF[],
     public filterRecord?: (params: PostParams) => RecordType,
   ) {
     if (Array.isArray(fieldDef)) {
@@ -79,7 +77,7 @@ export class SchemaUniversal<RecordType = DataRecord>
     }
   }
 
-  fields: Record<string, SchemaFieldBaseIF>;
+  fields: Record<string, FieldBaseIF>;
 
   add<T = any>(params: LocalCollAddParams<T>) {
     const { name, type, meta } = params;

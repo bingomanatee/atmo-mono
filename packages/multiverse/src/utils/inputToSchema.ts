@@ -1,15 +1,15 @@
 import type {
   FieldTypeValue,
   LocalFieldRecord,
-  SchemaLocalFieldIF,
-  SchemaLocalFieldInputIF,
+  FieldLocalIF,
+  FieldLocalInputIF,
 } from '../type.schema';
 
 type Constructor<T = any> = new (...args: any[]) => T;
 
 export function inputToSchema<
-  SchemaType = SchemaLocalFieldIF,
-  SchemaInputFieldType = SchemaLocalFieldInputIF,
+  SchemaType = FieldLocalIF,
+  SchemaInputFieldType = FieldLocalInputIF,
 >(
   schema: Record<string, SchemaInputFieldType | FieldTypeValue>,
   Klass?: Constructor<SchemaType>,
