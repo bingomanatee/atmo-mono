@@ -1,16 +1,16 @@
 import type {
   CollBaseIF,
+  SchemaLocalIF,
   SunIF,
   UniverseIF,
   UniverseName,
 } from './types.multiverse';
 import memorySunF from './suns/MemorySunF';
-import type { CollSchemaLocalIF } from './type.schema';
 import type { CollIF, CollSyncIF } from './types.coll';
 
 type CollParms<RecordType, KeyType = string> = {
   name: string;
-  schema: CollSchemaLocalIF;
+  schema: SchemaLocalIF;
   universe: UniverseIF;
   sunF?: (coll: CollIF<RecordType, KeyType>) => SunIF<RecordType, KeyType>; // will default to memorySunF
 };
@@ -20,7 +20,7 @@ export class CollSync<RecordType, KeyType = string>
 {
   name: string;
   #universe: UniverseIF;
-  schema: CollSchemaLocalIF;
+  schema: SchemaLocalIF;
   isAsync: false = false;
 
   constructor(params: CollParms<RecordType, KeyType>) {
@@ -54,10 +54,12 @@ export class CollSync<RecordType, KeyType = string>
         'CollSync.send: multiverse not set on universe ' + this.#universe.name,
       );
     }
-    const multiverse = this.#universe.multiverse;
     if (!this.has(key)) throw new Error(this.name + 'does not have key ' + key);
-    const record = this.get(key);
-    const universal = multiverse.toUniversal(record, this as CollBaseIF);
-    this.#universe.multiverse.send(key, universal, target);
+    this.#universe.multiverse.transport(
+      key,
+      this.name,
+      this.#universe.name,
+      target,
+    );
   }
 }

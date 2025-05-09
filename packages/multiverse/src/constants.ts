@@ -1,4 +1,4 @@
-export const FIELD_TYPES: Record<string, string> = {
+export const FIELD_TYPES = {
   string: 'string',
   number: 'number',
   boolean: 'bool',
@@ -7,3 +7,6 @@ export const FIELD_TYPES: Record<string, string> = {
   array: 'Array',
   function: 'Function',
 } as const;
+
+export type FieldTypeName = keyof typeof FIELD_TYPES; // 'string' | 'number' | ...
+export type FieldTypeValue = (typeof FIELD_TYPES)[FieldTypeName]; // 'string' | 'number' | 'bool' | ...

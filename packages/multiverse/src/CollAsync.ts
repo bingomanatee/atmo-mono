@@ -1,17 +1,17 @@
 import type {
   CollAsyncIF,
   CollBaseIF,
+  SchemaLocalIF,
   SunIF,
   UniverseIF,
   UniverseName,
 } from './types.multiverse';
 import memorySunF from './suns/MemorySunF';
-import type { CollSchemaLocalIF } from './type.schema';
 import type { CollIF, CollSyncIF } from './types.coll';
 
 type CollParms<RecordType, KeyType = string> = {
   name: string;
-  schema: CollSchemaLocalIF;
+  schema: SchemaLocalIF;
   universe: UniverseIF;
   sunF?: (coll: CollIF<RecordType, KeyType>) => SunIF<RecordType, KeyType>; // will default to memorySunF
 };
@@ -21,8 +21,8 @@ export class CollAsync<RecordType, KeyType = string>
 {
   name: string;
   #universe: UniverseIF;
-  schema: CollSchemaLocalIF;
-  isAsync: false = false;
+  schema: SchemaLocalIF;
+  isAsync: true = true;
 
   constructor(params: CollParms<RecordType, KeyType>) {
     const { name, sunF, schema, universe } = params;
@@ -37,28 +37,25 @@ export class CollAsync<RecordType, KeyType = string>
 
   #engine: SunIF<RecordType, KeyType>;
 
-  get(identity: KeyType): RecordType | undefined {
+  async get(identity: KeyType) {
     return this.#engine.get(identity);
   }
 
-  has(key: KeyType): boolean {
+  async has(key: KeyType) {
     return this.#engine.has(key);
   }
 
-  set(key: KeyType, value: RecordType): void {
+  async set(key: KeyType, value: RecordType) {
     this.#engine.set(key, value);
   }
 
-  send(key: KeyType, target: UniverseName): void {
+  async send(key: KeyType, target: UniverseName) {
     if (!this.#universe.multiverse) {
       throw new Error(
         'CollSync.send: multiverse not set on universe ' + this.#universe.name,
       );
     }
     const multiverse = this.#universe.multiverse;
-    if (!this.has(key)) throw new Error(this.name + 'does not have key ' + key);
-    const record = this.get(key);
-    const universal = multiverse.toUniversal(record, this as CollBaseIF);
-    this.#universe.multiverse.send(key, universal, target);
+    return multiverse.transport(key, this.name, this.#universe.name, target);
   }
 }

@@ -1,14 +1,12 @@
-import type { CollSchemaFieldIF, CollSchemaLocalIF } from './type.schema';
+import type { SchemaFieldBaseIF } from './type.schema';
 
-export function isObj(fromSchema: unknown): fromSchema is object {
-  return typeof fromSchema === 'object' && fromSchema !== null;
+export function isObj(value: unknown): value is object {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-export function isCollSchemaField(
-  fromSchema: unknown,
-): fromSchema is CollSchemaFieldIF {
-  if (!isObj(fromSchema)) {
+export function isSchemaField(value: unknown): value is SchemaFieldBaseIF {
+  if (!isObj(value)) {
     return false;
   }
-  return 'type' in fromSchema;
+  return 'type' in value;
 }

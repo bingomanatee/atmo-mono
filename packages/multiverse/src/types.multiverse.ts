@@ -1,8 +1,8 @@
 import type {
-  UnivCollSchemaMap,
-  CollSchemaLocalIF,
+  UnivSchemaMap,
   DataKey,
   DataRecord,
+  SchemaLocalIF,
 } from './type.schema';
 import type { CollBaseIF, CollIF, CollName } from './types.coll';
 
@@ -31,17 +31,17 @@ export interface MultiverseIF {
   has(name: UniverseName): boolean;
   get(name: UniverseName): UniverseIF | undefined;
   add(u: UniverseIF): UniverseIF;
-  baseCollSchemas?: UnivCollSchemaMap;
+  baseSchemas?: UnivSchemaMap;
 
   transport(
     keyK: any,
     collectionName: string,
     fromU: UniverseName,
     toU: UniverseName,
-  ): void;
+  ): void | Promise<void>;
 
-  toLocal(record: any, coll: CollBaseIF): any; //convert record from a "multiversal" record to a collection
-  toUniversal(record: any, coll: CollBaseIF): any; //convert record from a collection to a "multiversal" record
+  toLocal(record: any, coll: CollBaseIF, uName: string): any; //convert record from a "multiversal" record to a collection
+  toUniversal(record: any, coll: CollBaseIF, uName: string): any; //convert record from a collection to a "multiversal" record
 }
 
 export * from './type.schema';

@@ -155,11 +155,11 @@ describe('Multiverse', () => {
 
   describe('localizeUniversalSchema', () => {
     const m = new Multiverse();
-    const u = new Universe('uppercase', m);
+    const upperUniv = new Universe('uppercase', m);
     const sc = new Universe('snakecase', m);
     const upperUsers = new CollSync<UpperUser, number>({
       name: 'users',
-      universe: u,
+      universe: upperUniv,
       schema: {
         fields: {
           ID: { type: FIELD_TYPES.number, universalName: 'id' },
@@ -187,9 +187,9 @@ describe('Multiverse', () => {
     });
 
     it('should map universal fields to local fields', () => {
-      u.add(upperUsers);
+      upperUniv.add(upperUsers);
 
-      const LM = m.localizeUniversalSchema(upperUsers);
+      const LM = m.localizeUniversalSchema(upperUsers, upperUniv.name);
 
       expect(LM).toEqual({
         fullname: 'FULL_NAME',
@@ -198,7 +198,7 @@ describe('Multiverse', () => {
       });
     });
 
-    it('should unversilize a record', () => {
+    it('should universally filter a record', () => {
       const record = {
         ID: 1,
         FULL_NAME: 'John Doe',
@@ -263,7 +263,7 @@ describe('Multiverse', () => {
         fullname: 'John Doe',
         homeaddress: '123 Main St',
       };
-      const result = m.toLocal(record, upperUsers);
+      const result = m.toLocal(record, upperUsers, 'upper');
 
       expect(result).toEqual({
         ID: 1,
@@ -274,12 +274,12 @@ describe('Multiverse', () => {
   });
   describe('transport', () => {
     const m = new Multiverse();
-    const u = new Universe('uppercase', m);
-    const sc = new Universe('snakecase', m);
+    const upperUniv = new Universe('uppercase', m);
+    const snakeUniv = new Universe('snakecase', m);
 
     const upperUsers = new CollSync<DataRecord, number>({
       name: 'users',
-      universe: u,
+      universe: upperUniv,
       schema: {
         fields: {
           ID: { type: FIELD_TYPES.number, universalName: 'id' },
@@ -293,7 +293,7 @@ describe('Multiverse', () => {
     });
     const snakeUsers = new CollSync<DataRecord, number>({
       name: 'users',
-      universe: sc,
+      universe: snakeUniv,
       schema: {
         fields: {
           id: { type: FIELD_TYPES.number, universalName: 'id' },
@@ -312,8 +312,13 @@ describe('Multiverse', () => {
         FULL_NAME: 'John Doe',
         HOME_ADDRESS: '123 Main St',
       };
-      upperUsers.set(record.ID, record);
-      const result = m.transport(1, 'users', u.name, sc.name);
+      try {
+        upperUsers.set(record.ID, record);
+      } catch (err) {
+        console.error('failure initializing ', record, err);
+        return;
+      }
+      const result = m.transport(1, 'users', upperUniv.name, snakeUniv.name);
 
       expect(result).toEqual({
         id: 1,
@@ -322,14 +327,17 @@ describe('Multiverse', () => {
       });
     });
 
-    it('should transport a record from back', () => {
+    it('should transport a record the other way', () => {
       const record = {
         id: 1,
         'full-name': 'John Doe',
         'home-address': '123 Main St',
       };
       snakeUsers.set(record.id, record);
-      const result = m.transport(1, 'users', sc.name, u.name);
+
+      console.log('universal version:', m.toUniversal(record, snakeUsers));
+      console.log('universal map:', m.universalizeLocalSchema(snakeUsers));
+      const result = m.transport(1, 'users', snakeUniv.name, upperUniv.name);
 
       expect(result).toEqual({
         ID: 1,

@@ -1,10 +1,12 @@
 // a system has a collection of uniform records
-import type { CollSchemaLocalIF, DataKey, DataRecord } from './type.schema';
+import type { SchemaLocalIF, DataKey, DataRecord } from './type.schema';
 import type { UniverseName } from './types.multiverse';
+
+// ------------------- collection nodes -------------------
 
 export interface CollBaseIF<RecordType = DataRecord, KeyType = DataKey> {
   name: CollName;
-  schema: CollSchemaLocalIF;
+  schema: SchemaLocalIF;
 
   get(key: KeyType): RecordType | undefined;
   set(key: KeyType, value: RecordType): void;
@@ -14,7 +16,7 @@ export interface CollBaseIF<RecordType = DataRecord, KeyType = DataKey> {
 export interface CollSyncIF<RecordType = DataRecord, KeyType = DataKey>
   extends CollBaseIF<RecordType, KeyType> {
   name: CollName;
-  schema: CollSchemaLocalIF;
+  schema: SchemaLocalIF;
 
   get(key: KeyType): RecordType | undefined;
   set(key: KeyType, value: RecordType): void;

@@ -1,14 +1,17 @@
 import type {
-  CollSchemaLocalFieldIF,
-  CollSchemaLocalIF,
+  SchemaLocalFieldIF,
+  SchemaLocalFieldInputIF,
+  SchemaLocalIF,
   DataRecord,
   FieldAnnotation,
   FieldTypeValue,
+  LocalFieldRecord,
   PostParams,
 } from './type.schema';
 import { isObj } from './typeguards.multiverse';
+import { inputToSchema } from './utils/inputToSchema';
 
-function arrayToFields(fieldDef: CollSchemaLocalFieldIF[]) {
+function arrayToFields(fieldDef: SchemaLocalFieldIF[]) {
   return fieldDef.reduce(
     (acc, field) => {
       if (!('name' in field)) {
@@ -19,14 +22,14 @@ function arrayToFields(fieldDef: CollSchemaLocalFieldIF[]) {
       acc[field.name as string] = field;
       return acc;
     },
-    {} as Record<string, CollSchemaLocalFieldIF>,
+    {} as Record<string, SchemaLocalFieldIF>,
   );
 }
 
-class LocalCollField<T = any> implements CollSchemaLocalFieldIF<T> {
+class LocalCollField<T = any> implements SchemaLocalFieldIF<T> {
   constructor(
     params: LocalCollAddParams<T>,
-    private coll: CollSchemaLocal,
+    private coll: SchemaLocal,
   ) {
     const { name, type, meta, universalName, isLocal, filter } = params;
 
@@ -56,22 +59,22 @@ class LocalCollField<T = any> implements CollSchemaLocalFieldIF<T> {
   }
 }
 
-export class CollSchemaLocal<RecordType = DataRecord>
-  implements CollSchemaLocalIF<RecordType>
+export class SchemaLocal<RecordType = DataRecord>
+  implements SchemaLocalIF<RecordType>
 {
   constructor(
     public name: string,
-    fieldDef: Record<string, CollSchemaLocalFieldIF> | CollSchemaLocalFieldIF[],
+    fieldDef: Record<string, SchemaLocalFieldInputIF> | SchemaLocalFieldIF[],
     public filterRecord?: (params: PostParams) => RecordType,
   ) {
     if (Array.isArray(fieldDef)) {
       this.fields = arrayToFields(fieldDef);
     } else {
-      this.fields = fieldDef;
+      this.fields = inputToSchema(fieldDef);
     }
   }
 
-  fields: Record<string, CollSchemaLocalFieldIF>;
+  fields: LocalFieldRecord;
 
   add<T = any>(params: LocalCollAddParams<T>) {
     const { name, type, meta } = params;

@@ -1,6 +1,11 @@
-import type { SunIF } from '../types.multiverse';
+import type {
+  SchemaBaseIF,
+  SchemaLocalFieldIF,
+  SunIF,
+} from '../types.multiverse';
 import { CollSyncIF } from '../types.coll';
-import { isCollSchemaField, isObj } from '../typeguards.multiverse';
+import { isSchemaField, isObj } from '../typeguards.multiverse';
+import { validateField } from '../utils/validateField';
 
 export class MemorySunF<R, K> implements SunIF<R, K> {
   #data: Map<K, R>;
@@ -20,10 +25,10 @@ export class MemorySunF<R, K> implements SunIF<R, K> {
   set(key: K, record: R) {
     let existing = this.#data.get(key);
     const input = isObj(record) ? { ...record } : record;
-
+    this.#validateInput(input);
     for (const fieldName in Object.keys(this.coll.schema)) {
       const field = this.coll.schema.fields[fieldName];
-      if (isCollSchemaField(field) && field.filter && isObj(record)) {
+      if (isSchemaField(field) && field.filter && isObj(record)) {
         const fieldValue: any = field.filter({
           currentRecord: existing,
           inputRecord: record,
@@ -54,6 +59,40 @@ export class MemorySunF<R, K> implements SunIF<R, K> {
 
   clear() {
     this.#data.clear();
+  }
+
+  #eachSchemaField(
+    callback: (field: SchemaLocalFieldIF, ...rest: any[]) => void,
+    ...args: any[]
+  ) {
+    for (const fieldName in this.coll.schema.fields) {
+      const field = this.coll.schema.fields[fieldName];
+      callback(field, fieldName, ...args);
+    }
+  }
+
+  #validateInput(input: any) {
+    if (!isObj(input)) {
+      throw new Error(
+        'MemorySunF.set: input must be an object. ' + JSON.stringify(input),
+      );
+    }
+
+    const inputObj = input as Record<string, any>;
+    this.#eachSchemaField((_field, fieldName) => {
+      if (_field.meta?.optional && inputObj[fieldName] === undefined) {
+        return;
+      }
+
+      const result = validateField(
+        inputObj[fieldName],
+        fieldName,
+        this.coll.schema,
+      );
+      if (result) {
+        throw new Error(`\`validation error: ${fieldName}, ${result}`);
+      }
+    });
   }
 }
 
