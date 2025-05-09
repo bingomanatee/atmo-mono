@@ -1,29 +1,18 @@
 import type {
-  BaseCollSchemaMap,
+  UnivCollSchemaMap,
   CollBaseIF,
-  CollSchemaIF,
   CollSchemaLocalFieldIF,
   DataRecord,
   MultiverseIF,
   UniverseIF,
   UniverseName,
 } from './types.multiverse';
-
-function isObj(fromSchema: unknown): fromSchema is object {
-  return typeof fromSchema === 'object' && fromSchema !== null;
-}
-
-function isCollSchemaField(fromSchema: unknown): fromSchema is CollSchemaIF {
-  if (!isObj(fromSchema)) {
-    return false;
-  }
-  return 'type' in fromSchema;
-}
+import { isObj } from './typeguards.multiverse';
 
 // These helper functions are no longer needed with the simplified approach
 
 export class Multiverse implements MultiverseIF {
-  baseCollSchemas: BaseCollSchemaMap = new Map();
+  baseCollSchemas: UnivCollSchemaMap = new Map();
   #universes: Map<string, any> = new Map();
 
   has(name: string) {

@@ -1,6 +1,6 @@
 import type {
-  BaseCollSchemaMap,
-  CollSchemaIF,
+  UnivCollSchemaMap,
+  CollSchemaLocalIF,
   DataKey,
   DataRecord,
 } from './type.schema';
@@ -20,7 +20,9 @@ export interface UniverseIF {
   name: UniverseName;
   get(name: CollName): CollIF | undefined;
   has(name: CollName): boolean;
-  add<RecordType = DataRecord, KeyType = DataKey>(coll: CollIF<RecordType, KeyType>): CollIF<RecordType, KeyType>;
+  add<RecordType = DataRecord, KeyType = DataKey>(
+    coll: CollIF<RecordType, KeyType>,
+  ): CollIF<RecordType, KeyType>;
   multiverse?: MultiverseIF;
 }
 
@@ -29,7 +31,7 @@ export interface MultiverseIF {
   has(name: UniverseName): boolean;
   get(name: UniverseName): UniverseIF | undefined;
   add(u: UniverseIF): UniverseIF;
-  baseCollSchemas?: BaseCollSchemaMap;
+  baseCollSchemas?: UnivCollSchemaMap;
 
   transport(
     keyK: any,

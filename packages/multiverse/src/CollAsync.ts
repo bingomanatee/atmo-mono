@@ -1,4 +1,5 @@
 import type {
+  CollAsyncIF,
   CollBaseIF,
   SunIF,
   UniverseIF,
@@ -15,8 +16,8 @@ type CollParms<RecordType, KeyType = string> = {
   sunF?: (coll: CollIF<RecordType, KeyType>) => SunIF<RecordType, KeyType>; // will default to memorySunF
 };
 
-export class CollSync<RecordType, KeyType = string>
-  implements CollSyncIF<RecordType, KeyType>
+export class CollAsync<RecordType, KeyType = string>
+  implements CollAsyncIF<RecordType, KeyType>
 {
   name: string;
   #universe: UniverseIF;

@@ -17,6 +17,12 @@ type SnakeCaseUser = {
   home_address: string;
 };
 
+type DashCaseUser = {
+  id: number;
+  'full-name': string;
+  'home-address': string;
+};
+
 // Define a type for camelCase users to match
 type CamelCaseUser = {
   id: number;
@@ -51,6 +57,12 @@ const SNAKE_CASE_SCHEMA = {
       universalName: 'homeAddress', // Transform snake_case to camelCase
     },
   },
+};
+
+type UpperUser = {
+  ID: number;
+  FULL_NAME: string;
+  HOME_ADDRESS: string;
 };
 
 describe('Multiverse', () => {
@@ -98,11 +110,11 @@ describe('Multiverse', () => {
 
   describe('transform', () => {
     const m = new Multiverse();
-    const u = new Universe('uppercase', m);
-    const sc = new Universe('snakecase', m);
-    const upperUsers = new CollSync({
+    const upperUniv = new Universe('uppercase', m);
+    const dashUniv = new Universe('snakecase', m);
+    const upperUsers = new CollSync<UpperUser, number>({
       name: 'users',
-      universe: u,
+      universe: upperUniv,
       schema: {
         fields: {
           ID: { type: FIELD_TYPES.number, universalName: 'id' },
@@ -114,9 +126,9 @@ describe('Multiverse', () => {
         },
       },
     });
-    const snakeUsers = new CollSync({
+    const dashCaseUser = new CollSync<DashCaseUser, number>({
       name: 'users',
-      universe: sc,
+      universe: dashUniv,
       schema: {
         fields: {
           id: { type: FIELD_TYPES.number, universalName: 'id' },
@@ -136,7 +148,7 @@ describe('Multiverse', () => {
         'home-address': 'Hogwarts',
       };
 
-      sc.get('users')!.set(ron.id, ron);
+      dashUniv.get('users')!.set(ron.id, ron);
       const upperRon = m.transport(ron.id, 'users', 'snakecase', 'uppercase');
     });
   });
@@ -145,7 +157,7 @@ describe('Multiverse', () => {
     const m = new Multiverse();
     const u = new Universe('uppercase', m);
     const sc = new Universe('snakecase', m);
-    const upperUsers = new CollSync({
+    const upperUsers = new CollSync<UpperUser, number>({
       name: 'users',
       universe: u,
       schema: {
@@ -159,7 +171,7 @@ describe('Multiverse', () => {
         },
       },
     });
-    const snakeUsers = new CollSync({
+    const snakeUsers = new CollSync<SnakeCaseUser>({
       name: 'users',
       universe: sc,
       schema: {
