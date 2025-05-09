@@ -31,7 +31,7 @@ export interface MultiverseIF {
   has(name: UniverseName): boolean;
   get(name: UniverseName): UniverseIF | undefined;
   add(u: UniverseIF): UniverseIF;
-  baseSchemas?: UnivSchemaMap;
+  baseSchemas: UnivSchemaMap;
 
   transport(
     keyK: any,
@@ -39,7 +39,8 @@ export interface MultiverseIF {
     fromU: UniverseName,
     toU: UniverseName,
   ): void | Promise<void>;
-
+  localToUnivFieldMap(coll: CollIF): Record<string, string>;
+  univToLocalFieldMap(coll: CollIF): Record<string, string>;
   toLocal(record: any, coll: CollBaseIF, uName: string): any; //convert record from a "multiversal" record to a collection
   toUniversal(record: any, coll: CollBaseIF, uName: string): any; //convert record from a collection to a "multiversal" record
 }

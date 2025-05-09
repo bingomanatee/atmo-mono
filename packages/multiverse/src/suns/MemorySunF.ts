@@ -41,7 +41,7 @@ export class MemorySunF<R, K> implements SunIF<R, K> {
         });
         (input as { [fieldName]: any })[fieldName] = fieldValue;
       } else {
-        console.info('no filter in ', field);
+        // console.info('no filter in ', field);
       }
     }
 

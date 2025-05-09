@@ -1,15 +1,32 @@
-import type { SchemaLocalFieldInputIF, LocalFieldRecord } from '../type.schema';
+import type {
+  FieldTypeValue,
+  LocalFieldRecord,
+  SchemaLocalFieldIF,
+  SchemaLocalFieldInputIF,
+} from '../type.schema';
 
-export function inputToSchema(
-  schema: Record<string, SchemaLocalFieldInputIF>,
+type Constructor<T = any> = new (...args: any[]) => T;
+
+export function inputToSchema<
+  SchemaType = SchemaLocalFieldIF,
+  SchemaInputFieldType = SchemaLocalFieldInputIF,
+>(
+  schema: Record<string, SchemaInputFieldType | FieldTypeValue>,
+  Klass?: Constructor<SchemaType>,
 ): LocalFieldRecord {
-  const out: LocalFieldRecord = {};
+  const out: Record<string, SchemaType> = {};
 
   for (const [key, value] of Object.entries(schema)) {
-    if (typeof value === 'string' || typeof value === 'number') {
-      out[key] = { type: value, name: key };
+    let def;
+    if (typeof value === 'string') {
+      def = { type: value, name: key };
     } else {
-      out[key] = value;
+      def = value;
+    }
+    if (Klass) {
+      out[key] = new Klass({ name: key, ...def });
+    } else {
+      out[key] = def;
     }
   }
 

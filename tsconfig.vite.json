@@ -3,6 +3,8 @@
   "extends": "./tsconfig.base.json",
   "compilerOptions": {
     "types": ["vitest"],
+    "noEmit": true,
+    "moduleResolution": "bundler"
   },
   "include": ["src", "packages"]
 }

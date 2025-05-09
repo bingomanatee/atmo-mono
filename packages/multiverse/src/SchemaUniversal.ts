@@ -1,17 +1,20 @@
 import type {
-  SchemaLocalFieldIF,
-  SchemaLocalFieldInputIF,
-  SchemaLocalIF,
   DataRecord,
   FieldAnnotation,
   FieldTypeValue,
   LocalFieldRecord,
   PostParams,
+  SchemaFieldBaseIF,
+  SchemaFieldBaseInputIF,
+  SchemaLocalFieldIF,
+  SchemaLocalFieldInputIF,
+  SchemaLocalIF,
+  SchemaUnivIF,
 } from './type.schema';
 import { isObj } from './typeguards.multiverse';
 import { inputToSchema } from './utils/inputToSchema';
 
-function arrayToFields(fieldDef: SchemaLocalFieldIF[]) {
+function arrayToFields(fieldDef: SchemaFieldBaseIF[]) {
   return fieldDef.reduce(
     (acc, field) => {
       if (!('name' in field)) {
@@ -26,15 +29,13 @@ function arrayToFields(fieldDef: SchemaLocalFieldIF[]) {
   );
 }
 
-class LocalCollField<T = any> implements SchemaLocalFieldIF<T> {
+export class UnivCollField<T = any> implements SchemaFieldBaseIF<T> {
   constructor(
     params: LocalCollAddParams<T>,
     private coll: SchemaLocal,
   ) {
     const { name, type, meta, universalName, isLocal, filter } = params;
-    if (!name) {
-      throw new Error('name is required in LocalCollField');
-    }
+
     this.name = name;
     this.type = type;
     if (isObj(meta)) {
@@ -61,25 +62,24 @@ class LocalCollField<T = any> implements SchemaLocalFieldIF<T> {
   }
 }
 
-export class SchemaLocal<RecordType = DataRecord>
-  implements SchemaLocalIF<RecordType>
+export class SchemaUniversal<RecordType = DataRecord>
+  implements SchemaUnivIF<RecordType>
 {
   constructor(
     public name: string,
-    fieldDef: Record<string, SchemaLocalFieldInputIF> | SchemaLocalFieldIF[],
+    fieldDef:
+      | Record<string, SchemaFieldBaseInputIF | FieldTypeValue>
+      | SchemaFieldBaseIF[],
     public filterRecord?: (params: PostParams) => RecordType,
   ) {
     if (Array.isArray(fieldDef)) {
       this.fields = arrayToFields(fieldDef);
     } else {
-      this.fields = inputToSchema<SchemaLocalFieldIF, SchemaLocalFieldInputIF>(
-        fieldDef,
-        LocalCollField,
-      );
+      this.fields = inputToSchema(fieldDef, UnivCollField);
     }
   }
 
-  fields: LocalFieldRecord;
+  fields: Record<string, SchemaFieldBaseIF>;
 
   add<T = any>(params: LocalCollAddParams<T>) {
     const { name, type, meta } = params;

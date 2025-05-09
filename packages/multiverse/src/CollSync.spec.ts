@@ -5,6 +5,7 @@ import { Universe } from './Universe';
 import { FIELD_TYPES } from './constants';
 import type { CollSyncIF } from './types.coll';
 import type { UniverseIF } from './types.multiverse';
+import { SchemaUniversal } from './SchemaUniversal.ts';
 
 type User = { id: number; name: string; zip_code: number };
 
@@ -23,7 +24,18 @@ const collDef = (u: UniverseIF) => ({
 describe('CollSync', () => {
   describe('*class', () => {
     it('has its given name', () => {
-      const m = new Multiverse();
+      const m = new Multiverse(
+        new Map([
+          [
+            'foo',
+            new SchemaUniversal<User>('foo', {
+              id: FIELD_TYPES.number,
+              name: FIELD_TYPES.string,
+              zip_code: FIELD_TYPES.string,
+            }),
+          ],
+        ]),
+      );
       const u = new Universe('default');
       const c: CollSyncIF = new CollSync({
         name: 'foo',

@@ -1,14 +1,11 @@
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import { Multiverse } from './Multiverse';
-import type {
-  CollIF,
-  DataKey,
-  DataRecord,
-  UniverseIF,
-} from './types.multiverse';
+import type { DataRecord, MultiverseIF, UniverseIF } from './types.multiverse';
 import { FIELD_TYPES } from './constants';
 import { Universe } from './Universe';
 import { CollSync } from './CollSync';
+import { SchemaUniversal } from './SchemaUniversal.ts';
+import { SchemaLocal } from './SchemaLocal.ts';
 
 // Define types for our test cases
 type SnakeCaseUser = {
@@ -28,6 +25,15 @@ type CamelCaseUser = {
   id: number;
   fullName: string;
   homeAddress: string;
+};
+
+const UPPER_FIELDS = {
+  ID: { type: FIELD_TYPES.number, universalName: 'id' },
+  FULL_NAME: { type: FIELD_TYPES.string, universalName: 'fullname' },
+  HOME_ADDRESS: {
+    type: FIELD_TYPES.string,
+    universalName: 'homeaddress',
+  },
 };
 
 // Schema definitions
@@ -65,42 +71,46 @@ type UpperUser = {
   HOME_ADDRESS: string;
 };
 
+const universalSchema = new Map([
+  [
+    'users',
+    new SchemaUniversal('users', {
+      id: FIELD_TYPES.number,
+      fullname: FIELD_TYPES.string,
+      homeaddress: FIELD_TYPES.string,
+    }),
+  ],
+]);
+
 describe('Multiverse', () => {
   describe('*class', () => {
     it('should have no universes by default', () => {
-      const m = new Multiverse();
+      const m = new Multiverse(new Map());
       expect(m.has('foo')).toBe(false);
     });
   });
 
   describe('add', () => {
-    const u: UniverseIF = {
-      add(coll: CollIF<DataRecord, DataKey>): CollIF<DataRecord, DataKey> {
-        return coll;
-      },
-      get(): CollIF<DataRecord, DataKey> | undefined {
-        return undefined;
-      },
-      has(): boolean {
-        return false;
-      },
-      name: 'foo',
-    };
+    let m: Multiverse;
+    let u: UniverseIF;
+
+    beforeEach(() => {
+      m = new Multiverse(new Map());
+      u = new Universe('foo');
+    });
+
     it('should add a universe', () => {
-      const m = new Multiverse();
       m.add(u);
       expect(m.has('foo')).toBe(true);
       expect(m.get('foo')).toEqual(u);
     });
 
     it('should throw an error if universe already exists', () => {
-      const m = new Multiverse();
       m.add(u);
       expect(() => m.add(u)).toThrowError(/already exists/);
     });
 
     it('should replace an existing universe if replace is true', () => {
-      const m = new Multiverse();
       const u2 = { ...u, systems: new Map() };
       m.add(u);
       m.add(u2, true);
@@ -108,93 +118,67 @@ describe('Multiverse', () => {
     });
   });
 
-  describe('transform', () => {
-    const m = new Multiverse();
-    const upperUniv = new Universe('uppercase', m);
-    const dashUniv = new Universe('snakecase', m);
-    const upperUsers = new CollSync<UpperUser, number>({
-      name: 'users',
-      universe: upperUniv,
-      schema: {
-        fields: {
+  describe('localToUnivFieldMap', () => {
+    let m: MultiverseIF;
+    let upperUniv;
+    let sc;
+    let upperUsers;
+    let snakeUsers;
+    beforeEach(() => {
+      m = new Multiverse(
+        new Map([
+          [
+            'users',
+            new SchemaUniversal('uses', {
+              id: FIELD_TYPES.number,
+              fullname: FIELD_TYPES.string,
+              homeaddress: FIELD_TYPES.string,
+            }),
+          ],
+        ]),
+      );
+      upperUniv = new Universe('uppercase', m);
+      sc = new Universe('snakecase', m);
+      upperUsers = new CollSync<UpperUser, number>({
+        name: 'users',
+        universe: upperUniv,
+        schema: new SchemaLocal<UpperUser>('users', {
           ID: { type: FIELD_TYPES.number, universalName: 'id' },
           FULL_NAME: { type: FIELD_TYPES.string, universalName: 'fullname' },
           HOME_ADDRESS: {
             type: FIELD_TYPES.string,
             universalName: 'homeaddress',
           },
-        },
-      },
-    });
-    const dashCaseUser = new CollSync<DashCaseUser, number>({
-      name: 'users',
-      universe: dashUniv,
-      schema: {
-        fields: {
-          id: { type: FIELD_TYPES.number, universalName: 'id' },
-          'full-name': { type: FIELD_TYPES.string, universalName: 'fullname' },
-          'home-address': {
-            type: FIELD_TYPES.string,
-            universalName: 'homeaddress',
+        }),
+      });
+      snakeUsers = new CollSync<SnakeCaseUser>({
+        name: 'users',
+        universe: sc,
+        schema: {
+          fields: {
+            id: { type: FIELD_TYPES.number, universalName: 'id' },
+            'full-name': {
+              type: FIELD_TYPES.string,
+              universalName: 'fullname',
+            },
+            'home-address': {
+              type: FIELD_TYPES.string,
+              universalName: 'homeaddress',
+            },
           },
         },
-      },
-    });
-
-    it('should convert snakeUsers to upperUsers', () => {
-      const ron = {
-        id: 11,
-        'full-name': 'Ron Weasley',
-        'home-address': 'Hogwarts',
-      };
-
-      dashUniv.get('users')!.set(ron.id, ron);
-      const upperRon = m.transport(ron.id, 'users', 'snakecase', 'uppercase');
-    });
-  });
-
-  describe('localizeUniversalSchema', () => {
-    const m = new Multiverse();
-    const upperUniv = new Universe('uppercase', m);
-    const sc = new Universe('snakecase', m);
-    const upperUsers = new CollSync<UpperUser, number>({
-      name: 'users',
-      universe: upperUniv,
-      schema: {
-        fields: {
-          ID: { type: FIELD_TYPES.number, universalName: 'id' },
-          FULL_NAME: { type: FIELD_TYPES.string, universalName: 'fullname' },
-          HOME_ADDRESS: {
-            type: FIELD_TYPES.string,
-            universalName: 'homeaddress',
-          },
-        },
-      },
-    });
-    const snakeUsers = new CollSync<SnakeCaseUser>({
-      name: 'users',
-      universe: sc,
-      schema: {
-        fields: {
-          id: { type: FIELD_TYPES.number, universalName: 'id' },
-          'full-name': { type: FIELD_TYPES.string, universalName: 'fullname' },
-          'home-address': {
-            type: FIELD_TYPES.string,
-            universalName: 'homeaddress',
-          },
-        },
-      },
+      });
     });
 
     it('should map universal fields to local fields', () => {
       upperUniv.add(upperUsers);
 
-      const LM = m.localizeUniversalSchema(upperUsers, upperUniv.name);
+      const LM = m.localToUnivFieldMap(upperUsers, upperUniv.name);
 
       expect(LM).toEqual({
-        fullname: 'FULL_NAME',
-        homeaddress: 'HOME_ADDRESS',
-        id: 'ID',
+        FULL_NAME: 'fullname',
+        ID: 'id',
+        HOME_ADDRESS: 'homeaddress',
       });
     });
 
@@ -204,8 +188,7 @@ describe('Multiverse', () => {
         FULL_NAME: 'John Doe',
         HOME_ADDRESS: '123 Main St',
       };
-      const result = m.toUniversal(record, upperUsers);
-
+      const result = m.toUniversal(record, upperUsers, upperUniv.name);
       expect(result).toEqual({
         id: 1,
         fullname: 'John Doe',
@@ -214,41 +197,53 @@ describe('Multiverse', () => {
     });
   });
   describe('unversalizeLocalSchema', () => {
-    const m = new Multiverse();
-    const u = new Universe('uppercase', m);
-    const sc = new Universe('snakecase', m);
+    let m: Multiverse;
+    let upperUniv: Universe;
+    let snakeUiverse: Universe;
+    let upperUsers: CollSync<DataRecord, number>;
+    let snakeUsers: CollSync<DataRecord, number>;
 
-    const upperUsers = new CollSync<DataRecord, number>({
-      name: 'users',
-      universe: u,
-      schema: {
-        fields: {
-          ID: { type: FIELD_TYPES.number, universalName: 'id' },
-          FULL_NAME: { type: FIELD_TYPES.string, universalName: 'fullname' },
-          HOME_ADDRESS: {
-            type: FIELD_TYPES.string,
-            universalName: 'homeaddress',
+    beforeEach(() => {
+      m = new Multiverse(
+        new Map([
+          [
+            'users',
+            new SchemaUniversal('users', {
+              id: FIELD_TYPES.string,
+              fullname: FIELD_TYPES.string,
+              homeaddress: FIELD_TYPES.string,
+            }),
+          ],
+        ]),
+      );
+      upperUniv = new Universe('uppercase', m);
+      snakeUiverse = new Universe('snakecase', m);
+      upperUsers = new CollSync<DataRecord, number>({
+        name: 'users',
+        universe: upperUniv,
+        schema: new SchemaLocal('users', UPPER_FIELDS),
+      });
+      snakeUsers = new CollSync<DataRecord, number>({
+        name: 'users',
+        universe: snakeUiverse,
+        schema: {
+          fields: {
+            id: { type: FIELD_TYPES.number, universalName: 'id' },
+            'full-name': {
+              type: FIELD_TYPES.string,
+              universalName: 'fullname',
+            },
+            'home-address': {
+              type: FIELD_TYPES.string,
+              universalName: 'homeaddress',
+            },
           },
         },
-      },
-    });
-    const snakeUsers = new CollSync<DataRecord, number>({
-      name: 'users',
-      universe: sc,
-      schema: {
-        fields: {
-          id: { type: FIELD_TYPES.number, universalName: 'id' },
-          'full-name': { type: FIELD_TYPES.string, universalName: 'fullname' },
-          'home-address': {
-            type: FIELD_TYPES.string,
-            universalName: 'homeaddress',
-          },
-        },
-      },
+      });
     });
 
     it('should map local fields to universal fields', () => {
-      const LM = m.universalizeLocalSchema(upperUsers);
+      const LM = m.localToUnivFieldMap(upperUsers, upperUniv.name);
 
       expect(LM).toEqual({
         FULL_NAME: 'fullname',
@@ -263,7 +258,7 @@ describe('Multiverse', () => {
         fullname: 'John Doe',
         homeaddress: '123 Main St',
       };
-      const result = m.toLocal(record, upperUsers, 'upper');
+      const result = m.toLocal(record, upperUsers, upperUniv.name);
 
       expect(result).toEqual({
         ID: 1,
@@ -273,37 +268,45 @@ describe('Multiverse', () => {
     });
   });
   describe('transport', () => {
-    const m = new Multiverse();
-    const upperUniv = new Universe('uppercase', m);
-    const snakeUniv = new Universe('snakecase', m);
+    let m: Multiverse;
+    let upperUniv: Universe;
+    let snakeUniv: Universe;
+    let upperUsers: CollSync<DataRecord, number>;
+    let snakeUsers: CollSync<DataRecord, number>;
 
-    const upperUsers = new CollSync<DataRecord, number>({
-      name: 'users',
-      universe: upperUniv,
-      schema: {
-        fields: {
+    beforeEach(() => {
+      m = new Multiverse(universalSchema);
+      upperUniv = new Universe('uppercase', m);
+      snakeUniv = new Universe('snakecase', m);
+
+      upperUsers = new CollSync<DataRecord, number>({
+        name: 'users',
+        universe: upperUniv,
+        schema: new SchemaLocal('users', {
           ID: { type: FIELD_TYPES.number, universalName: 'id' },
           FULL_NAME: { type: FIELD_TYPES.string, universalName: 'fullname' },
           HOME_ADDRESS: {
             type: FIELD_TYPES.string,
             universalName: 'homeaddress',
           },
-        },
-      },
-    });
-    const snakeUsers = new CollSync<DataRecord, number>({
-      name: 'users',
-      universe: snakeUniv,
-      schema: {
-        fields: {
-          id: { type: FIELD_TYPES.number, universalName: 'id' },
-          'full-name': { type: FIELD_TYPES.string, universalName: 'fullname' },
+        }),
+      });
+
+      snakeUsers = new CollSync<DataRecord, number>({
+        name: 'users',
+        universe: snakeUniv,
+        schema: new SchemaLocal('users', {
+          id: FIELD_TYPES.number,
+          'full-name': {
+            type: FIELD_TYPES.string,
+            universalName: 'fullname',
+          },
           'home-address': {
             type: FIELD_TYPES.string,
             universalName: 'homeaddress',
           },
-        },
-      },
+        }),
+      });
     });
 
     it('should transport a record from one universe to another', () => {
@@ -312,18 +315,8 @@ describe('Multiverse', () => {
         FULL_NAME: 'John Doe',
         HOME_ADDRESS: '123 Main St',
       };
-      try {
-        upperUsers.set(record.ID, record);
-      } catch (err) {
-        console.error(
-          'failure initializing ',
-          record,
-          err,
-          'schema = ',
-          upperUsers.schema,
-        );
-        return;
-      }
+
+      upperUsers.set(record.ID, record);
       const result = m.transport(1, 'users', upperUniv.name, snakeUniv.name);
 
       expect(result).toEqual({
@@ -340,9 +333,6 @@ describe('Multiverse', () => {
         'home-address': '123 Main St',
       };
       snakeUsers.set(record.id, record);
-
-      console.log('universal version:', m.toUniversal(record, snakeUsers));
-      console.log('universal map:', m.universalizeLocalSchema(snakeUsers));
       const result = m.transport(1, 'users', snakeUniv.name, upperUniv.name);
 
       expect(result).toEqual({

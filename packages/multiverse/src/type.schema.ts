@@ -16,7 +16,7 @@ export type FieldTypeValue = (typeof FIELD_TYPES)[keyof typeof FIELD_TYPES];
  */
 export type FieldAnnotation = {
   optional?: boolean; // !required
-  default?: any;
+  defaultValue?: any;
   unique?: boolean;
   index?: boolean;
   values?: Set<any>; // limit values localize a fixed set
@@ -24,7 +24,7 @@ export type FieldAnnotation = {
 } & Record<string, any>; // other meta data
 
 /**
- * the base collection field definition
+ * the base collection field definition; also, the universal schema field definition
  */
 export interface SchemaFieldBaseIF<RecordType = DataRecord> {
   name?: FieldName; // maay be interpolated by containing collection
@@ -45,6 +45,7 @@ type ValidatorParams<RecordType = DataRecord> = {
 };
 
 export type SchemaLocalFieldIF<T = any> = SchemaFieldBaseIF & {
+  name: string;
   universalName?: string;
   isLocal?: boolean; // if true, this field is not in the universal schema
   filter?: (params: PostParams) => T; // when a record is set,
@@ -52,7 +53,7 @@ export type SchemaLocalFieldIF<T = any> = SchemaFieldBaseIF & {
 };
 
 export type SchemaLocalFieldInputIF = SchemaLocalFieldIF | FieldTypeValue;
-
+export type SchemaFieldBaseInputIF = SchemaBaseInputIF | FieldTypeValue;
 export type LocalFieldRecord = Record<string, SchemaLocalFieldIF>;
 
 // ------------------- schema nodes -------------------
