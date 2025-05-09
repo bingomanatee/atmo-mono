@@ -1,12 +1,11 @@
 import type {
   CollAsyncIF,
-  CollBaseIF,
   SchemaLocalIF,
   SunIF,
   UniverseIF,
   UniverseName,
 } from './types.multiverse';
-import memorySunF from './suns/MemorySunF';
+import sunMemoryAsyncF from './suns/SunMemoryAsync.ts';
 import type { CollIF, CollSyncIF } from './types.coll';
 
 type CollParms<RecordType, KeyType = string> = {
@@ -29,7 +28,7 @@ export class CollAsync<RecordType, KeyType = string>
     this.name = name;
     this.schema = schema;
     this.#universe = universe;
-    this.#engine = (sunF ?? memorySunF)(this);
+    this.#engine = (sunF ?? sunMemoryAsyncF)(this);
     if (universe) {
       universe.add(this);
     }

@@ -4,17 +4,13 @@ import type { UniverseName } from './types.multiverse';
 
 // ------------------- collection nodes -------------------
 
-export interface CollBaseIF<RecordType = DataRecord, KeyType = DataKey> {
+export interface CollBaseIF {
   name: CollName;
   schema: SchemaLocalIF;
-
-  get(key: KeyType): RecordType | undefined;
-  set(key: KeyType, value: RecordType): void;
-  has(key: KeyType): boolean;
 }
 
 export interface CollSyncIF<RecordType = DataRecord, KeyType = DataKey>
-  extends CollBaseIF<RecordType, KeyType> {
+  extends CollBaseIF {
   name: CollName;
   schema: SchemaLocalIF;
 
@@ -26,7 +22,7 @@ export interface CollSyncIF<RecordType = DataRecord, KeyType = DataKey>
 }
 
 export interface CollAsyncIF<RecordType = DataRecord, KeyType = DataKey>
-  extends CollBaseIF<RecordType, KeyType> {
+  extends CollBaseIF {
   isAsync: true;
   get(key: KeyType): Promise<RecordType | undefined>;
   set(key: KeyType, value: RecordType): Promise<void>;

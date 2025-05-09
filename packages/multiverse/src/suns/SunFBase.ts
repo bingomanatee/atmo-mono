@@ -2,20 +2,13 @@ import type { CollBaseIF, FieldLocalIF, SunIF } from '../types.multiverse';
 import { isObj } from '../typeguards.multiverse';
 import { validateField } from '../utils/validateField';
 
-export abstract class SunBase<RecordType, KeyType>
-  implements SunIF<RecordType, KeyType>
+export abstract class SunBase<
+  RecordType,
+  KeyType,
+  CollType extends CollBaseIF = CollBaseIF,
+> implements SunIF<RecordType, KeyType>
 {
-  protected coll!: CollBaseIF;
-
-  abstract set(key: KeyType, value: RecordType): void;
-
-  abstract get(key: KeyType): RecordType | undefined;
-
-  abstract delete(key: KeyType): void;
-
-  abstract clear(): void;
-
-  abstract has(key: KeyType): boolean;
+  protected coll!: CollType;
 
   protected eachField(
     callback: (field: FieldLocalIF, ...rest: any[]) => void,

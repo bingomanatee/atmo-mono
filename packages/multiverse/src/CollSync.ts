@@ -5,7 +5,7 @@ import type {
   UniverseIF,
   UniverseName,
 } from './types.multiverse';
-import memorySunF from './suns/MemorySunF';
+import memorySunF from './suns/SunMemory.ts';
 import type { CollIF, CollSyncIF } from './types.coll';
 
 type CollParms<RecordType, KeyType = string> = {

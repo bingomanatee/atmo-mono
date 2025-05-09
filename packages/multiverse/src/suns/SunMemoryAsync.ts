@@ -1,14 +1,17 @@
-import type { FieldLocalIF, SunIF } from '../types.multiverse';
-import { CollSyncIF } from '../types.coll';
-import { isObj, isField } from '../typeguards.multiverse';
-import { validateField } from '../utils/validateField';
+import type { SunIF } from '../types.multiverse';
+import type { CollAsyncIF } from '../types.coll';
+import { isObj } from '../typeguards.multiverse';
 import { SunBase } from './SunFBase.ts';
 
-export class MemorySunF<R, K> extends SunBase<R, K> implements SunIF<R, K> {
+export class SunMemoryAsync<R, K>
+  extends SunBase<R, K, CollAsyncIF<R, K>>
+  implements SunIF<R, K>
+{
   #data: Map<K, R>;
 
-  constructor(protected coll: CollSyncIF<R, K>) {
+  constructor(coll: CollAsyncIF<R, K>) {
     super();
+    this.coll = coll;
     this.#data = new Map();
   }
 
@@ -16,11 +19,11 @@ export class MemorySunF<R, K> extends SunBase<R, K> implements SunIF<R, K> {
     return this.#data.get(key);
   }
 
-  has(key: K) {
+  async has(key: K) {
     return this.#data.has(key);
   }
 
-  set(key: K, record: R) {
+  async set(key: K, record: R) {
     let existing = this.#data.get(key);
     const input = isObj(record) ? { ...record } : record;
 
@@ -56,7 +59,7 @@ export class MemorySunF<R, K> extends SunBase<R, K> implements SunIF<R, K> {
     } else this.#data.set(key, input);
   }
 
-  delete(key: K) {
+  async delete(key: K) {
     this.#data.delete(key);
   }
 
@@ -65,6 +68,8 @@ export class MemorySunF<R, K> extends SunBase<R, K> implements SunIF<R, K> {
   }
 }
 
-export default function memorySunF<R, K>(coll: CollSyncIF<R, K>): SunIF<R, K> {
-  return new MemorySunF<R, K>(coll);
+export default function memoryAsyncSunF<R, K>(
+  coll: CollAsyncIF<R, K>,
+): SunIF<R, K> {
+  return new SunMemoryAsync<R, K>(coll);
 }

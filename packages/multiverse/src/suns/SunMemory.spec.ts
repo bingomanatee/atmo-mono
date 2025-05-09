@@ -1,5 +1,5 @@
 import { describe, expect, it, beforeEach, vi } from 'vitest';
-import { MemorySunF } from './MemorySunF';
+import { SunMemory } from './SunMemory.ts';
 import { FIELD_TYPES } from '../constants';
 import type { CollSyncIF } from '../types.coll';
 import { SchemaLocal } from '../SchemaLocal';
@@ -9,11 +9,11 @@ import type { PostParams, FieldLocalIF } from '../type.schema';
 
 type User = { id: number; name: string; age?: number; email?: string };
 
-describe('MemorySunF', () => {
+describe('SunMemory', () => {
   let univ: Universe;
   let schema: SchemaLocal;
   let coll: CollSyncIF<User, number>;
-  let sun: MemorySunF<User, number>;
+  let sun: SunMemory<User, number>;
 
   beforeEach(() => {
     univ = new Universe('test-universe');
@@ -28,12 +28,12 @@ describe('MemorySunF', () => {
       schema,
       universe: univ,
     });
-    sun = new MemorySunF<User, number>(coll);
+    sun = new SunMemory<User, number>(coll);
   });
 
   describe('constructor', () => {
     it('should create a new instance with an empty data map', () => {
-      expect(sun).toBeInstanceOf(MemorySunF);
+      expect(sun).toBeInstanceOf(SunMemory);
       expect(sun.has(1)).toBe(false);
     });
   });
@@ -182,7 +182,7 @@ describe('MemorySunF', () => {
         universe: univ,
       });
 
-      sun = new MemorySunF<User, number>(coll);
+      sun = new SunMemory<User, number>(coll);
     });
 
     it('should apply field filters when setting a record', () => {
@@ -236,7 +236,7 @@ describe('MemorySunF', () => {
         universe: univ,
       });
 
-      sun = new MemorySunF<User & { lastUpdated?: string }, number>(coll);
+      sun = new SunMemory<User & { lastUpdated?: string }, number>(coll);
     });
 
     it('should apply record filter when setting a record', () => {

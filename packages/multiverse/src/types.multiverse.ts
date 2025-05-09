@@ -9,11 +9,11 @@ import type { CollBaseIF, CollIF, CollName } from './types.coll';
 export type UniverseName = string;
 
 export interface SunIF<RecordType = DataRecord, KeyType = DataKey> {
-  get(key: KeyType): RecordType | undefined;
-  set(key: KeyType, value: RecordType): void;
-  delete(key: KeyType): void;
-  clear(): void;
-  has(key: KeyType): boolean;
+  get(key: KeyType): any;
+  set(key: KeyType, value: RecordType): any;
+  delete(key: KeyType): any;
+  clear(): any;
+  has(key: KeyType): any;
 }
 
 export interface UniverseIF {
