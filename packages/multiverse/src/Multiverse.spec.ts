@@ -315,7 +315,13 @@ describe('Multiverse', () => {
       try {
         upperUsers.set(record.ID, record);
       } catch (err) {
-        console.error('failure initializing ', record, err);
+        console.error(
+          'failure initializing ',
+          record,
+          err,
+          'schema = ',
+          upperUsers.schema,
+        );
         return;
       }
       const result = m.transport(1, 'users', upperUniv.name, snakeUniv.name);

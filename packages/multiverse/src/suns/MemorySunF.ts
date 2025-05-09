@@ -1,10 +1,6 @@
-import type {
-  SchemaBaseIF,
-  SchemaLocalFieldIF,
-  SunIF,
-} from '../types.multiverse';
+import type { SchemaLocalFieldIF, SunIF } from '../types.multiverse';
 import { CollSyncIF } from '../types.coll';
-import { isSchemaField, isObj } from '../typeguards.multiverse';
+import { isObj, isSchemaField } from '../typeguards.multiverse';
 import { validateField } from '../utils/validateField';
 
 export class MemorySunF<R, K> implements SunIF<R, K> {
@@ -25,10 +21,13 @@ export class MemorySunF<R, K> implements SunIF<R, K> {
   set(key: K, record: R) {
     let existing = this.#data.get(key);
     const input = isObj(record) ? { ...record } : record;
+
     this.#validateInput(input);
-    for (const fieldName in Object.keys(this.coll.schema)) {
+
+    for (const fieldName of Object.keys(this.coll.schema.fields)) {
       const field = this.coll.schema.fields[fieldName];
-      if (isSchemaField(field) && field.filter && isObj(record)) {
+
+      if (field.filter) {
         const fieldValue: any = field.filter({
           currentRecord: existing,
           inputRecord: record,
@@ -41,6 +40,8 @@ export class MemorySunF<R, K> implements SunIF<R, K> {
             : undefined,
         });
         (input as { [fieldName]: any })[fieldName] = fieldValue;
+      } else {
+        console.info('no filter in ', field);
       }
     }
 
