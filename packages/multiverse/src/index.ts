@@ -1,0 +1,31 @@
+/**
+ * Multiverse - A synchronization engine for sending records and signals between multiple scopes
+ * @packageDocumentation
+ */
+
+// Core classes
+export { Multiverse } from './Multiverse';
+export { Universe } from './Universe';
+export { CollSync } from './CollSync';
+export { CollAsync } from './CollAsync';
+export { SchemaLocal } from './SchemaLocal';
+export { SchemaUniversal } from './SchemaUniversal';
+
+// Sun implementations
+export { SunBase } from './suns/SunFBase';
+export { SunMemory } from './suns/SunMemory';
+export { SunMemoryAsync } from './suns/SunMemoryAsync';
+export { default as memorySunF } from './suns/SunMemory';
+export { default as memoryAsyncSunF } from './suns/SunMemoryAsync';
+
+// Constants
+export { FIELD_TYPES } from './constants';
+
+// Type exports
+export * from './types.multiverse';
+export * from './types.coll';
+export * from './type.schema';
+
+// Utility functions
+export * from './typeguards.multiverse';
+export * from './utils/validateField';
