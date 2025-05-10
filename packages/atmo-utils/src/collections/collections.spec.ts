@@ -368,7 +368,7 @@ describe('Collection Classes', () => {
       // Verify the result
       expect(result.size).toBe(1);
       expect(result.has('key2')).toBe(true);
-
+      console.log('property search indexes', map.getIndexes());
       // Now an index should exist
       const indexes = map.getIndexes();
       expect(indexes).toBeDefined();

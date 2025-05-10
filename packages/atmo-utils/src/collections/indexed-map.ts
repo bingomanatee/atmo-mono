@@ -63,21 +63,6 @@ export class IndexedMap<K, V> extends ExtendedMap<K, V> {
   }
 
   /**
-   * Get the current indexes for testing/inspection
-   * Returns a copy of the indexes to prevent external modification
-   */
-  getIndexesForTesting(): Map<string, Set<K>> {
-    // Create a deep copy of the indexes
-    const copy = new Map<string, Set<K>>();
-    if (this._indexes) {
-      for (const [key, value] of this._indexes.entries()) {
-        copy.set(key, new Set(value));
-      }
-    }
-    return copy;
-  }
-
-  /**
    * Create a new IndexedMap
    *
    * @param entries - An iterable of key-value pairs to initialize the map with
@@ -102,6 +87,18 @@ export class IndexedMap<K, V> extends ExtendedMap<K, V> {
     return new IndexedMap<K, V>(map).find(...args);
   }
 
+  find(...args: any[]) {
+    const [a, b] = args;
+    if (
+      a &&
+      b &&
+      typeof a == 'string' &&
+      ['boolean', 'string', 'number'].includes(typeof b)
+    ) {
+      return this.findKeysByProperty(...args);
+    }
+    return super.find(...args);
+  }
   override set(key: K, value: V): this {
     super.set(key, value);
     this.invalidateIndexes();
@@ -148,24 +145,17 @@ export class IndexedMap<K, V> extends ExtendedMap<K, V> {
       let keys = this.getIndex(indexKey);
 
       // If not, create one
-      if (!keys) {
-        keys = new Set<K>();
-
-        // Populate the index
-        for (const [key, val] of this.entries()) {
-          const propValue = (val as any)[property];
-
-          if (this.isEqual(propValue, value)) {
-            keys.add(key);
-          }
-        }
+      if (keys) {
+        return keys;
+      } else {
+        const result = super.findKeysByProperty(property, value);
 
         // Store the index
-        this.setIndex(indexKey, keys);
+        this.setIndex(indexKey, result);
+        return result;
       }
 
       // Return the keys (already a Set)
-      return keys;
     } catch (e) {
       // If any error occurs, fall back to the parent's implementation
       return super.findKeysByProperty(property, value);
