@@ -203,6 +203,9 @@ export class Multiverse implements MultiverseIF {
         `Collection ${collection} not found in universe ${fromU}`,
       );
     }
+    if (fromColl.isAsync) {
+      return this.#asyncTransport(key, collection, fromU, toU);
+    }
 
     const toColl = this.get(toU)?.get(collection);
     if (!toColl) {
@@ -225,5 +228,46 @@ export class Multiverse implements MultiverseIF {
     }
     toColl.set(key, localize);
     return localize;
+  }
+
+  async #asyncTransport(
+    key: any,
+    collection: string,
+    fromU: UniverseName,
+    toU: UniverseName,
+  ): Promise<void> {
+    if (!this.baseSchemas.has(collection)) {
+      throw new Error(
+        `cannot transport collections without a universal schema definition: ${collection}`,
+      );
+    }
+    const fromColl = this.get(fromU)?.get(collection);
+    if (!fromColl) {
+      throw new Error(
+        `Collection ${collection} not found in universe ${fromU}`,
+      );
+    }
+
+    const toColl = this.get(toU)?.get(collection);
+    if (!toColl) {
+      throw new Error(`Collection ${collection} not found in universe ${toU}`);
+    }
+
+    const record = await fromColl.get(key);
+
+    if (!record) {
+      console.warn(`cannot find ${key} in ${collection} in ${fromU}`);
+      return;
+    }
+
+    const universal = this.toUniversal(record, fromColl as CollBaseIF, fromU);
+
+    const localize = this.toLocal(universal, toColl as CollBaseIF, toU);
+    if (toColl.isAsync) {
+      const asyncColl: CollAsyncIF = toColl as CollAsyncIF;
+      await asyncColl.set(key, localize);
+    } else {
+      toColl.set(key, localize);
+    }
   }
 }
