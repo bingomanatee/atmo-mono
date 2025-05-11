@@ -1,12 +1,11 @@
+import sunMemoryAsyncF from '../suns/SunMemoryAsync.ts';
+import type { CollIF } from '../types.coll.ts';
 import type {
   CollAsyncIF,
   SchemaLocalIF,
   SunIF,
   UniverseIF,
-  UniverseName,
-} from './types.multiverse';
-import sunMemoryAsyncF from './suns/SunMemoryAsync.ts';
-import type { CollIF } from './types.coll';
+} from '../types.multiverse.ts';
 
 type CollParms<RecordType, KeyType = string> = {
   name: string;
@@ -60,16 +59,10 @@ export class CollAsync<RecordType, KeyType = string>
     } else {
       // Fallback for engines that don't support mutate
       const existing = await this.get(key);
-      if (existing) {
-        const result =
-          (await Promise.resolve(mutator(existing, this))) || existing;
-        if (result) {
-          await this.set(key, result);
-        }
-        return result;
-      }
-      console.warn(`cannot mutate non-existent record ${key} in ${this.name}`);
-      return undefined;
+      if (!existing) return undefined;
+      const result = await mutator(existing, this);
+      await this.set(key, result);
+      return this.get(key);
     }
   }
 
@@ -80,10 +73,10 @@ export class CollAsync<RecordType, KeyType = string>
    * @returns A promise that resolves to an array of records matching the query
    * @throws Error if the engine does not implement find
    */
-  async find(query: any): Promise<RecordType[]> {
+  async find(...query: any[]) {
     // If the engine has a find method, use it
     if (typeof this.#engine.find === 'function') {
-      return this.#engine.find(query);
+      return this.#engine.find(...query);
     }
 
     // Throw an error if find is not implemented
@@ -166,10 +159,10 @@ export class CollAsync<RecordType, KeyType = string>
       key: KeyType,
       collection: CollAsyncIF<RecordType, KeyType>,
     ) => Promise<RecordType>,
-  ): Promise<number> {
+  ): Promise<Map<KeyType, RecordType>> {
     // If the engine has a map method, use it
     if (typeof this.#engine.map === 'function') {
-      return this.#engine.map((record, key) => mapper(record, key, this));
+      return this.#engine.map(mapper);
     }
     if (!(typeof this.#engine.keys === 'function')) {
       throw new Error(
@@ -178,57 +171,16 @@ export class CollAsync<RecordType, KeyType = string>
     }
 
     const keys = await this.#engine.keys();
-
-    // If noTransaction is true, apply changes immediately
-    if (noTransaction) {
-      try {
-        const map: Map<KeyType, RecordType> = new Map();
-
-        // Then apply the mapper function to each record
-        for (const key of keys) {
-          let record;
-          try {
-            record = await this.get(key);
-            if (record === undefined) continue;
-            const result = await mapper(record, key, this);
-            map.set(key, result);
-          } catch (error) {
-            // Create a MapError with additional information
-            const mapError = new Error(
-              `Error in map function: ${error.message}`,
-            ) as any;
-            mapError.name = 'MapError';
-            mapError.originalError = error;
-            mapError.successCount = map.size;
-            mapError.record = record;
-            mapError.key = key;
-
-            throw mapError;
-          }
+    const values: RecordType[] = Promise.all(
+      Array.from(keys).map(async () => {
+        const record = await this.get(record);
+        if (record !== undefined) {
+          return mapper(record, key, this);
         }
-      } catch (error) {
-        // Re-throw the error
-        throw error;
-      }
-    }
-
-    // If noTransaction is false, collect all changes and apply them atomically
-    const newRecords: RecordType = await Promise.all(
-      keys.map(async (key) => {
-        const record = await this.get(key);
-        if (!record) return undefined;
-        return mapper(record, key, this);
       }),
     );
-    return Array.from(newRecords).reduce(
-      (m: Map<string, RecordType>, record: RecordType, index: number) => {
-        const key = keys[index]!;
-        // @ts-ignore
-        m.set(key, record);
-        return m;
-      },
-      new Map(),
-    );
+
+    return new Map(keys.map((key, index) => [values[index], key]));
   }
 
   async send(key: KeyType, target: UniverseName) {
@@ -237,6 +189,7 @@ export class CollAsync<RecordType, KeyType = string>
         'CollSync.send: multiverse not set on universe ' + this.#universe.name,
       );
     }
+
     const multiverse = this.#universe.multiverse;
     return multiverse.transport(key, this.name, this.#universe.name, target);
   }

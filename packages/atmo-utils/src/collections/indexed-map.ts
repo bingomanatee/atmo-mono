@@ -1,4 +1,5 @@
 import { ExtendedMap } from './extended-map.ts';
+import { isEqual } from 'lodash-es';
 
 /**
  * IndexedMap - Extends ExtendedMap and adds indexing for more efficient searching.
@@ -84,20 +85,37 @@ export class IndexedMap<K, V> extends ExtendedMap<K, V> {
     ...args: any[]
   ): Map<K, V> {
     // Convert to IndexedMap and use instance method
-    return new IndexedMap<K, V>(map).find(...args);
+    const indexedMap = new IndexedMap<K, V>(map);
+    const result = indexedMap.find(...args);
+    // Ensure we always return a Map<KeyType, V>
+    return result instanceof Map ? result : new Map<K, V>();
   }
 
-  find(...args: any[]) {
-    const [a, b] = args;
+  find(prop?: keyof V | ((value: V) => boolean), val?: any): Map<K, V> {
+    // If prop is a string property name and val is a primitive value,
+    // use our optimized property lookup
     if (
-      a &&
-      b &&
-      typeof a == 'string' &&
-      ['boolean', 'string', 'number'].includes(typeof b)
+      prop &&
+      val !== undefined &&
+      typeof prop === 'string' &&
+      ['boolean', 'string', 'number'].includes(typeof val)
     ) {
-      return this.findKeysByProperty(...args);
+      // Get the matching keys
+      const matchingKeys = this.findKeysByProperty(prop, val);
+
+      // Create a new map with the matching entries
+      const result = new Map<K, V>();
+      for (const key of matchingKeys) {
+        const value = this.get(key);
+        if (value !== undefined) {
+          result.set(key, value);
+        }
+      }
+      return result;
     }
-    return super.find(...args);
+
+    // Otherwise use the parent implementation
+    return super.find(prop, val);
   }
   override set(key: K, value: V): this {
     super.set(key, value);
@@ -189,7 +207,8 @@ export class IndexedMap<K, V> extends ExtendedMap<K, V> {
         const valueProperty = (value as any)[prop];
 
         // If the property doesn't match, return false
-        if (!this.isEqual(valueProperty, recordValue)) {
+        // Use lodash's isEqual directly for deep equality comparison
+        if (!isEqual(valueProperty, recordValue)) {
           return false;
         }
       }

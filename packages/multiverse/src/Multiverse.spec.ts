@@ -3,7 +3,7 @@ import { Multiverse } from './Multiverse';
 import type { DataRecord, MultiverseIF, UniverseIF } from './types.multiverse';
 import { FIELD_TYPES } from './constants';
 import { Universe } from './Universe';
-import { CollSync } from './CollSync';
+import { CollSync } from './collections/CollSync.ts';
 import { SchemaUniversal } from './SchemaUniversal.ts';
 import { SchemaLocal } from './SchemaLocal.ts';
 

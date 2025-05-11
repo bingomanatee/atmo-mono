@@ -1,21 +1,21 @@
-import type { SunIF } from '../types.multiverse';
+import type { MutationAction, SunIF } from '../types.multiverse';
 import type { CollSyncIF } from '../types.coll';
 import { isObj } from '../typeguards.multiverse';
-import { MUTATION_ACTIONS, MutationAction } from '../constants';
+import { MUTATION_ACTIONS } from '../constants';
 import { SunBase } from './SunFBase';
-import { asError } from '@wonderlandlabs/atmo-utils/src';
+import { asError, ExtendedMap } from '@wonderlandlabs/atmo-utils';
 
 export class SunMemory<RecordType, KeyType>
   extends SunBase<RecordType, KeyType, CollSyncIF<RecordType, KeyType>>
   implements SunIF<RecordType, KeyType>
 {
   // Private data storage
-  #data: Map<KeyType, RecordType>;
+  #data: ExtendedMap<KeyType, RecordType>;
 
   constructor(coll: CollSyncIF<RecordType, KeyType>) {
     super();
     this.coll = coll;
-    this.#data = new Map();
+    this.#data = new ExtendedMap();
   }
 
   /**
@@ -100,40 +100,8 @@ export class SunMemory<RecordType, KeyType>
     return Array.from(this.#data.keys());
   }
 
-  /**
-   * Find records matching a query
-   * @param query - The query to match against
-   * @returns An array of records matching the query
-   */
-  find(query: any): RecordType[] {
-    const results: RecordType[] = [];
-
-    // Iterate through all records
-    for (const [key, record] of this.#data.entries()) {
-      // Simple matching logic - if query is an object, check if all properties match
-      if (typeof query === 'object' && query !== null) {
-        let matches = true;
-        for (const prop in query) {
-          if (Object.prototype.hasOwnProperty.call(query, prop)) {
-            if ((record as any)[prop] !== query[prop]) {
-              matches = false;
-              break;
-            }
-          }
-        }
-        if (matches) {
-          results.push(record);
-        }
-      }
-      // If query is a function, use it as a predicate
-      else if (typeof query === 'function') {
-        if (query(record)) {
-          results.push(record);
-        }
-      }
-    }
-
-    return results;
+  find(...args): RecordType[] {
+    return this.#data.find(...args);
   }
 
   /**
@@ -180,7 +148,7 @@ export class SunMemory<RecordType, KeyType>
 
     try {
       this.#data.forEach((record, key) => {
-        map.set(key, mapper(record, key, this));
+        map.set(key, mapper(record, key, this.coll));
       });
     } catch (err) {
       const error = asError(err);
@@ -234,7 +202,7 @@ export class SunMemory<RecordType, KeyType>
     try {
       const existing = this.#data.get(key);
 
-      const result = mutator(existing, this);
+      const result = mutator(existing, this.coll);
       return this._afterMutate(key, result);
     } finally {
       // Unlock the collection

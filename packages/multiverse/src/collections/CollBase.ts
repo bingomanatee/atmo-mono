@@ -4,8 +4,8 @@ import type {
   SunIF,
   UniverseIF,
   UniverseName,
-} from './types.multiverse';
-import type { CollIF } from './types.coll';
+} from '../types.multiverse.ts';
+import type { CollIF } from '../types.coll.ts';
 
 /**
  * Base class for collections with common functionality

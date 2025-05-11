@@ -27,14 +27,6 @@ export const MUTATION_ACTIONS = {
   UNLOCK: Symbol('UNLOCK'),
 } as const;
 
-/**
- * Interface for mutation action results
- */
-export interface MutationAction {
-  /** The action to perform */
-  action: symbol;
-  /** Optional key for the record (required for DELETE) */
-  key?: any;
-  /** Optional value for the action */
-  value?: any;
-}
+export const MUTATION_ACTIONS_VALUES = Array.from(
+  Object.values(MUTATION_ACTIONS),
+);

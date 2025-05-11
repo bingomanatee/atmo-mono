@@ -1,8 +1,8 @@
-import type { SunIF } from '../types.multiverse';
+import type { MutationAction, SunIF } from '../types.multiverse';
 import type { CollAsyncIF } from '../types.coll';
 import { isObj, isPromiseLike } from '../typeguards.multiverse';
 import { SunBase } from './SunFBase.ts';
-import { MUTATION_ACTIONS, MutationAction } from '../constants';
+import { MUTATION_ACTIONS } from '../constants';
 
 // Helper function for tests
 const delay = (fn: () => void) => setTimeout(fn, 0);

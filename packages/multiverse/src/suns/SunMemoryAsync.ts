@@ -1,19 +1,20 @@
-import type { SunIF } from '../types.multiverse';
+import { ExtendedMap } from '@wonderlandlabs/atmo-utils';
+import { MUTATION_ACTIONS } from '../constants';
+import { isMutatorAction, isObj } from '../typeguards.multiverse';
 import type { CollAsyncIF } from '../types.coll';
-import { isObj, isPromiseLike } from '../typeguards.multiverse';
+import type { MutationAction, SunIF } from '../types.multiverse';
 import { SunBase } from './SunFBase.ts';
-import { MUTATION_ACTIONS, MutationAction } from '../constants';
 
 export class SunMemoryAsync<R, K>
   extends SunBase<R, K, CollAsyncIF<R, K>>
   implements SunIF<R, K>
 {
-  #data: Map<K, R>;
+  #data: ExtendedMap<K, R>;
 
   constructor(coll: CollAsyncIF<R, K>) {
     super();
     this.coll = coll;
-    this.#data = new Map();
+    this.#data = new ExtendedMap<K, R>();
   }
 
   /**
@@ -107,35 +108,8 @@ export class SunMemoryAsync<R, K>
    * @param query - The query to match against
    * @returns A promise that resolves to an array of records matching the query
    */
-  async find(query: any): Promise<R[]> {
-    const results: R[] = [];
-
-    // Iterate through all records
-    for (const [key, record] of this.#data.entries()) {
-      // Simple matching logic - if query is an object, check if all properties match
-      if (typeof query === 'object' && query !== null) {
-        let matches = true;
-        for (const prop in query) {
-          if (Object.prototype.hasOwnProperty.call(query, prop)) {
-            if ((record as any)[prop] !== query[prop]) {
-              matches = false;
-              break;
-            }
-          }
-        }
-        if (matches) {
-          results.push(record);
-        }
-      }
-      // If query is a function, use it as a predicate
-      else if (typeof query === 'function') {
-        if (await Promise.resolve(query(record))) {
-          results.push(record);
-        }
-      }
-    }
-
-    return results;
+  async find(...query: any[]): Promise<Map<K, R>> {
+    return this.#data.find(...query);
   }
 
   /**
@@ -163,7 +137,6 @@ export class SunMemoryAsync<R, K>
   /**
    * Map over each record in the collection and apply a transformation
    * @param mapper - Function to transform each record
-   * @param noTransaction - If true, changes are applied immediately without transaction support
    * @returns A promise that resolves to the number of records processed
    * @throws MapError if any mapper function throws and noTransaction is false
    */
@@ -173,13 +146,14 @@ export class SunMemoryAsync<R, K>
       key: K,
       collection: CollAsyncIF<R, K>,
     ) => R | void | MutationAction | Promise<R | void | MutationAction>,
-  ): Promise<number> {
+  ): Promise<Map<K, R>> {
     const keys = await this.keys();
 
     const recordsAndKeys = await Promise.all(
       Array.from(keys).map(async (key: KeyType) => {
-        const record = this.get(key);
-        return [key, mapper(record, key, this)];
+        const record = await this.get(key);
+        const result = await mapper(record, key, this);
+        return [key, result];
       }),
     );
     return new Map(Array.from(recordsAndKeys));
@@ -220,49 +194,13 @@ export class SunMemoryAsync<R, K>
   ): Promise<R | undefined> {
     // Lock the collection during synchronous part of mutation
     this._locked = true;
-
-    try {
-      const existing = this.#data.get(key);
-
-      // Create a deep clone of the existing record
-      const draft = existing ? JSON.parse(JSON.stringify(existing)) : undefined;
-
-      try {
-        // Apply the mutator function
-        const result = mutator(draft, this.coll);
-
-        // Handle Promise-like result
-        if (isPromiseLike(result)) {
-          // Unlock the collection immediately for async operations
-          this._locked = false;
-
-          // Await the promise result without locking
-          try {
-            const asyncResult = await result;
-            // Process the async result without locking
-            return this.#afterMutate(key, asyncResult);
-          } catch (error) {
-            console.error(
-              `Error in async mutation for key ${String(key)}:`,
-              error,
-            );
-            throw error;
-          }
-        }
-
-        // Process the synchronous result
-        return this.#afterMutate(key, result);
-      } catch (error) {
-        // Log errors from the synchronous mutator
-        console.error(`Error in mutation for key ${String(key)}:`, error);
-
-        // Rethrow the error to the caller
-        throw error;
-      }
-    } finally {
-      // Ensure the collection is unlocked
-      this._locked = false;
+    const value = await this.get(key);
+    if (value === undefined) {
+      throw new Error(`cannot mutate ${key} - not found`);
     }
+    const result = await mutator(value, this.coll);
+
+    return this.#afterMutate(key, result);
   }
 
   /**
@@ -276,55 +214,23 @@ export class SunMemoryAsync<R, K>
     key: K,
     result: R | void | MutationAction,
   ): Promise<R | undefined> {
-    try {
-      // Handle special actions
-      if (result && typeof result === 'object' && 'action' in result) {
-        // Queue the action to be processed after unlocking
-        this.#queueEvent(() => {
-          try {
-            this.#processAction(result as MutationAction);
-          } catch (error) {
-            console.error(
-              `Error in processAction for key ${String(key)}:`,
-              error,
-            );
-          }
-        });
+    this._locked = false;
+    if (!isMutatorAction(result)) {
+      await this.set(key, result);
+      return this.get(key);
+    }
 
-        // For DELETE action, return undefined
-        if ((result as MutationAction).action === MUTATION_ACTIONS.DELETE) {
+    switch (result.action) {
+      case MUTATION_ACTIONS.DELETE:
+        {
+          await this.delete(key);
           return undefined;
         }
+        break;
 
-        // For NOOP action, return the current value
-        if ((result as MutationAction).action === MUTATION_ACTIONS.NOOP) {
-          return this.get(key);
-        }
-
-        // For other actions, return the current value
+      case MUTATION_ACTIONS.NOOP: {
         return this.get(key);
       }
-
-      // Set the result if it's not undefined
-      if (result !== undefined) {
-        // Queue the set operation to be processed after unlocking
-        this.#queueEvent(() => {
-          try {
-            this.set(key, result as R);
-          } catch (error) {
-            console.error(`Error in queued set for key ${String(key)}:`, error);
-          }
-        });
-      }
-
-      // Return the result (will be the current value until the queued set is processed)
-      return (result as R) || this.get(key);
-    } catch (error) {
-      // Log errors in afterMutate
-      console.error(`Error in afterMutate for key ${String(key)}:`, error);
-
-      // Rethrow the error
-      throw error;
     }
   }
 }

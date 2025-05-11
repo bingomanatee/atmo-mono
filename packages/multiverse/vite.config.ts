@@ -13,10 +13,18 @@ export default defineConfig({
     emptyOutDir: true,
     sourcemap: true,
     rollupOptions: {
-      external: [],
+      external: ['@wonderlandlabs/atmo-utils'],
       output: {
         preserveModules: true,
       },
+    },
+  },
+  resolve: {
+    alias: {
+      '@wonderlandlabs/atmo-utils': resolve(
+        __dirname,
+        '../atmo-utils/dist/index.js',
+      ),
     },
   },
   test: {

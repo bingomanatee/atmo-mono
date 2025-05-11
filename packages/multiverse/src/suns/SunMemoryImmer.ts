@@ -1,9 +1,9 @@
-import type { SunIF } from '../types.multiverse';
-import type { CollSyncIF } from '../types.coll';
-import { isObj } from '../typeguards.multiverse';
-import { SunBase } from './SunFBase.ts';
-import { MUTATION_ACTIONS, MutationAction } from '../constants';
 import { produce } from 'immer';
+import { MUTATION_ACTIONS } from '../constants';
+import { isMutatorAction, isObj } from '../typeguards.multiverse';
+import type { CollSyncIF } from '../types.coll';
+import type { MutationAction, SunIF } from '../types.multiverse';
+import { SunBase } from './SunFBase.ts';
 
 // Helper function for tests
 const delay = (fn: () => void) => setTimeout(fn, 0);
@@ -32,15 +32,15 @@ class SimpleEventEmitter {
 /**
  * A Sun implementation that uses Immer for immutable state management
  */
-export class SunMemoryImmer<R, K>
-  extends SunBase<R, K, CollSyncIF<R, K>>
-  implements SunIF<R, K>
+export class SunMemoryImmer<RecordType, KeyType>
+  extends SunBase<RecordType, KeyType, CollSyncIF<RecordType, KeyType>>
+  implements SunIF<RecordType, KeyType>
 {
-  #data: Map<K, R>;
+  #data: Map<KeyType, RecordType>;
   #locked: boolean = false;
   #event$: SimpleEventEmitter = new SimpleEventEmitter();
 
-  constructor(coll: CollSyncIF<R, K>) {
+  constructor(coll: CollSyncIF<RecordType, KeyType>) {
     super();
     this.coll = coll;
     this.#data = new Map();
@@ -65,15 +65,15 @@ export class SunMemoryImmer<R, K>
     this.#event$.next(event);
   }
 
-  get(key: K) {
+  get(key: KeyType) {
     return this.#data.get(key);
   }
 
-  has(key: K) {
+  has(key: KeyType) {
     return this.#data.has(key);
   }
 
-  set(key: K, record: R) {
+  set(key: KeyType, record: RecordType) {
     // If the collection is locked, queue the set operation
     if (this.#locked) {
       this.#queueEvent(() => this.set(key, record));
@@ -109,7 +109,7 @@ export class SunMemoryImmer<R, K>
         currentRecord: existing,
         inputRecord: input,
       });
-      this.#data.set(key, filtered as R);
+      this.#data.set(key, filtered as RecordType);
     } else this.#data.set(key, input);
   }
 
@@ -121,12 +121,16 @@ export class SunMemoryImmer<R, K>
    * @returns The mutated record or undefined if deleted
    */
   mutate(
-    key: K,
+    key: KeyType,
     mutator: (
-      draft: R | undefined,
-      collection: CollSyncIF<R, K>,
-    ) => R | void | MutationAction | Promise<R | void | MutationAction>,
-  ): R | undefined {
+      draft: RecordType | undefined,
+      collection: CollSyncIF<RecordType, KeyType>,
+    ) =>
+      | RecordType
+      | void
+      | MutationAction
+      | Promise<RecordType | void | MutationAction>,
+  ): RecordType | undefined {
     // Lock the collection during mutation
     this.#locked = true;
 
@@ -135,9 +139,13 @@ export class SunMemoryImmer<R, K>
 
       // Apply the mutator function
       const result = produce(existing, (draft) => mutator(draft, this.coll));
-
-      // Process the result
-      return this.#afterMutate(key, result);
+      this.#locked = false;
+      if (isMutatorAction(result)) {
+        return this.#afterMutate(key, result);
+      } else {
+        this.set(key, result);
+        return this.get(key);
+      }
     } finally {
       // Unlock the collection
       this.#locked = false;
@@ -151,37 +159,18 @@ export class SunMemoryImmer<R, K>
    * @returns The final record value or undefined if deleted
    * @private
    */
-  #afterMutate(key: K, result: R | void | MutationAction): R | undefined {
+  #afterMutate(
+    key: KeyType,
+    result: RecordType | void | MutationAction,
+  ): RecordType | undefined {
     // Handle special actions
-    if (result && typeof result === 'object' && 'action' in result) {
-      // Queue the action to be processed after unlocking
-      this.#queueEvent(() => this.#processAction(result as MutationAction));
-
-      // For DELETE action, return undefined
-      if ((result as MutationAction).action === MUTATION_ACTIONS.DELETE) {
-        return undefined;
-      }
-
-      // For NOOP action, return the current value
-      if ((result as MutationAction).action === MUTATION_ACTIONS.NOOP) {
-        return this.get(key);
-      }
-
-      // For other actions, return the current value
-      return this.get(key);
+    if (isMutatorAction(result)) {
+      return this.#processAction(result, key);
     }
-
-    // Set the result if it's not undefined
-    if (result !== undefined) {
-      // Queue the set operation to be processed after unlocking
-      this.#queueEvent(() => this.set(key, result as R));
-    }
-
-    // Return the result (will be the current value until the queued set is processed)
-    return (result as R) || this.get(key);
+    return this.get(key);
   }
 
-  delete(key: K) {
+  delete(key: KeyType) {
     // If the collection is locked, queue the delete operation
     if (this.#locked) {
       this.#queueEvent(() => this.delete(key));
@@ -205,7 +194,7 @@ export class SunMemoryImmer<R, K>
    * Get all keys in the collection
    * @returns An array of keys
    */
-  keys(): K[] {
+  keys(): KeyType[] {
     return Array.from(this.#data.keys());
   }
 
@@ -214,8 +203,8 @@ export class SunMemoryImmer<R, K>
    * @param query - The query to match against
    * @returns An array of records matching the query
    */
-  find(query: any): R[] {
-    const results: R[] = [];
+  find(query: any): RecordType[] {
+    const results: RecordType[] = [];
 
     // Iterate through all records
     for (const [key, record] of this.#data.entries()) {
@@ -250,18 +239,24 @@ export class SunMemoryImmer<R, K>
    * @param action - The action to process
    * @private
    */
-  #processAction(action: MutationAction): void {
-    if (action.action === MUTATION_ACTIONS.DELETE) {
-      if (action.key !== undefined) {
-        // Use the key from the action to delete the record
-        this.delete(action.key);
-      }
-    } else if (action.action === MUTATION_ACTIONS.LOCK) {
-      this.#locked = true;
-    } else if (action.action === MUTATION_ACTIONS.UNLOCK) {
-      this.#locked = false;
+  #processAction(action: MutationAction, key: KeyType): void {
+    switch (action.action) {
+      case MUTATION_ACTIONS.DELETE:
+        if (action.key !== undefined) {
+          // Use the key from the action to delete the record
+          this.delete(action.key);
+        }
+        break;
+      case MUTATION_ACTIONS.LOCK:
+        this.#locked = true;
+        break;
+      case MUTATION_ACTIONS.UNLOCK:
+        this.#locked = false;
+        break;
+      case MUTATION_ACTIONS.NOOP:
+        return this.get(key);
+        break;
     }
-    // NOOP action does nothing
   }
 }
 

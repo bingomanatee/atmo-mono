@@ -3,8 +3,8 @@ import { Multiverse } from './Multiverse.ts';
 import type { DataRecord } from './types/types.multiverse.ts';
 import { FIELD_TYPES } from './constants.ts';
 import { Universe } from './Universe.ts';
-import { CollSync } from './CollSync.ts';
-import { CollAsync } from './CollAsync.ts';
+import { CollSync } from './collections/CollSync.ts';
+import { CollAsync } from './collections/CollAsync.ts';
 import { SchemaUniversal } from './SchemaUniversal.ts';
 import { SchemaLocal } from './SchemaLocal.ts';
 

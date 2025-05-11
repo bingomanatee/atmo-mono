@@ -20,6 +20,7 @@
     "prepublishOnly": "yarn build:all"
   },
   "dependencies": {
+    "@wonderlandlabs/atmo-utils": "workspace:*",
     "immer": "^10.0.3",
     "rxjs": "^7.8.1"
   },

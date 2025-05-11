@@ -3,7 +3,7 @@ import { SunMemoryAsync } from './SunMemoryAsync.ts';
 import { FIELD_TYPES, MUTATION_ACTIONS } from '../constants';
 import type { CollAsyncIF } from '../types.coll';
 import { SchemaLocal } from '../SchemaLocal';
-import { CollAsync } from '../CollAsync';
+import { CollAsync } from '../collections/CollAsync.ts';
 import { Universe } from '../Universe';
 import type { PostParams } from '../type.schema';
 

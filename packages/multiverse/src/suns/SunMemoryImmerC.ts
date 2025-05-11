@@ -1,7 +1,7 @@
-import type { SunIF } from '../types.multiverse';
+import type { MutationAction, SunIF } from '../types.multiverse';
 import type { CollSyncIF } from '../types.coll';
 import { isObj, isPromiseLike } from '../typeguards.multiverse';
-import { MUTATION_ACTIONS, MutationAction } from '../constants';
+import { MUTATION_ACTIONS } from '../constants';
 import { SunMemory } from './SunMemory';
 
 /**

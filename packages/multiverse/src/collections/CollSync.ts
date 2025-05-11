@@ -4,9 +4,9 @@ import type {
   SunIF,
   UniverseIF,
   UniverseName,
-} from './types.multiverse';
-import memorySunF from './suns/SunMemory.ts';
-import type { CollIF, CollSyncIF } from './types.coll';
+} from '../types.multiverse.ts';
+import memorySunF from '../suns/SunMemory.ts';
+import type { CollIF, CollSyncIF } from '../types.coll.ts';
 import { asError } from '@wonderlandlabs/atmo-utils/src';
 
 type CollParms<RecordType, KeyType = string> = {
@@ -76,10 +76,10 @@ export class CollSync<RecordType, KeyType = string>
    * @returns An array of records matching the query
    * @throws Error if the engine does not implement find
    */
-  find(query: any): RecordType[] {
+  find(...query: any[]): Map<KeyType, RecordType> {
     // If the engine has a find method, use it
     if (typeof this.#engine.find === 'function') {
-      return this.#engine.find(query);
+      return this.#engine.find(...query);
     }
 
     // Throw an error if find is not implemented
@@ -87,10 +87,9 @@ export class CollSync<RecordType, KeyType = string>
   }
 
   /**
-   * Map over each record in the collection and apply a transformation
+   * Map over each record in the collection return the updated items
    * @param mapper - Function to transform each record
-   * @param noTransaction - If true, changes are applied immediately without transaction support
-   * @returns The number of records processed
+   * @returns a Map of record
    * @throws MapError if any mapper function throws and noTransaction is false
    */
   map(

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { SunMemoryImmerC } from './SunMemoryImmerC';
-import { CollSync } from '../CollSync';
+import { CollSync } from '../collections/CollSync.ts';
 import { SchemaLocal } from '../SchemaLocal';
 import { Universe } from '../Universe';
 import { FIELD_TYPES, MUTATION_ACTIONS } from '../constants';

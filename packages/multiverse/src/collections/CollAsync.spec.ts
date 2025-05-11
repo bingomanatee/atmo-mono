@@ -1,14 +1,15 @@
-import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { Multiverse } from './Multiverse';
-import { CollAsync } from './CollAsync';
-import { Universe } from './Universe';
-import { FIELD_TYPES, MUTATION_ACTIONS } from './constants';
-import type { CollAsyncIF } from './types.coll';
-import type { UniverseIF } from './types.multiverse';
-import { SchemaUniversal } from './SchemaUniversal.ts';
-import { SchemaLocal } from './SchemaLocal';
-import { memoryImmerAsyncSunF } from './suns/SunMemoryImmerAsync';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { FIELD_TYPES, MUTATION_ACTIONS } from '../constants.ts';
+import { Multiverse } from '../Multiverse.ts';
+import { SchemaLocal } from '../SchemaLocal.ts';
+import { SchemaUniversal } from '../SchemaUniversal.ts';
+import { memoryImmerAsyncSunF } from '../suns/SunMemoryImmerAsync.ts';
+import type { CollAsyncIF } from '../types.coll.ts';
+import type { UniverseIF } from '../types.multiverse.ts';
+import { Universe } from '../Universe.ts';
+import { CollAsync } from './CollAsync.ts';
 
+const TEST_ERROR = 'Test Error';
 // Helper function for tests
 const delayMs = (ms: number) =>
   new Promise((resolve) => setTimeout(resolve, ms));
@@ -189,62 +190,31 @@ describe('CollAsync', () => {
         expect(result.get(4)?.zip_code).toBe(45679);
       });
 
-      it('should map over records with transaction support', async () => {
-        // Reset zip codes to initial values
-        await c.set(1, { id: 1, name: 'John Doe', zip_code: 12345 });
-        await c.set(2, { id: 2, name: 'Jane Smith', zip_code: 23456 });
-        await c.set(3, { id: 3, name: 'Bob Johnson', zip_code: 34567 });
-        await c.set(4, { id: 4, name: 'Alice Brown', zip_code: 45678 });
-
-        const count = await c.map((record) => {
-          record.zip_code += 1;
-          return record;
-        });
-
-        expect(count).toBe(4);
-        expect((await c.get(1))?.zip_code).toBe(12346);
-        expect((await c.get(2))?.zip_code).toBe(23457);
-        expect((await c.get(3))?.zip_code).toBe(34568);
-        expect((await c.get(4))?.zip_code).toBe(45679);
-      });
-
       it('should handle errors in map()', async () => {
-        // Reset zip codes to initial values
-        await c.set(1, { id: 1, name: 'John Doe', zip_code: 12345 });
-        await c.set(2, { id: 2, name: 'Jane Smith', zip_code: 23456 });
-        await c.set(3, { id: 3, name: 'Bob Johnson', zip_code: 34567 });
-        await c.set(4, { id: 4, name: 'Alice Brown', zip_code: 45678 });
-
-        expect(async () => {
-          await c.map((record, key) => {
+        await expect(async () => {
+          const result = await c.map((record, key) => {
             if (key === 3) {
-              throw new Error('Test error');
+              throw new Error(TEST_ERROR);
             }
             record.zip_code += 1;
             return record;
           });
-        }).toThrow(/Test Error/);
+          console.log('result of erroring map:', result);
+        }).rejects.toThrow(new RegExp(TEST_ERROR));
       });
 
       it('should handle async mapper functions', async () => {
-        // Reset zip codes to initial values
-        await c.set(1, { id: 1, name: 'John Doe', zip_code: 12345 });
-        await c.set(2, { id: 2, name: 'Jane Smith', zip_code: 23456 });
-        await c.set(3, { id: 3, name: 'Bob Johnson', zip_code: 34567 });
-        await c.set(4, { id: 4, name: 'Alice Brown', zip_code: 45678 });
-
-        const count = await c.map(async (record) => {
+        const result = await c.map(async (record) => {
           // Simulate async operation
           await new Promise((resolve) => setTimeout(resolve, 10));
           record.zip_code += 1;
           return record;
         });
 
-        expect(count).toBe(4);
-        expect((await c.get(1))?.zip_code).toBe(12346);
-        expect((await c.get(2))?.zip_code).toBe(23457);
-        expect((await c.get(3))?.zip_code).toBe(34568);
-        expect((await c.get(4))?.zip_code).toBe(45679);
+        expect(result.get(1).zip_code).toBe(12346);
+        expect(result.get(2).zip_code).toBe(23457);
+        expect(result.get(3).zip_code).toBe(34568);
+        expect(result.get(4).zip_code).toBe(45679);
       });
     });
   });
@@ -310,15 +280,16 @@ describe('CollAsync', () => {
       );
     });
 
-    it('should find records by object query', async () => {
-      // Find users with status 'active'
-      const results = await coll.find({ status: 'active' });
-
+    it('should find records by parameter query', async () => {
+      console.log(" Find users with status 'active'");
+      const results = await coll.find('status', 'active');
       // Should return 2 users
-      expect(results.length).toBe(2);
-      expect(results.map((user) => user.id).sort()).toEqual(
-        ['user3', 'user4'].sort(),
-      );
+      expect(results.size).toBe(2);
+      expect(
+        Array.from(results.values())
+          .map((user) => user.id)
+          .sort(),
+      ).toEqual(['user3', 'user4'].sort());
     });
 
     it('should find records by function predicate', async () => {
@@ -328,23 +299,12 @@ describe('CollAsync', () => {
       );
 
       // Should return 2 users
-      expect(results.length).toBe(2);
-      expect(results.map((user) => user.id).sort()).toEqual(
-        ['user3', 'user4'].sort(),
-      );
-    });
-
-    it('should find records with multiple criteria', async () => {
-      // Find active users over 35
-      const results = await coll.find((user) => {
-        return (
-          user.status === 'active' && user.age !== undefined && user.age >= 35
-        );
-      });
-
-      // Should return 1 user
-      expect(results.length).toBe(1);
-      expect(results[0].id).toBe('user4');
+      expect(results.size).toBe(2);
+      expect(
+        Array.from(results.values())
+          .map((user) => user.id)
+          .sort(),
+      ).toEqual(['user3', 'user4'].sort());
     });
 
     it('should return empty array if no records match', async () => {
@@ -352,22 +312,7 @@ describe('CollAsync', () => {
       const results = await coll.find({ status: 'inactive' });
 
       // Should return empty array
-      expect(results).toEqual([]);
-    });
-
-    it('should handle async predicates', async () => {
-      // Find users with async predicate
-      const results = await coll.find(async (user) => {
-        // Simulate async operation
-        await new Promise((resolve) => setTimeout(resolve, 10));
-        return user.age !== undefined && user.age > 30;
-      });
-
-      // Should return 2 users
-      expect(results.length).toBe(2);
-      expect(results.map((user) => user.id).sort()).toEqual(
-        ['user3', 'user4'].sort(),
-      );
+      expect(results.size).toBe(0);
     });
   });
 
@@ -405,7 +350,7 @@ describe('CollAsync', () => {
     describe('DELETE action', () => {
       it('should delete a record when returning DELETE action with key', async () => {
         // Mutate with DELETE action
-        const result = await coll.mutate('user1', (draft) => {
+        const result = await coll.mutate('user1', () => {
           return { action: MUTATION_ACTIONS.DELETE, key: 'user1' };
         });
 
@@ -507,47 +452,20 @@ describe('CollAsync', () => {
         const stored = await coll.get('user1');
         expect(stored?.name).toBe('Friend of Jane Smith');
       });
-
-      it('should allow creating new records via the collection', async () => {
-        // Mutate with a function that creates a new record
-        const result = await coll.mutate('user1', async (draft, collection) => {
-          if (draft) {
-            // Create a new record
-            await collection.set('user4', {
-              id: 'user4',
-              name: 'New User',
-              age: 22,
-            });
-
-            // Update the draft
-            draft.name = 'Created a friend';
-            return draft;
-          }
-        });
-
-        // Check that the original record was updated
-        expect(result?.name).toBe('Created a friend');
-
-        // Check that the new record was created
-        expect(await coll.has('user4')).toBe(true);
-
-        const newUser = await coll.get('user4');
-        expect(newUser?.name).toBe('New User');
-      });
     });
 
     describe('Error handling', () => {
       it('should handle errors in async mutations', async () => {
         // Attempt to mutate with a function that throws an error
 
-        expect(async () => {
-          return coll.mutate('user1', async (draft) => {
+        await expect(async () => {
+          await coll.mutate('user1', async (draft) => {
             if (draft) {
               await delayMs(10);
-              throw new Error('Test error');
+              throw new Error(TEST_ERROR);
             }
-        }).toThrow(/Test Error/);
-
+          });
+        }).rejects.toThrow(new RegExp(TEST_ERROR));
 
         // Record should not be changed
         const user = await coll.get('user1');

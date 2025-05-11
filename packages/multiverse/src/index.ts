@@ -6,8 +6,8 @@
 // Core classes
 export { Multiverse } from './Multiverse';
 export { Universe } from './Universe';
-export { CollSync } from './CollSync';
-export { CollAsync } from './CollAsync';
+export { CollSync } from './collections/CollSync.ts';
+export { CollAsync } from './collections/CollAsync.ts';
 export { SchemaLocal } from './SchemaLocal';
 export { SchemaUniversal } from './SchemaUniversal';
 

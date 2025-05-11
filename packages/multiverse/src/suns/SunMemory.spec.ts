@@ -3,7 +3,7 @@ import { SunMemory } from './SunMemory.ts';
 import { FIELD_TYPES, MUTATION_ACTIONS } from '../constants';
 import type { CollSyncIF } from '../types.coll';
 import { SchemaLocal } from '../SchemaLocal';
-import { CollSync } from '../CollSync';
+import { CollSync } from '../collections/CollSync.ts';
 import { Universe } from '../Universe';
 import type { PostParams, FieldLocalIF } from '../type.schema';
 

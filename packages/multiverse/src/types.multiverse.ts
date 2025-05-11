@@ -1,9 +1,4 @@
-import type {
-  UnivSchemaMap,
-  DataKey,
-  DataRecord,
-  SchemaLocalIF,
-} from './type.schema';
+import type { DataKey, DataRecord, UnivSchemaMap } from './type.schema';
 import type { CollBaseIF, CollIF, CollName } from './types.coll';
 
 export type UniverseName = string;
@@ -29,7 +24,7 @@ export interface SunIF<RecordType = DataRecord, KeyType = DataKey> {
    * @param query - The query to match against
    * @returns An array of records matching the query
    */
-  find?(query: any): RecordType[] | Promise<RecordType[]>;
+  find?(...query: any[]): RecordType[] | Promise<Map<KeyType, RecordType>>;
   /**
    * Optional method to get all keys in the collection
    * @returns An array of keys
@@ -100,3 +95,15 @@ export interface MultiverseIF {
 
 export * from './type.schema';
 export * from './types.coll';
+
+/**
+ * Interface for mutation action results
+ */
+export interface MutationAction {
+  /** The action to perform */
+  action: symbol;
+  /** Optional key for the record (required for DELETE) */
+  key?: any;
+  /** Optional value for the action */
+  value?: any;
+}
