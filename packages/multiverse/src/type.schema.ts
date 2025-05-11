@@ -54,8 +54,8 @@ export type FieldLocalIF<T = any> = FieldBaseIF & {
   // this is called immediately before writing to update or generate the field
 };
 
-export type FieldLocalInputIF = FieldLocalIF | FieldTypeValue;
-export type FieldBaseInputIF = SchemaBaseInputIF | FieldTypeValue;
+export type FieldLocalInputIF = FieldLocalIF;
+export type FieldBaseInputIF = FieldBaseIF;
 export type LocalFieldRecord = Record<string, FieldLocalIF>;
 
 // ------------------- schema nodes -------------------

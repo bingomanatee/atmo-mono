@@ -1,6 +1,6 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, afterEach, vi } from 'vitest';
 import { SunMemoryAsync } from './SunMemoryAsync.ts';
-import { FIELD_TYPES } from '../constants';
+import { FIELD_TYPES, MUTATION_ACTIONS } from '../constants';
 import type { CollAsyncIF } from '../types.coll';
 import { SchemaLocal } from '../SchemaLocal';
 import { CollAsync } from '../CollAsync';
@@ -290,6 +290,273 @@ describe('SunMemoryAsync', () => {
         id: 1,
         name: 'JOHN DOE',
         lastUpdated: 'filtered',
+      });
+    });
+  });
+
+  describe('Special Actions', () => {
+    beforeEach(async () => {
+      // Set up initial data
+      await sun.set(1, { id: 1, name: 'John Doe', age: 30 });
+      await sun.set(2, { id: 2, name: 'Jane Smith', age: 25 });
+      await sun.set(3, {
+        id: 3,
+        name: 'Bob Johnson',
+        age: 40,
+        status: 'locked',
+      });
+    });
+
+    describe('DELETE action', () => {
+      it('should delete a record when returning DELETE action with key', async () => {
+        // Mutate with DELETE action
+        const result = await sun.mutate(1, (draft) => {
+          return { action: MUTATION_ACTIONS.DELETE, key: 1 };
+        });
+
+        // Result should be undefined
+        expect(result).toBeUndefined();
+
+        // Record should be deleted
+        expect(await sun.has(1)).toBe(false);
+      });
+
+      it('should delete a record using the ID from the draft', async () => {
+        // Mutate with DELETE action using ID from draft
+        const result = await sun.mutate(2, (draft) => {
+          if (draft) {
+            return { action: MUTATION_ACTIONS.DELETE, key: draft.id };
+          }
+        });
+
+        // Result should be undefined
+        expect(result).toBeUndefined();
+
+        // Record should be deleted
+        expect(await sun.has(2)).toBe(false);
+      });
+
+      it('should not delete a record if key is missing', async () => {
+        // Mutate with DELETE action but missing key
+        const result = await sun.mutate(1, (draft) => {
+          return { action: MUTATION_ACTIONS.DELETE };
+        });
+
+        // Result should be undefined (as per DELETE action)
+        expect(result).toBeUndefined();
+
+        // Record should still exist
+        expect(await sun.has(1)).toBe(true);
+      });
+    });
+
+    describe('NOOP action', () => {
+      it('should do nothing when returning NOOP action', async () => {
+        // Get the original record
+        const original = await sun.get(3);
+
+        // Mutate with NOOP action
+        const result = await sun.mutate(3, (draft) => {
+          if (draft && draft.status === 'locked') {
+            return { action: MUTATION_ACTIONS.NOOP };
+          }
+
+          // This should not be executed due to the NOOP
+          draft.name = 'Changed Name';
+          return draft;
+        });
+
+        // Result should be the original record
+        expect(result).toEqual(original);
+
+        // Record should not be changed
+        expect(await sun.get(3)).toEqual(original);
+      });
+    });
+
+    describe('Nested async mutations', () => {
+      it('should handle nested async operations', async () => {
+        // Mutate with nested async functions
+        const result = await sun.mutate(1, async (draft) => {
+          if (draft) {
+            // First async operation
+            await new Promise((resolve) => setTimeout(resolve, 10));
+            draft.name = 'First Update';
+
+            // Second async operation
+            const secondUpdate = async () => {
+              await new Promise((resolve) => setTimeout(resolve, 10));
+              return 'Second Update';
+            };
+
+            draft.name = await secondUpdate();
+
+            return draft;
+          }
+        });
+
+        // Check that the record was updated with the final value
+        expect(result?.name).toBe('Second Update');
+
+        // Check that the stored record was updated
+        const stored = await sun.get(1);
+        expect(stored?.name).toBe('Second Update');
+      });
+    });
+
+    describe('Collection locking', () => {
+      it('should queue set operations during mutation', async () => {
+        // Create a spy on the set method
+        const setSpy = vi.spyOn(sun, 'set');
+
+        // Mutate with a function that tries to set another record
+        await sun.mutate(1, async (draft, collection) => {
+          if (draft) {
+            // Try to set another record during mutation
+            await collection.set(4, { id: 4, name: 'New User', age: 22 });
+
+            // Update the draft
+            draft.name = 'Updated Name';
+            return draft;
+          }
+        });
+
+        // Check that the original record was updated
+        const updated = await sun.get(1);
+        expect(updated?.name).toBe('Updated Name');
+
+        // Check that the new record was added
+        expect(await sun.has(4)).toBe(true);
+        const newUser = await sun.get(4);
+        expect(newUser?.name).toBe('New User');
+
+        // Check that set was called twice (once for the mutation result, once for the queued operation)
+        expect(setSpy).toHaveBeenCalledTimes(2);
+      });
+
+      it('should queue delete operations during mutation', async () => {
+        // Create a spy on the delete method
+        const deleteSpy = vi.spyOn(sun, 'delete');
+
+        // Mutate with a function that tries to delete another record
+        await sun.mutate(1, async (draft, collection) => {
+          if (draft) {
+            // Try to delete another record during mutation
+            await collection.delete(2);
+
+            // Update the draft
+            draft.name = 'Updated Name';
+            return draft;
+          }
+        });
+
+        // Check that the original record was updated
+        const updated = await sun.get(1);
+        expect(updated?.name).toBe('Updated Name');
+
+        // Check that the other record was deleted
+        expect(await sun.has(2)).toBe(false);
+
+        // Check that delete was called once for the queued operation
+        expect(deleteSpy).toHaveBeenCalledTimes(1);
+      });
+    });
+  });
+
+  describe('Error handling', () => {
+    let consoleSpy: any;
+
+    beforeEach(async () => {
+      // Set up initial data
+      await sun.set(1, { id: 1, name: 'John Doe', age: 30 });
+
+      // Spy on console.error
+      consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    });
+
+    afterEach(() => {
+      consoleSpy.mockRestore();
+    });
+
+    describe('Asynchronous error handling', () => {
+      it('should catch and rethrow errors from async mutators', async () => {
+        // Define a mutator that throws an error
+        const errorMutator = async () => {
+          await new Promise((resolve) => setTimeout(resolve, 10));
+          throw new Error('Test error in async mutator');
+        };
+
+        // Expect the mutate call to throw
+        await expect(sun.mutate(1, errorMutator)).rejects.toThrow(
+          'Test error in async mutator',
+        );
+
+        // Verify that console.error was called
+        expect(consoleSpy).toHaveBeenCalled();
+
+        // Verify that the original record is unchanged
+        const record = await sun.get(1);
+        expect(record).toEqual({
+          id: 1,
+          name: 'John Doe',
+          age: 30,
+        });
+      });
+
+      it('should continue processing mutations after an error', async () => {
+        // First try a mutation that throws
+        try {
+          await sun.mutate(1, async () => {
+            await new Promise((resolve) => setTimeout(resolve, 10));
+            throw new Error('Test error');
+          });
+        } catch (error) {
+          // Ignore the error
+        }
+
+        // Then try a valid mutation
+        await sun.mutate(1, async (draft) => {
+          if (draft) {
+            await new Promise((resolve) => setTimeout(resolve, 10));
+            draft.name = 'Updated Name';
+            return draft;
+          }
+        });
+
+        // Verify that the second mutation worked
+        const record = await sun.get(1);
+        expect(record?.name).toBe('Updated Name');
+      });
+
+      it('should handle errors in nested async operations', async () => {
+        // Define a mutator with nested async operations that throw
+        const errorMutator = async (draft: any) => {
+          if (draft) {
+            // First async operation
+            await new Promise((resolve) => setTimeout(resolve, 10));
+
+            // Second async operation that throws
+            const nestedOperation = async () => {
+              await new Promise((resolve) => setTimeout(resolve, 10));
+              throw new Error('Nested error');
+            };
+
+            await nestedOperation();
+
+            // This should not be executed
+            draft.name = 'Updated Name';
+            return draft;
+          }
+        };
+
+        // Expect the mutate call to throw
+        await expect(sun.mutate(1, errorMutator)).rejects.toThrow(
+          'Nested error',
+        );
+
+        // Verify that the original record is unchanged
+        const record = await sun.get(1);
+        expect(record?.name).toBe('John Doe');
       });
     });
   });

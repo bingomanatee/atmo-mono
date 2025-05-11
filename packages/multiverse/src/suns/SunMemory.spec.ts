@@ -1,6 +1,6 @@
-import { describe, expect, it, beforeEach, vi } from 'vitest';
+import { describe, expect, it, beforeEach, afterEach, vi } from 'vitest';
 import { SunMemory } from './SunMemory.ts';
-import { FIELD_TYPES } from '../constants';
+import { FIELD_TYPES, MUTATION_ACTIONS } from '../constants';
 import type { CollSyncIF } from '../types.coll';
 import { SchemaLocal } from '../SchemaLocal';
 import { CollSync } from '../CollSync';
@@ -263,6 +263,246 @@ describe('SunMemory', () => {
         id: 1,
         name: 'JOHN DOE',
         lastUpdated: 'filtered',
+      });
+    });
+  });
+
+  describe('Special Actions', () => {
+    beforeEach(() => {
+      // Set up initial data
+      sun.set(1, { id: 1, name: 'John Doe', age: 30 });
+      sun.set(2, { id: 2, name: 'Jane Smith', age: 25 });
+      sun.set(3, { id: 3, name: 'Bob Johnson', age: 40, status: 'locked' });
+    });
+
+    describe('DELETE action', () => {
+      it('should delete a record when returning DELETE action with key', () => {
+        // Mutate with DELETE action
+        const result = sun.mutate(1, (draft) => {
+          return { action: MUTATION_ACTIONS.DELETE, key: 1 };
+        });
+
+        // Result should be undefined
+        expect(result).toBeUndefined();
+
+        // Record should be deleted
+        expect(sun.has(1)).toBe(false);
+      });
+
+      it('should delete a record using the ID from the draft', () => {
+        // Mutate with DELETE action using ID from draft
+        const result = sun.mutate(2, (draft) => {
+          if (draft) {
+            return { action: MUTATION_ACTIONS.DELETE, key: draft.id };
+          }
+        });
+
+        // Result should be undefined
+        expect(result).toBeUndefined();
+
+        // Record should be deleted
+        expect(sun.has(2)).toBe(false);
+      });
+
+      it('should not delete a record if key is missing', () => {
+        // Mutate with DELETE action but missing key
+        const result = sun.mutate(1, (draft) => {
+          return { action: MUTATION_ACTIONS.DELETE };
+        });
+
+        // Result should be undefined (as per DELETE action)
+        expect(result).toBeUndefined();
+
+        // Record should still exist
+        expect(sun.has(1)).toBe(true);
+      });
+    });
+
+    describe('NOOP action', () => {
+      it('should do nothing when returning NOOP action', () => {
+        // Get the original record
+        const original = sun.get(3);
+
+        // Mutate with NOOP action
+        const result = sun.mutate(3, (draft) => {
+          if (draft && draft.status === 'locked') {
+            return { action: MUTATION_ACTIONS.NOOP };
+          }
+
+          // This should not be executed due to the NOOP
+          draft.name = 'Changed Name';
+          return draft;
+        });
+
+        // Result should be the original record
+        expect(result).toEqual(original);
+
+        // Record should not be changed
+        expect(sun.get(3)).toEqual(original);
+      });
+    });
+
+    describe('Async mutations', () => {
+      it('should handle async mutations that return a value', async () => {
+        // Mutate with async function
+        sun.mutate(1, async (draft) => {
+          if (draft) {
+            // Simulate async operation
+            await new Promise((resolve) => setTimeout(resolve, 10));
+
+            // Update the draft
+            draft.name = 'Updated Async';
+            draft.age = 31;
+
+            return draft;
+          }
+        });
+
+        // Wait for the async operation to complete
+        await new Promise((resolve) => setTimeout(resolve, 50));
+
+        // Check that the record was updated
+        const updated = sun.get(1);
+        expect(updated?.name).toBe('Updated Async');
+        expect(updated?.age).toBe(31);
+      });
+
+      it('should handle async mutations that return DELETE action', async () => {
+        // Mutate with async function returning DELETE
+        sun.mutate(2, async (draft) => {
+          if (draft) {
+            // Simulate async operation
+            await new Promise((resolve) => setTimeout(resolve, 10));
+
+            return { action: MUTATION_ACTIONS.DELETE, key: draft.id };
+          }
+        });
+
+        // Wait for the async operation to complete
+        await new Promise((resolve) => setTimeout(resolve, 50));
+
+        // Check that the record was deleted
+        expect(sun.has(2)).toBe(false);
+      });
+    });
+
+    describe('Collection locking', () => {
+      it('should queue set operations during mutation', () => {
+        // Create a spy on the set method
+        const setSpy = vi.spyOn(sun, 'set');
+
+        // Mutate with a function that tries to set another record
+        sun.mutate(1, (draft, collection) => {
+          if (draft) {
+            // Try to set another record during mutation
+            collection.set(4, { id: 4, name: 'New User', age: 22 });
+
+            // Update the draft
+            draft.name = 'Updated Name';
+            return draft;
+          }
+        });
+
+        // Check that the original record was updated
+        expect(sun.get(1)?.name).toBe('Updated Name');
+
+        // Check that the new record was added (after the mutation completed)
+        expect(sun.has(4)).toBe(true);
+        expect(sun.get(4)?.name).toBe('New User');
+
+        // Check that set was called twice (once for the mutation result, once for the queued operation)
+        expect(setSpy).toHaveBeenCalledTimes(2);
+      });
+
+      it('should queue delete operations during mutation', () => {
+        // Create a spy on the delete method
+        const deleteSpy = vi.spyOn(sun, 'delete');
+
+        // Mutate with a function that tries to delete another record
+        sun.mutate(1, (draft, collection) => {
+          if (draft) {
+            // Try to delete another record during mutation
+            collection.delete(2);
+
+            // Update the draft
+            draft.name = 'Updated Name';
+            return draft;
+          }
+        });
+
+        // Check that the original record was updated
+        expect(sun.get(1)?.name).toBe('Updated Name');
+
+        // Check that the other record was deleted (after the mutation completed)
+        expect(sun.has(2)).toBe(false);
+
+        // Check that delete was called once for the queued operation
+        expect(deleteSpy).toHaveBeenCalledTimes(1);
+      });
+    });
+  });
+
+  describe('Error handling', () => {
+    let consoleSpy: any;
+
+    beforeEach(() => {
+      // Set up initial data
+      sun.set(1, { id: 1, name: 'John Doe', age: 30 });
+
+      // Spy on console.error
+      consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    });
+
+    afterEach(() => {
+      consoleSpy.mockRestore();
+    });
+
+    describe('Synchronous error handling', () => {
+      it('should catch and rethrow errors from synchronous mutators', () => {
+        // Define a mutator that throws an error
+        const errorMutator = () => {
+          throw new Error('Test error in sync mutator');
+        };
+
+        // Expect the mutate call to throw
+        expect(() => sun.mutate(1, errorMutator)).toThrow(
+          'Test error in sync mutator',
+        );
+
+        // Verify that console.error was called
+        expect(consoleSpy).toHaveBeenCalled();
+
+        // Verify that the original record is unchanged
+        expect(sun.get(1)).toEqual({
+          id: 1,
+          name: 'John Doe',
+          age: 30,
+        });
+      });
+
+      it('should continue processing mutations after an error', async () => {
+        // First try a mutation that throws
+        try {
+          sun.mutate(1, () => {
+            throw new Error('Test error');
+          });
+        } catch (error) {
+          // Ignore the error
+        }
+
+        // Then try a valid mutation
+        sun.mutate(1, (draft) => {
+          if (draft) {
+            draft.name = 'Updated Name';
+            return draft;
+          }
+        });
+
+        // Wait for the event queue to be processed
+        await new Promise((resolve) => setTimeout(resolve, 50));
+
+        // Verify that the second mutation worked
+        expect(sun.get(1)?.name).toBe('Updated Name');
       });
     });
   });

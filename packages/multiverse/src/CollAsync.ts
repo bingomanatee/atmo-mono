@@ -6,7 +6,7 @@ import type {
   UniverseName,
 } from './types.multiverse';
 import sunMemoryAsyncF from './suns/SunMemoryAsync.ts';
-import type { CollIF, CollSyncIF } from './types.coll';
+import type { CollIF } from './types.coll';
 
 type CollParms<RecordType, KeyType = string> = {
   name: string;
@@ -46,6 +46,189 @@ export class CollAsync<RecordType, KeyType = string>
 
   async set(key: KeyType, value: RecordType) {
     this.#engine.set(key, value);
+  }
+
+  async mutate(
+    key: KeyType,
+    mutator: (
+      draft: RecordType | undefined,
+      collection: CollAsyncIF<RecordType, KeyType>,
+    ) => RecordType | void | any | Promise<RecordType | void | any>,
+  ): Promise<RecordType | undefined> {
+    if (this.#engine.mutate) {
+      return this.#engine.mutate(key, (draft) => mutator(draft, this));
+    } else {
+      // Fallback for engines that don't support mutate
+      const existing = await this.get(key);
+      if (existing) {
+        const result =
+          (await Promise.resolve(mutator(existing, this))) || existing;
+        if (result) {
+          await this.set(key, result);
+        }
+        return result;
+      }
+      console.warn(`cannot mutate non-existent record ${key} in ${this.name}`);
+      return undefined;
+    }
+  }
+
+  /**
+   * Find records matching a query
+   * The implementation of this method is engine-dependent
+   * @param query - The query to match against
+   * @returns A promise that resolves to an array of records matching the query
+   * @throws Error if the engine does not implement find
+   */
+  async find(query: any): Promise<RecordType[]> {
+    // If the engine has a find method, use it
+    if (typeof this.#engine.find === 'function') {
+      return this.#engine.find(query);
+    }
+
+    // Throw an error if find is not implemented
+    throw new Error(
+      `Find method not implemented for engine in collection ${this.name}`,
+    );
+  }
+
+  /**
+   * Iterate over each record in the collection
+   * @param callback - Function to call for each record
+   * @returns A promise that resolves when all callbacks have been called
+   */
+  async each(
+    callback: (
+      record: RecordType,
+      key: KeyType,
+      collection: CollAsyncIF<RecordType, KeyType>,
+    ) => void | Promise<void>,
+  ): Promise<void> {
+    // If the engine has an each method, use it
+    if (typeof this.#engine.each === 'function') {
+      await this.#engine.each((record, key) => callback(record, key, this));
+      return;
+    }
+
+    // Fallback implementation using keys
+    if (typeof this.#engine.keys === 'function') {
+      const keys = await this.#engine.keys();
+
+      // Process all keys in parallel
+      await Promise.all(
+        keys.map(async (key) => {
+          const record = await this.get(key);
+          if (record !== undefined) {
+            await Promise.resolve(callback(record, key, this));
+          }
+        }),
+      );
+
+      return;
+    }
+
+    // Throw an error if neither each nor keys is implemented
+    throw new Error(`Each method not implemented for collection ${this.name}`);
+  }
+
+  /**
+   * Get the number of records in the collection
+   * @returns A promise that resolves to the number of records
+   */
+  async count(): Promise<number> {
+    // If the engine has a count method, use it
+    if (typeof this.#engine.count === 'function') {
+      return this.#engine.count();
+    }
+
+    // Fallback implementation using keys
+    if (typeof this.#engine.keys === 'function') {
+      const keys = await this.#engine.keys();
+      return keys.length;
+    }
+
+    // Throw an error if neither count nor keys is implemented
+    throw new Error(
+      `Count method not implemented for collection ${this.name} no each or keys method in engine`,
+    );
+  }
+
+  /**
+   * Map over each record in the collection and apply a transformation
+   * @param mapper - Function to transform each record
+   * @param noTransaction - If true, changes are applied immediately without transaction support
+   * @returns A promise that resolves to the number of records processed
+   * @throws MapError if any mapper function throws and noTransaction is false
+   */
+  async map(
+    mapper: (
+      record: RecordType,
+      key: KeyType,
+      collection: CollAsyncIF<RecordType, KeyType>,
+    ) => Promise<RecordType>,
+  ): Promise<number> {
+    // If the engine has a map method, use it
+    if (typeof this.#engine.map === 'function') {
+      return this.#engine.map((record, key) => mapper(record, key, this));
+    }
+    if (!(typeof this.#engine.keys === 'function')) {
+      throw new Error(
+        `each not implemented in ${this.name}; engine has no keys or map function`,
+      );
+    }
+
+    const keys = await this.#engine.keys();
+
+    // If noTransaction is true, apply changes immediately
+    if (noTransaction) {
+      try {
+        const map: Map<KeyType, RecordType> = new Map();
+
+        // Then apply the mapper function to each record
+        for (const key of keys) {
+          let record;
+          try {
+            record = await this.get(key);
+            if (record === undefined) continue;
+            const result = await mapper(record, key, this);
+            map.set(key, result);
+          } catch (error) {
+            // Create a MapError with additional information
+            const mapError = new Error(
+              `Error in map function: ${error.message}`,
+            ) as any;
+            mapError.name = 'MapError';
+            mapError.originalError = error;
+            mapError.successCount = map.size;
+            mapError.record = record;
+            mapError.key = key;
+
+            throw mapError;
+          }
+        }
+      } catch (error) {
+        // Re-throw the error
+        throw error;
+      }
+    }
+
+    // If noTransaction is false, collect all changes and apply them atomically
+    const newRecords: RecordType = await Promise.all(
+      keys.map(async (key) => {
+        const record = await this.get(key);
+        if (!record) return undefined;
+        return mapper(record, key, this);
+      }),
+    );
+    return Array.from(newRecords).reduce(
+      (m: Map<string, RecordType>, record: RecordType, index: number) => {
+        const key = keys[index]!;
+        // @ts-ignore
+        m.set(key, record);
+        return m;
+      },
+      new Map(),
+    );
   }
 
   async send(key: KeyType, target: UniverseName) {

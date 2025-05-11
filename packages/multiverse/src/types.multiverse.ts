@@ -14,6 +14,59 @@ export interface SunIF<RecordType = DataRecord, KeyType = DataKey> {
   delete(key: KeyType): any;
   clear(): any;
   has(key: KeyType): any;
+  /**
+   * Optional method to mutate a record
+   * @param key - The key of the record to mutate
+   * @param mutator - A function that accepts the previous record (or undefined) and returns a new record
+   * @returns The mutated record or undefined if deleted
+   */
+  mutate?(
+    key: KeyType,
+    mutator: (draft: RecordType | undefined) => RecordType | void | any,
+  ): any;
+  /**
+   * Optional method to find records matching a query
+   * @param query - The query to match against
+   * @returns An array of records matching the query
+   */
+  find?(query: any): RecordType[] | Promise<RecordType[]>;
+  /**
+   * Optional method to get all keys in the collection
+   * @returns An array of keys
+   */
+  keys?(): KeyType[] | Promise<KeyType[]>;
+  /**
+   * Iterate over each record in the collection
+   * @param callback - Function to call for each record
+   * @returns void for sync collections, Promise<void> for async collections
+   */
+  each(
+    callback: (
+      record: RecordType,
+      key: KeyType,
+      collection: CollBaseIF,
+    ) => void,
+  ): void | Promise<void>;
+  /**
+   * Get the number of records in the collection
+   * @returns The number of records for sync collections, Promise<number> for async collections
+   */
+  count(): number | Promise<number>;
+  /**
+   * Map over each record in the collection and apply a transformation
+   * @param mapper - Function to transform each record
+   * @param noTransaction - If true, changes are applied immediately without transaction support
+   * @returns The number of records processed for sync collections, Promise<number> for async collections
+   * @throws MapError if any mapper function throws and noTransaction is false
+   */
+  map?(
+    mapper: (
+      record: RecordType,
+      key: KeyType,
+      collection: CollBaseIF,
+    ) => RecordType | void | any,
+    noTransaction?: boolean,
+  ): Map<KeyType, RecordType> | Promise<Map<KeyType, RecordType>>;
 }
 
 export interface UniverseIF {

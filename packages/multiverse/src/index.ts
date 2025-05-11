@@ -15,11 +15,17 @@ export { SchemaUniversal } from './SchemaUniversal';
 export { SunBase } from './suns/SunFBase';
 export { SunMemory } from './suns/SunMemory';
 export { SunMemoryAsync } from './suns/SunMemoryAsync';
+export { SunMemoryImmer } from './suns/SunMemoryImmer';
+export { SunMemoryImmerAsync } from './suns/SunMemoryImmerAsync';
+export { SunMemoryImmerC } from './suns/SunMemoryImmerC';
 export { default as memorySunF } from './suns/SunMemory';
 export { default as memoryAsyncSunF } from './suns/SunMemoryAsync';
+export { default as memoryImmerSunF } from './suns/SunMemoryImmer';
+export { default as memoryImmerAsyncSunF } from './suns/SunMemoryImmerAsync';
+export { memoryImmerCSunF } from './suns/SunMemoryImmerC';
 
 // Constants
-export { FIELD_TYPES } from './constants';
+export { FIELD_TYPES, MUTATION_ACTIONS } from './constants';
 
 // Type exports
 export * from './types.multiverse';

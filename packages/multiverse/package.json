@@ -1,7 +1,6 @@
 {
   "name": "@wonderlandlabs/multiverse",
   "version": "0.2.0",
-  "private": false,
   "main": "dist/index.js",
   "module": "dist/index.js",
   "types": "dist/types/index.d.ts",
@@ -19,6 +18,10 @@
     "build:types": "node scripts/generate-dts.js",
     "build:all": "yarn build && yarn build:types",
     "prepublishOnly": "yarn build:all"
+  },
+  "dependencies": {
+    "immer": "^10.0.3",
+    "rxjs": "^7.8.1"
   },
   "devDependencies": {
     "typescript": "^5.0.0",
