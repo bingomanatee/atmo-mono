@@ -1,4 +1,4 @@
-import type { MutationAction, SunIF } from '../types.multiverse';
+import type { MutationAction, SunIF, SunIFSync } from '../types.multiverse';
 import type { CollSyncIF } from '../types.coll';
 import { isObj, isPromiseLike } from '../typeguards.multiverse';
 import { MUTATION_ACTIONS } from '../constants';
@@ -10,7 +10,7 @@ import { SunMemory } from './SunMemory';
  */
 export class SunMemoryImmerC<R, K>
   extends SunMemory<R, K>
-  implements SunIF<R, K>
+  implements SunIFSync<R, K>
 {
   /**
    * Mutate a record using a simple deep clone approach
@@ -26,7 +26,7 @@ export class SunMemoryImmerC<R, K>
   override mutate(
     key: K,
     mutator: (
-      draft: R | undefined,
+      draft: R,
       collection: CollSyncIF<R, K>,
     ) => R | void | MutationAction | Promise<R | void | MutationAction>,
   ): R | undefined {
@@ -126,6 +126,8 @@ export class SunMemoryImmerC<R, K>
 /**
  * Factory function to create instances of SunMemoryImmerC
  */
-export function memoryImmerCSunF<R, K>(coll: CollSyncIF<R, K>): SunIF<R, K> {
+export function memoryImmerCSunF<R, K>(
+  coll: CollSyncIF<R, K>,
+): SunIFSync<R, K> {
   return new SunMemoryImmerC<R, K>(coll);
 }

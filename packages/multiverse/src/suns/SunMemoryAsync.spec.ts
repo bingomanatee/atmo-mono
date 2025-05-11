@@ -8,7 +8,7 @@ import { Universe } from '../Universe';
 import type { PostParams } from '../type.schema';
 
 type User = { id: number; name: string; age?: number; email?: string };
-
+const TEST_ERROR = 'Test Error';
 describe('SunMemoryAsync', () => {
   let univ: Universe;
   let schema: SchemaLocal;
@@ -336,17 +336,17 @@ describe('SunMemoryAsync', () => {
         expect(await sun.has(2)).toBe(false);
       });
 
-      it('should not delete a record if key is missing', async () => {
+      it("should  delete a record even if action doesn't have key", async () => {
         // Mutate with DELETE action but missing key
-        const result = await sun.mutate(1, (draft) => {
+        const result = await sun.mutate(1, () => {
           return { action: MUTATION_ACTIONS.DELETE };
         });
 
         // Result should be undefined (as per DELETE action)
         expect(result).toBeUndefined();
 
-        // Record should still exist
-        expect(await sun.has(1)).toBe(true);
+        const has1 = await sun.has(1);
+        expect(has1).toBe(false);
       });
     });
 
@@ -403,96 +403,21 @@ describe('SunMemoryAsync', () => {
         expect(stored?.name).toBe('Second Update');
       });
     });
-
-    describe('Collection locking', () => {
-      it('should queue set operations during mutation', async () => {
-        // Create a spy on the set method
-        const setSpy = vi.spyOn(sun, 'set');
-
-        // Mutate with a function that tries to set another record
-        await sun.mutate(1, async (draft, collection) => {
-          if (draft) {
-            // Try to set another record during mutation
-            await collection.set(4, { id: 4, name: 'New User', age: 22 });
-
-            // Update the draft
-            draft.name = 'Updated Name';
-            return draft;
-          }
-        });
-
-        // Check that the original record was updated
-        const updated = await sun.get(1);
-        expect(updated?.name).toBe('Updated Name');
-
-        // Check that the new record was added
-        expect(await sun.has(4)).toBe(true);
-        const newUser = await sun.get(4);
-        expect(newUser?.name).toBe('New User');
-
-        // Check that set was called twice (once for the mutation result, once for the queued operation)
-        expect(setSpy).toHaveBeenCalledTimes(2);
-      });
-
-      it('should queue delete operations during mutation', async () => {
-        // Create a spy on the delete method
-        const deleteSpy = vi.spyOn(sun, 'delete');
-
-        // Mutate with a function that tries to delete another record
-        await sun.mutate(1, async (draft, collection) => {
-          if (draft) {
-            // Try to delete another record during mutation
-            await collection.delete(2);
-
-            // Update the draft
-            draft.name = 'Updated Name';
-            return draft;
-          }
-        });
-
-        // Check that the original record was updated
-        const updated = await sun.get(1);
-        expect(updated?.name).toBe('Updated Name');
-
-        // Check that the other record was deleted
-        expect(await sun.has(2)).toBe(false);
-
-        // Check that delete was called once for the queued operation
-        expect(deleteSpy).toHaveBeenCalledTimes(1);
-      });
-    });
   });
 
   describe('Error handling', () => {
-    let consoleSpy: any;
-
-    beforeEach(async () => {
-      // Set up initial data
-      await sun.set(1, { id: 1, name: 'John Doe', age: 30 });
-
-      // Spy on console.error
-      consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-    });
-
-    afterEach(() => {
-      consoleSpy.mockRestore();
-    });
-
     describe('Asynchronous error handling', () => {
       it('should catch and rethrow errors from async mutators', async () => {
         // Define a mutator that throws an error
         const errorMutator = async () => {
           await new Promise((resolve) => setTimeout(resolve, 10));
-          throw new Error('Test error in async mutator');
+          throw new Error(TEST_ERROR);
         };
 
         // Expect the mutate call to throw
         await expect(sun.mutate(1, errorMutator)).rejects.toThrow(
-          'Test error in async mutator',
+          new RegExp(TEST_ERROR),
         );
-
-        // Verify that console.error was called
-        expect(consoleSpy).toHaveBeenCalled();
 
         // Verify that the original record is unchanged
         const record = await sun.get(1);

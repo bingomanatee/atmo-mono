@@ -1,13 +1,13 @@
-import type { MutationAction, SunIF } from '../types.multiverse';
+import type { MutationAction, SunIF, SunIFSync } from '../types.multiverse';
 import type { CollSyncIF } from '../types.coll';
-import { isObj } from '../typeguards.multiverse';
+import { isMutatorAction, isObj } from '../typeguards.multiverse';
 import { MUTATION_ACTIONS } from '../constants';
 import { SunBase } from './SunFBase';
 import { asError, ExtendedMap } from '@wonderlandlabs/atmo-utils';
 
 export class SunMemory<RecordType, KeyType>
   extends SunBase<RecordType, KeyType, CollSyncIF<RecordType, KeyType>>
-  implements SunIF<RecordType, KeyType>
+  implements SunIFSync<RecordType, KeyType>
 {
   // Private data storage
   #data: ExtendedMap<KeyType, RecordType>;
@@ -129,6 +129,10 @@ export class SunMemory<RecordType, KeyType>
     return this.#data.size;
   }
 
+  getAll() {
+    return new Map(this.#data);
+  }
+
   /**
    * Map over each record in the collection and apply a transformation
    * @param mapper - Function to transform each record
@@ -190,11 +194,7 @@ export class SunMemory<RecordType, KeyType>
     mutator: (
       draft: RecordType | undefined,
       collection: CollSyncIF<RecordType, KeyType>,
-    ) =>
-      | RecordType
-      | void
-      | MutationAction
-      | Promise<RecordType | void | MutationAction>,
+    ) => RecordType | MutationAction,
   ): RecordType | undefined {
     // Lock the collection during mutation
     this._locked = true;
@@ -203,6 +203,7 @@ export class SunMemory<RecordType, KeyType>
       const existing = this.#data.get(key);
 
       const result = mutator(existing, this.coll);
+      this._locked = false;
       return this._afterMutate(key, result);
     } finally {
       // Unlock the collection
@@ -219,12 +220,10 @@ export class SunMemory<RecordType, KeyType>
    */
   protected _afterMutate(
     key: KeyType,
-    result: RecordType | void | MutationAction,
+    result: RecordType | MutationAction,
   ): RecordType | undefined {
-    if (!result) return;
-
     // Handle special actions
-    if (result && typeof result === 'object' && 'action' in result) {
+    if (isMutatorAction(result)) {
       // For DELETE action, return undefined
       if ((result as MutationAction).action === MUTATION_ACTIONS.DELETE) {
         this.delete(key);
@@ -235,12 +234,14 @@ export class SunMemory<RecordType, KeyType>
       if ((result as MutationAction).action === MUTATION_ACTIONS.NOOP) {
         return this.get(key);
       }
-      this.set(key, result);
-      return this.get(key); // should equal result but ...
     }
+    this.set(key, result);
+    return this.get(key); // should equal result but ...
   }
 }
 
-export default function memorySunF<R, K>(coll: CollSyncIF<R, K>): SunIF<R, K> {
+export default function memorySunF<R, K>(
+  coll: CollSyncIF<R, K>,
+): SunIFSync<R, K> {
   return new SunMemory<R, K>(coll);
 }

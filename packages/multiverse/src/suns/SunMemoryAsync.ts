@@ -2,7 +2,7 @@ import { ExtendedMap } from '@wonderlandlabs/atmo-utils';
 import { MUTATION_ACTIONS } from '../constants';
 import { isMutatorAction, isObj } from '../typeguards.multiverse';
 import type { CollAsyncIF } from '../types.coll';
-import type { MutationAction, SunIF } from '../types.multiverse';
+import type { MutationAction, SunIF, SunIfAsync } from '../types.multiverse';
 import { SunBase } from './SunFBase.ts';
 
 export class SunMemoryAsync<R, K>
@@ -27,7 +27,7 @@ export class SunMemoryAsync<R, K>
     this._queueEvent(event);
   }
 
-  get(key: K) {
+  async get(key: K) {
     return this.#data.get(key);
   }
 
@@ -85,7 +85,7 @@ export class SunMemoryAsync<R, K>
     this.#data.delete(key);
   }
 
-  clear() {
+  async clear() {
     // If the collection is locked, queue the clear operation
     if (this._locked) {
       this.#queueEvent(() => this.clear());
@@ -203,6 +203,10 @@ export class SunMemoryAsync<R, K>
     return this.#afterMutate(key, result);
   }
 
+  async getAll() {
+    return new Map(this.#data);
+  }
+
   /**
    * Process the result of a mutation
    * @param key - The key of the record
@@ -237,6 +241,6 @@ export class SunMemoryAsync<R, K>
 
 export default function memoryAsyncSunF<R, K>(
   coll: CollAsyncIF<R, K>,
-): SunIF<R, K> {
+): SunIfAsync<R, K> {
   return new SunMemoryAsync<R, K>(coll);
 }

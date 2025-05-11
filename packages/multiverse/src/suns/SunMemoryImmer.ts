@@ -1,8 +1,8 @@
 import { produce } from 'immer';
 import { MUTATION_ACTIONS } from '../constants';
 import { isMutatorAction, isObj } from '../typeguards.multiverse';
-import type { CollSyncIF } from '../types.coll';
-import type { MutationAction, SunIF } from '../types.multiverse';
+import type { CollBaseIF, CollSyncIF } from '../types.coll';
+import type { MutationAction, SunIF, SunIFSync } from '../types.multiverse';
 import { SunBase } from './SunFBase.ts';
 
 // Helper function for tests
@@ -36,6 +36,20 @@ export class SunMemoryImmer<RecordType, KeyType>
   extends SunBase<RecordType, KeyType, CollSyncIF<RecordType, KeyType>>
   implements SunIF<RecordType, KeyType>
 {
+  each(
+    callback: (
+      record: RecordType,
+      key: KeyType,
+      collection: CollSyncIF<RecordType, KeyType>,
+    ) => void,
+  ): void | Promise<void> {
+    for (const [key, value] of this.#data) {
+      callback(value, key, this.coll);
+    }
+  }
+  count(): number | Promise<number> {
+    return this.#data.size;
+  }
   #data: Map<KeyType, RecordType>;
   #locked: boolean = false;
   #event$: SimpleEventEmitter = new SimpleEventEmitter();
@@ -53,6 +67,20 @@ export class SunMemoryImmer<RecordType, KeyType>
         event();
       });
     });
+  }
+
+  getAll() {
+    return new Map(this.#data);
+  }
+  map?(
+    mapper: (
+      record: RecordType,
+      key: KeyType,
+      collection: CollBaseIF,
+    ) => RecordType | void | any,
+    noTransaction?: boolean,
+  ) {
+    throw new Error('Method not implemented.');
   }
 
   /**
@@ -247,12 +275,6 @@ export class SunMemoryImmer<RecordType, KeyType>
           this.delete(action.key);
         }
         break;
-      case MUTATION_ACTIONS.LOCK:
-        this.#locked = true;
-        break;
-      case MUTATION_ACTIONS.UNLOCK:
-        this.#locked = false;
-        break;
       case MUTATION_ACTIONS.NOOP:
         return this.get(key);
         break;
@@ -262,6 +284,6 @@ export class SunMemoryImmer<RecordType, KeyType>
 
 export default function memoryImmerSunF<R, K>(
   coll: CollSyncIF<R, K>,
-): SunIF<R, K> {
+): SunIFSync<R, K> {
   return new SunMemoryImmer<R, K>(coll);
 }

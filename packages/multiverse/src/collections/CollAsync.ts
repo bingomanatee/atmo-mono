@@ -3,7 +3,7 @@ import type { CollIF } from '../types.coll.ts';
 import type {
   CollAsyncIF,
   SchemaLocalIF,
-  SunIF,
+  SunIfAsync,
   UniverseIF,
 } from '../types.multiverse.ts';
 
@@ -11,7 +11,7 @@ type CollParms<RecordType, KeyType = string> = {
   name: string;
   schema: SchemaLocalIF;
   universe: UniverseIF;
-  sunF?: (coll: CollIF<RecordType, KeyType>) => SunIF<RecordType, KeyType>; // will default to memorySunF
+  sunF?: (coll: CollIF<RecordType, KeyType>) => SunIfAsync<RecordType, KeyType>; // will default to memorySunF
 };
 
 export class CollAsync<RecordType, KeyType = string>
@@ -33,7 +33,7 @@ export class CollAsync<RecordType, KeyType = string>
     }
   }
 
-  #engine: SunIF<RecordType, KeyType>;
+  #engine: SunIfAsync<RecordType, KeyType>;
 
   async get(identity: KeyType) {
     return this.#engine.get(identity);

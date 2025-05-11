@@ -2,6 +2,7 @@ import type {
   CollBaseIF,
   SchemaLocalIF,
   SunIF,
+  SunIFSync,
   UniverseIF,
   UniverseName,
 } from '../types.multiverse.ts';
@@ -13,7 +14,7 @@ type CollParms<RecordType, KeyType = string> = {
   name: string;
   schema: SchemaLocalIF;
   universe: UniverseIF;
-  sunF?: (coll: CollIF<RecordType, KeyType>) => SunIF<RecordType, KeyType>; // will default to memorySunF
+  sunF?: (coll: CollIF<RecordType, KeyType>) => SunIFSync<RecordType, KeyType>; // will default to memorySunF
 };
 
 export class CollSync<RecordType, KeyType = string>
@@ -35,7 +36,7 @@ export class CollSync<RecordType, KeyType = string>
     }
   }
 
-  #engine: SunIF<RecordType, KeyType>;
+  #engine: SunAsycIF<RecordType, KeyType>;
 
   get(identity: KeyType): RecordType | undefined {
     return this.#engine.get(identity);
@@ -56,19 +57,17 @@ export class CollSync<RecordType, KeyType = string>
       collection: CollSyncIF<RecordType, KeyType>,
     ) => RecordType | void | any,
   ): RecordType | undefined {
-    if (this.#engine.mutate) {
-      return this.#engine.mutate(key, (draft) => mutator(draft, this));
-    } else {
-      // Fallback for engines that don't support mutate
-      const existing = this.get(key);
-      const result = mutator(existing, this) || existing;
-      if (result) {
-        this.set(key, result);
-      }
-      return result;
+    if (typeof this.#engine.mutate !== 'function') {
+      throw new Error(
+        `collection ${this.name} engine does not support mutation`,
+      );
     }
+    return this.#engine.mutate(key, mutator);
   }
 
+  getAll() {
+    return this.#engine.getAll();
+  }
   /**
    * Find records matching a query
    * The implementation of this method is engine-dependent

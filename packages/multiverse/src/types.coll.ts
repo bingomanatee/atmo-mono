@@ -1,6 +1,6 @@
 // a system has a collection of uniform records
 import type { SchemaLocalIF, DataKey, DataRecord } from './type.schema';
-import type { UniverseName } from './types.multiverse';
+import type { MutationAction, UniverseName } from './types.multiverse';
 
 // ------------------- collection nodes -------------------
 
@@ -16,6 +16,7 @@ export interface CollSyncIF<RecordType = DataRecord, KeyType = DataKey>
 
   get(key: KeyType): RecordType | undefined;
   set(key: KeyType, value: RecordType): void;
+  getAll(): Map<KeyType, RecordType>;
   has(key: KeyType): boolean;
   mutate(
     key: KeyType,
@@ -70,6 +71,7 @@ export interface CollAsyncIF<RecordType = DataRecord, KeyType = DataKey>
   extends CollBaseIF {
   isAsync: true;
   get(key: KeyType): Promise<RecordType | undefined>;
+  getAll(): Promise<Map<KeyType, RecordType>>;
   set(key: KeyType, value: RecordType): Promise<void>;
   has(key: KeyType): Promise<boolean>;
   mutate(
@@ -77,7 +79,7 @@ export interface CollAsyncIF<RecordType = DataRecord, KeyType = DataKey>
     mutator: (
       draft: RecordType | undefined,
       collection: CollAsyncIF<RecordType, KeyType>,
-    ) => RecordType | void | any | Promise<RecordType | void | any>,
+    ) => Promise<RecordType | MutationAction>,
   ): Promise<RecordType | undefined>;
   send(key: KeyType, target: UniverseName): Promise<void>;
   /**

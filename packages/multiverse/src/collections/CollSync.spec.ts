@@ -372,7 +372,6 @@ describe('CollSync', () => {
 
               // Update the draft based on the other record
               draft.name = `Friend of ${user2?.name}`;
-              console.log('returning ', draft);
               return draft;
             }
           });
@@ -423,7 +422,7 @@ describe('CollSync', () => {
         });
       });
 
-      it('should mutate an existing record using fallback implementation', () => {
+      it('should mutate an existing record', () => {
         // Set initial record
         const user = { id: 1, name: 'John Doe' };
         coll.set(1, user);
@@ -434,7 +433,13 @@ describe('CollSync', () => {
             draft.name = 'Jane Doe';
             draft.age = 30;
           }
+          return draft;
         });
+
+        console.log(
+          'should mutate an existing record: result of mutate is ',
+          result,
+        );
 
         // Check the result
         expect(result).toEqual({ id: 1, name: 'Jane Doe', age: 30 });
@@ -518,16 +523,16 @@ describe('CollSync', () => {
       });
 
       it('should mutate an existing record using Immer implementation', () => {
-        // Set initial record
-        const user = { id: 1, name: 'John Doe' };
-        coll.set(1, user);
-
         // Mutate the record
+
+        coll.set(1, { id: 1, name: 'John Doe' });
+
         const result = coll.mutate(1, (draft) => {
           if (draft) {
             draft.name = 'Jane Doe';
             draft.age = 30;
           }
+          return draft;
         });
 
         // Check the result

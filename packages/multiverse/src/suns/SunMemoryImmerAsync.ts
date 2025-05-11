@@ -1,32 +1,13 @@
-import type { MutationAction, SunIF } from '../types.multiverse';
-import type { CollAsyncIF } from '../types.coll';
-import { isObj, isPromiseLike } from '../typeguards.multiverse';
-import { SunBase } from './SunFBase.ts';
+import { ExtendedMap } from '@wonderlandlabs/atmo-utils';
+import { produce } from 'immer';
 import { MUTATION_ACTIONS } from '../constants';
+import { isObj } from '../typeguards.multiverse';
+import type { CollAsyncIF, CollBaseIF } from '../types.coll';
+import type { MutationAction, SunIF, SunIfAsync } from '../types.multiverse';
+import { SunBase } from './SunFBase.ts';
 
 // Helper function for tests
 const delay = (fn: () => void) => setTimeout(fn, 0);
-
-// Simple event emitter for tests
-class SimpleEventEmitter {
-  private listeners: Array<(data: any) => void> = [];
-
-  subscribe(listener: (data: any) => void): { unsubscribe: () => void } {
-    this.listeners.push(listener);
-    return {
-      unsubscribe: () => {
-        const index = this.listeners.indexOf(listener);
-        if (index !== -1) {
-          this.listeners.splice(index, 1);
-        }
-      },
-    };
-  }
-
-  next(data: any): void {
-    this.listeners.forEach((listener) => listener(data));
-  }
-}
 
 /**
  * An async Sun implementation that uses Immer for immutable state management
@@ -35,36 +16,48 @@ export class SunMemoryImmerAsync<R, K>
   extends SunBase<R, K, CollAsyncIF<R, K>>
   implements SunIF<R, K>
 {
-  #data: Map<K, R>;
+  #data = new ExtendedMap();
   #locked: boolean = false;
-  #event$: SimpleEventEmitter = new SimpleEventEmitter();
 
   constructor(coll: CollAsyncIF<R, K>) {
     super();
     this.coll = coll;
-    this.#data = new Map();
-
-    // Subscribe to the event subject to process events
-    this.#event$.subscribe((event) => {
-      // Use delay to ensure events are processed in the next tick
-      delay(() => {
-        // Execute the event
-        event();
-      });
-    });
   }
 
-  /**
-   * Add an event to the queue
-   * @param event - Function to execute
-   * @private
-   */
-  #queueEvent(event: () => void): void {
-    // Emit the event to the subject
-    this.#event$.next(event);
+  async getAll() {
+    return new Map(this.#data);
   }
 
-  get(key: K) {
+  async find(...query: any[]): Promise<Map<K, R>> | R[] {
+    return this.#data.find(...query);
+  }
+
+  async keys(): Promise<K[]> {
+    return Array.from(this.#data.keys());
+  }
+
+  async map(
+    mapper: (
+      record: R,
+      key: K,
+      collection: CollBaseIF,
+    ) => Promise<R | MutationAction>,
+  ) {
+    const keys = await this.keys();
+
+    return new Map(
+      // @ts-ignore
+      keys.map(async (key) => {
+        const value = await this.get(key);
+        const updated = produce(value, (draft) => {
+          return mapper(draft as R, key, this.coll);
+        });
+        return [key, updated];
+      }),
+    );
+  }
+
+  async get(key: K) {
     return this.#data.get(key);
   }
 
@@ -75,41 +68,47 @@ export class SunMemoryImmerAsync<R, K>
   async set(key: K, record: R) {
     // If the collection is locked, queue the set operation
     if (this.#locked) {
-      this.#queueEvent(() => this.set(key, record));
+      throw new Error(
+        'cannot set a record if collection is locked (usually, by mutate)',
+      );
       return;
     }
 
     let existing = this.#data.get(key);
-    const input = isObj(record) ? { ...record } : record;
 
-    this.validateInput(input);
+    const result = produce(record, (draft) => {
+      for (const fieldName of Object.keys(this.coll.schema.fields)) {
+        const field = this.coll.schema.fields[fieldName];
 
-    for (const fieldName of Object.keys(this.coll.schema.fields)) {
-      const field = this.coll.schema.fields[fieldName];
-
-      if (field.filter) {
-        const fieldValue: any = field.filter({
-          currentRecord: existing,
-          inputRecord: record,
-          field: field,
-          currentValue: isObj(existing)
-            ? (existing as { [fieldName]: any })[fieldName]
-            : undefined,
-          newValue: isObj(record)
-            ? (record as { [fieldName]: any })[fieldName]
-            : undefined,
-        });
-        (input as { [fieldName]: any })[fieldName] = fieldValue;
+        if (field.filter) {
+          const fieldValue: any = field.filter({
+            currentRecord: existing,
+            inputRecord: draft,
+            field: field,
+            currentValue: isObj(existing)
+              ? (existing as { [fieldName]: any })[fieldName]
+              : undefined,
+            newValue: isObj(record)
+              ? (record as { [fieldName]: any })[fieldName]
+              : undefined,
+          });
+          (draft as { [fieldName]: any })[fieldName] = fieldValue;
+        }
       }
-    }
+    });
 
     if (this.coll.schema.filterRecord) {
-      const filtered = this.coll.schema.filterRecord({
-        currentRecord: existing,
-        inputRecord: input,
-      });
+      const filtered = produce(result, (draft) =>
+        this.coll.schema.filterRecord({
+          currentRecord: existing,
+          inputRecord: draft,
+        }),
+      );
       this.#data.set(key, filtered as R);
-    } else this.#data.set(key, input);
+    } else {
+      this.validateInput(result);
+      this.#data.set(key, result);
+    }
   }
 
   /**
@@ -130,33 +129,7 @@ export class SunMemoryImmerAsync<R, K>
     this.#locked = true;
 
     try {
-      const existing = this.#data.get(key);
-
-      // Create a deep clone of the existing record
-      const draft = existing ? JSON.parse(JSON.stringify(existing)) : undefined;
-
-      // Apply the mutator function
-      const result = mutator(draft, this.coll);
-
-      // Handle Promise-like result
-      if (isPromiseLike(result)) {
-        // Unlock the collection immediately for async operations
-        this.#locked = false;
-
-        // Await the promise result without locking
-        try {
-          const asyncResult = await result;
-          // Process the async result without locking
-          return this.#afterMutate(key, asyncResult);
-        } catch (error) {
-          console.error(
-            `Error in async mutation for key ${String(key)}:`,
-            error,
-          );
-          throw error;
-        }
-      }
-
+      this.#locked = false;
       // Process the synchronous result
       return this.#afterMutate(key, result);
     } finally {
@@ -247,6 +220,6 @@ export class SunMemoryImmerAsync<R, K>
 
 export default function memoryImmerAsyncSunF<R, K>(
   coll: CollAsyncIF<R, K>,
-): SunIF<R, K> {
+): SunIfAsync<R, K> {
   return new SunMemoryImmerAsync<R, K>(coll);
 }
