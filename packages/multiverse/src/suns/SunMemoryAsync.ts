@@ -196,6 +196,7 @@ export class SunMemoryAsync<R, K>
     this._locked = true;
     const value = await this.get(key);
     if (value === undefined) {
+      console.error('cannot find ', key, 'in', this.#data);
       throw new Error(`cannot mutate ${key} - not found`);
     }
     const result = await mutator(value, this.coll);

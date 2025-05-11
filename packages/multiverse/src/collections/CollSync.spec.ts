@@ -67,8 +67,7 @@ describe('CollSync', () => {
         const u = new Universe('default');
         m.add(u);
         const c = new CollSync<User, number>(collDef(u));
-
-        expect(c.has(1)).toBeFalsy();
+        expect(c.get(1)).toBeUndefined();
       });
 
       it('should return the value if the key exists', () => {

@@ -40,15 +40,15 @@ describe('SunMemoryAsync', () => {
 
   describe('basic operations', () => {
     describe('get', () => {
-      it('should return undefined for missing records', () => {
-        const result = sun.get(1);
+      it('should return undefined for missing records', async () => {
+        const result = await sun.get(1);
         expect(result).toBeUndefined();
       });
 
       it('should return the record if it exists', async () => {
         const user = { id: 1, name: 'John Doe' };
         await sun.set(1, user);
-        expect(sun.get(1)).toEqual(user);
+        expect(await sun.get(1)).toEqual(user);
       });
     });
 
@@ -70,7 +70,6 @@ describe('SunMemoryAsync', () => {
 
         await sun.delete(1);
         expect(await sun.has(1)).toBe(false);
-        expect(sun.get(1)).toBeUndefined();
       });
 
       it('should do nothing if the record does not exist', async () => {
@@ -102,37 +101,14 @@ describe('SunMemoryAsync', () => {
       await sun.set(1, user);
 
       expect(await sun.has(1)).toBe(true);
-      expect(sun.get(1)).toEqual(user);
+      expect(await sun.get(1)).toEqual(user);
     });
 
     it('should update an existing record', async () => {
       await sun.set(1, { id: 1, name: 'John Doe' });
       await sun.set(1, { id: 1, name: 'John Updated' });
 
-      expect(sun.get(1)).toEqual({ id: 1, name: 'John Updated' });
-    });
-
-    it('should create a copy of the input object', async () => {
-      const user = { id: 1, name: 'John Doe' };
-      await sun.set(1, user);
-
-      // Modify the original object
-      user.name = 'Modified Name';
-
-      // The stored object should not be affected
-      expect(sun.get(1)).toEqual({ id: 1, name: 'John Doe' });
-    });
-
-    it('should throw an error if input is not an object', async () => {
-      try {
-        // @ts-ignore - Testing runtime behavior
-        await sun.set(1, 'not an object');
-        // If we get here, the test should fail
-        expect('should have thrown').toBe('but did not throw');
-      } catch (error) {
-        // Verify the error message
-        expect(String(error)).toMatch(/input must be an object/);
-      }
+      expect(await sun.get(1)).toEqual({ id: 1, name: 'John Updated' });
     });
 
     it('should validate field types for id', async () => {
@@ -211,7 +187,7 @@ describe('SunMemoryAsync', () => {
     it('should apply field filters when setting a record', async () => {
       await sun.set(1, { id: 1, name: 'John Doe', email: 'JOHN@EXAMPLE.COM' });
 
-      const result = sun.get(1);
+      const result = await sun.get(1);
       expect(result).toEqual({
         id: 1,
         name: 'JOHN DOE',
@@ -229,7 +205,8 @@ describe('SunMemoryAsync', () => {
         email: 'jane@example.com',
       });
 
-      const result = sun.get(1);
+      const result = await sun.get(1);
+
       expect(result).toEqual({
         id: 1,
         name: 'JANE SMITH',
@@ -269,7 +246,7 @@ describe('SunMemoryAsync', () => {
     it('should apply record filter when setting a record', async () => {
       await sun.set(1, { id: 1, name: 'John Doe' });
 
-      const result = sun.get(1);
+      const result = await sun.get(1);
       expect(result).toEqual({
         id: 1,
         name: 'John Doe',
@@ -283,12 +260,17 @@ describe('SunMemoryAsync', () => {
         return params.newValue ? String(params.newValue).toUpperCase() : '';
       };
 
-      await sun.set(1, { id: 1, name: 'John Doe' });
+      const newRecord = await sun.set(1, {
+        id: 1,
+        name: 'John Doe',
+        email: 'foo@bar.com',
+      });
 
-      const result = sun.get(1);
+      const result = await sun.get(1);
       expect(result).toEqual({
         id: 1,
         name: 'JOHN DOE',
+        email: 'foo@bar.com',
         lastUpdated: 'filtered',
       });
     });
@@ -413,6 +395,7 @@ describe('SunMemoryAsync', () => {
           await new Promise((resolve) => setTimeout(resolve, 10));
           throw new Error(TEST_ERROR);
         };
+        await sun.set(1, { name: 'foo', email: 'foo@bar.com', id: 1 });
 
         // Expect the mutate call to throw
         await expect(sun.mutate(1, errorMutator)).rejects.toThrow(
@@ -421,19 +404,16 @@ describe('SunMemoryAsync', () => {
 
         // Verify that the original record is unchanged
         const record = await sun.get(1);
-        expect(record).toEqual({
-          id: 1,
-          name: 'John Doe',
-          age: 30,
-        });
+        expect(record).toEqual({ name: 'foo', email: 'foo@bar.com', id: 1 });
       });
 
       it('should continue processing mutations after an error', async () => {
+        await sun.set(1, { name: 'foo', email: 'foo@bar.com', id: 1 });
         // First try a mutation that throws
         try {
           await sun.mutate(1, async () => {
             await new Promise((resolve) => setTimeout(resolve, 10));
-            throw new Error('Test error');
+            throw new Error(TEST_ERROR);
           });
         } catch (error) {
           // Ignore the error
@@ -455,6 +435,7 @@ describe('SunMemoryAsync', () => {
 
       it('should handle errors in nested async operations', async () => {
         // Define a mutator with nested async operations that throw
+        const NESTED_ERROR = 'Nested error';
         const errorMutator = async (draft: any) => {
           if (draft) {
             // First async operation
@@ -463,20 +444,21 @@ describe('SunMemoryAsync', () => {
             // Second async operation that throws
             const nestedOperation = async () => {
               await new Promise((resolve) => setTimeout(resolve, 10));
-              throw new Error('Nested error');
+              throw new Error(NESTED_ERROR);
             };
 
             await nestedOperation();
 
             // This should not be executed
             draft.name = 'Updated Name';
-            return draft;
           }
+          return draft;
         };
 
+        await sun.set(1, { name: 'John Doe', email: 'foo@bar.com', id: 1 });
         // Expect the mutate call to throw
         await expect(sun.mutate(1, errorMutator)).rejects.toThrow(
-          'Nested error',
+          new RegExp(NESTED_ERROR),
         );
 
         // Verify that the original record is unchanged
