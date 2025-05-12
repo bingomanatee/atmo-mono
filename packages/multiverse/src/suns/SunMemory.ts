@@ -34,42 +34,45 @@ export class SunMemory<RecordType, KeyType>
 
   set(key: KeyType, record: RecordType) {
     // If the collection is locked, queue the set operation
+    console.log('sun memory set', key, record, this._locked, this);
     if (this._locked) {
-      this._queueEvent(() => this.set(key, record));
-      return;
+      throw new Error(
+        'cannot set during locked operations - usually mutations',
+      );
     }
 
     let existing = this.#data.get(key);
-    const input = isObj(record) ? { ...record } : record;
 
-    this.validateInput(input);
+    this.validateInput(record);
 
-    for (const fieldName of Object.keys(this.coll.schema.fields)) {
-      const field = this.coll.schema.fields[fieldName];
+    if (isObj(record)) {
+      for (const fieldName of Object.keys(this.coll.schema.fields)) {
+        const field = this.coll.schema.fields[fieldName];
 
-      if (field.filter) {
-        const fieldValue: any = field.filter({
-          currentRecord: existing,
-          inputRecord: record,
-          field: field,
-          currentValue: isObj(existing)
-            ? (existing as { [fieldName]: any })[fieldName]
-            : undefined,
-          newValue: isObj(record)
-            ? (record as { [fieldName]: any })[fieldName]
-            : undefined,
-        });
-        (input as { [fieldName]: any })[fieldName] = fieldValue;
+        if (field.filter) {
+          const fieldValue: any = field.filter({
+            currentRecord: existing,
+            inputRecord: record,
+            field: field,
+            currentValue: isObj(existing)
+              ? (existing as { [fieldName]: any })[fieldName]
+              : undefined,
+            newValue: isObj(record)
+              ? (record as { [fieldName]: any })[fieldName]
+              : undefined,
+          });
+          (record as { [fieldName]: any })[fieldName] = fieldValue;
+        }
       }
     }
 
     if (this.coll.schema.filterRecord) {
       const filtered = this.coll.schema.filterRecord({
         currentRecord: existing,
-        inputRecord: input,
+        inputRecord: record,
       });
       this.#data.set(key, filtered as RecordType);
-    } else this.#data.set(key, input);
+    } else this.#data.set(key, record);
   }
 
   delete(key: KeyType) {
@@ -201,8 +204,9 @@ export class SunMemory<RecordType, KeyType>
 
     try {
       const existing = this.#data.get(key);
-
+      console.log('sun memory starting mutate', this._locked);
       const result = mutator(existing, this.coll);
+      console.log('sun memory done with mutate', this._locked);
       this._locked = false;
       return this._afterMutate(key, result);
     } finally {
