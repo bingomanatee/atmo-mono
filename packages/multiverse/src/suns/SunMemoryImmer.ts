@@ -95,7 +95,7 @@ export class SunMemoryImmer<RecordType, KeyType>
     // If the collection is locked, queue the set operation
     if (this.#locked) {
       throw new Error(
-        'SunMemoryImmer: cannot set while record is lockked - usually during mutation',
+        'SunMemoryImmer: cannot set while record is locked - usually during mutation',
       );
     }
 

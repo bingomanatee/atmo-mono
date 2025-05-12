@@ -254,9 +254,6 @@ describe('CollSync', () => {
           user.status === 'active' && user.age !== undefined && user.age >= 35
         );
       });
-
-      console.log('multi search reesults', ...results.values());
-
       // Should return 1 user
       expect(results.size).toBe(2);
       expect(

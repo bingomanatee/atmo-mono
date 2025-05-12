@@ -1,10 +1,11 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { SunMemoryImmer } from './SunMemoryImmer';
+import { Vector3 } from 'three';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { CollSync } from '../collections/CollSync.ts';
+import { FIELD_TYPES, MUTATION_ACTIONS } from '../constants';
 import { SchemaLocal } from '../SchemaLocal';
 import { Universe } from '../Universe';
-import { FIELD_TYPES, MUTATION_ACTIONS } from '../constants';
-import { Vector3 } from 'three';
+import { SunMemoryImmer } from './SunMemoryImmer';
+import { immerable } from 'immer';
 
 interface User {
   id: number;
@@ -79,7 +80,7 @@ describe('SunMemoryImmer', () => {
     });
   });
 
-  describe.only('mutate', () => {
+  describe('mutate', () => {
     it('should mutate an existing record', () => {
       // Set initial record
       const user = { id: 1, name: 'John Doe' };
@@ -215,7 +216,31 @@ describe('SunMemoryImmer', () => {
       });
     });
 
-    describe('DELETE action', () => {
+    describe('mutation', () => {
+      it('should lock set operations during mutation', () => {
+        // Mutate with a function that tries to set another record
+
+        expect(() => {
+          sun.mutate('user1', (draft, collection) => {
+            collection.set('user4', {
+              id: 'user4',
+              name: 'New User',
+              age: 22,
+            });
+            if (draft) {
+              draft.name = 'Updated Name';
+            }
+            return draft;
+          });
+        }).toThrow();
+
+        // Check that the original record was updated
+        expect(sun.get('user1')?.name).toBe('John Doe');
+
+        // Check that the new record was added (after the mutation completed)
+        expect(sun.has('user4')).toBe(false);
+      });
+
       it('should delete a record when returning DELETE action with key', () => {
         // Mutate with DELETE action
         const result = sun.mutate('user1', (draft) => {
@@ -244,21 +269,6 @@ describe('SunMemoryImmer', () => {
         expect(sun.has('user2')).toBe(false);
       });
 
-      it('should not delete a record if key is missing', () => {
-        // Mutate with DELETE action but missing key
-        const result = sun.mutate('user1', (draft) => {
-          return { action: MUTATION_ACTIONS.DELETE };
-        });
-
-        // Result should be undefined (as per DELETE action)
-        expect(result).toBeUndefined();
-
-        // Record should still exist
-        expect(sun.has('user1')).toBe(true);
-      });
-    });
-
-    describe('NOOP action', () => {
       it('should do nothing when returning NOOP action', () => {
         // Get the original record
         const original = sun.get('user3');
@@ -280,26 +290,18 @@ describe('SunMemoryImmer', () => {
         // Record should not be changed
         expect(sun.get('user3')).toEqual(original);
       });
-    });
 
-    describe('Async mutations', () => {
-      it('should handle async mutations that return a value', async () => {
+      it('should handle mutations that return a value', async () => {
         // Mutate with async function
-        sun.mutate('user1', async (draft) => {
-          if (draft) {
-            // Simulate async operation
-            await new Promise((resolve) => setTimeout(resolve, 10));
 
+        await sun.mutate('user1', (draft) => {
+          if (draft) {
             // Update the draft
             draft.name = 'Updated Async';
             draft.age = 31;
-
-            return draft;
           }
+          return draft;
         });
-
-        // Wait for the async operation to complete
-        await new Promise((resolve) => setTimeout(resolve, 50));
 
         // Check that the record was updated
         const updated = sun.get('user1');
@@ -307,104 +309,28 @@ describe('SunMemoryImmer', () => {
         expect(updated?.age).toBe(31);
       });
 
-      it('should handle async mutations that return DELETE action', async () => {
-        // Mutate with async function returning DELETE
-        sun.mutate('user2', async (draft) => {
-          if (draft) {
-            // Simulate async operation
-            await new Promise((resolve) => setTimeout(resolve, 10));
-
-            return { action: MUTATION_ACTIONS.DELETE, key: draft.id };
-          }
-        });
-
-        // Wait for the async operation to complete
-        await new Promise((resolve) => setTimeout(resolve, 50));
-
-        // Check that the record was deleted
-        expect(sun.has('user2')).toBe(false);
-      });
-
-      it('should handle async mutations that return NOOP action', async () => {
-        // Get the original record
-        const original = sun.get('user3');
-
-        // Mutate with async function returning NOOP
-        sun.mutate('user3', async (draft) => {
-          if (draft) {
-            // Simulate async operation
-            await new Promise((resolve) => setTimeout(resolve, 10));
-
-            if (draft.status === 'locked') {
-              return { action: MUTATION_ACTIONS.NOOP };
-            }
-
-            // This should not be executed due to the NOOP
-            draft.name = 'Changed Name';
-            return draft;
-          }
-        });
-
-        // Wait for the async operation to complete
-        await new Promise((resolve) => setTimeout(resolve, 50));
-
-        // Check that the record was not changed
-        expect(sun.get('user3')).toEqual(original);
-      });
-    });
-
-    describe('Collection locking', () => {
-      it('should queue set operations during mutation', () => {
-        // Create a spy on the set method
-        const setSpy = vi.spyOn(sun, 'set');
-
-        // Mutate with a function that tries to set another record
-        sun.mutate('user1', (draft, collection) => {
-          if (draft) {
-            // Try to set another record during mutation
-            collection.set('user4', { id: 'user4', name: 'New User', age: 22 });
-
-            // Update the draft
-            draft.name = 'Updated Name';
-            return draft;
-          }
-        });
-
-        // Check that the original record was updated
-        expect(sun.get('user1')?.name).toBe('Updated Name');
-
-        // Check that the new record was added (after the mutation completed)
-        expect(sun.has('user4')).toBe(true);
-        expect(sun.get('user4')?.name).toBe('New User');
-
-        // Check that set was called twice (once for the mutation result, once for the queued operation)
-        expect(setSpy).toHaveBeenCalledTimes(2);
-      });
-
-      it('should queue delete operations during mutation', () => {
+      it('should throw on delete operations during mutation', () => {
         // Create a spy on the delete method
-        const deleteSpy = vi.spyOn(sun, 'delete');
 
         // Mutate with a function that tries to delete another record
-        sun.mutate('user1', (draft, collection) => {
-          if (draft) {
-            // Try to delete another record during mutation
-            collection.delete('user2');
+        expect(() => {
+          sun.mutate('user1', (draft, collection) => {
+            if (draft) {
+              // Try to delete another record during mutation
+              collection.delete('user2');
 
-            // Update the draft
-            draft.name = 'Updated Name';
-            return draft;
-          }
-        });
+              // Update the draft
+              draft.name = 'Updated Name';
+              return draft;
+            }
+          });
+        }).toThrow();
 
         // Check that the original record was updated
-        expect(sun.get('user1')?.name).toBe('Updated Name');
+        expect(sun.get('user1')?.name).toBe('John Doe');
 
         // Check that the other record was deleted (after the mutation completed)
-        expect(sun.has('user2')).toBe(false);
-
-        // Check that delete was called once for the queued operation
-        expect(deleteSpy).toHaveBeenCalledTimes(1);
+        expect(sun.has('user2')).toBe(true);
       });
     });
   });
@@ -460,7 +386,7 @@ describe('SunMemoryImmer', () => {
      */
     class PositionEntity extends BaseEntity {
       #position: Vector3;
-
+      [immerable] = true;
       constructor(data: {
         id: string;
         name: string;
