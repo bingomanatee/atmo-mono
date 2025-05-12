@@ -3,6 +3,7 @@ import { MUTATION_ACTIONS } from '../constants';
 import { isMutatorAction, isObj } from '../typeguards.multiverse';
 import type { CollAsyncIF } from '../types.coll';
 import type { MutationAction, SunIF, SunIfAsync } from '../types.multiverse';
+import { applyFieldFilters } from './applyFieldFilters';
 import { SunBase } from './SunFBase.ts';
 
 export class SunMemoryAsync<R, K>
@@ -17,16 +18,6 @@ export class SunMemoryAsync<R, K>
     this.#data = new ExtendedMap<K, R>();
   }
 
-  /**
-   * Queue an event to be processed
-   * @param event - Function to execute
-   * @private
-   */
-  #queueEvent(event: () => void): void {
-    // Use the protected method from SunBase
-    this._queueEvent(event);
-  }
-
   async get(key: K) {
     return this.#data.get(key);
   }
@@ -38,48 +29,31 @@ export class SunMemoryAsync<R, K>
   async set(key: K, record: R) {
     // If the collection is locked, queue the set operation
     if (this._locked) {
-      this.#queueEvent(() => this.set(key, record));
-      return;
+      throw new Error('cannot set when locked - usually during mutation');
     }
 
     let existing = this.#data.get(key);
-    const input = isObj(record) ? { ...record } : record;
-
-    this.validateInput(input);
-
-    for (const fieldName of Object.keys(this.coll.schema.fields)) {
-      const field = this.coll.schema.fields[fieldName];
-
-      if (field.filter) {
-        const fieldValue: any = field.filter({
-          currentRecord: existing,
-          inputRecord: record,
-          field: field,
-          currentValue: isObj(existing)
-            ? (existing as { [fieldName]: any })[fieldName]
-            : undefined,
-          newValue: isObj(record)
-            ? (record as { [fieldName]: any })[fieldName]
-            : undefined,
-        });
-        (input as { [fieldName]: any })[fieldName] = fieldValue;
-      }
+    if (isObj(record)) {
+      record = applyFieldFilters(record, existing, this.coll.schema);
     }
 
     if (this.coll.schema.filterRecord) {
       const filtered = this.coll.schema.filterRecord({
         currentRecord: existing,
-        inputRecord: input,
+        inputRecord: record,
       });
+      this.validate(filtered);
       this.#data.set(key, filtered as R);
-    } else this.#data.set(key, input);
+    } else {
+      this.validate(record);
+      this.#data.set(key, record);
+    }
   }
 
   async delete(key: K) {
     // If the collection is locked, queue the delete operation
     if (this._locked) {
-      this.#queueEvent(() => this.delete(key));
-      return;
+      throw new Error('cannot delete when locked - usually during a mutation');
     }
 
     this.#data.delete(key);
@@ -88,8 +62,9 @@ export class SunMemoryAsync<R, K>
   async clear() {
     // If the collection is locked, queue the clear operation
     if (this._locked) {
-      this.#queueEvent(() => this.clear());
-      return;
+      throw new Error(
+        'cannot clear while collection is locked - usually during mutation',
+      );
     }
 
     this.#data.clear();

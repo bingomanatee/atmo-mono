@@ -83,16 +83,6 @@ export class SunMemoryImmer<RecordType, KeyType>
     throw new Error('Method not implemented.');
   }
 
-  /**
-   * Add an event to the queue
-   * @param event - Function to execute
-   * @private
-   */
-  #queueEvent(event: () => void): void {
-    // Emit the event to the subject
-    this.#event$.next(event);
-  }
-
   get(key: KeyType) {
     return this.#data.get(key);
   }
@@ -104,14 +94,15 @@ export class SunMemoryImmer<RecordType, KeyType>
   set(key: KeyType, record: RecordType) {
     // If the collection is locked, queue the set operation
     if (this.#locked) {
-      this.#queueEvent(() => this.set(key, record));
-      return;
+      throw new Error(
+        'SunMemoryImmer: cannot set while record is lockked - usually during mutation',
+      );
     }
 
     let existing = this.#data.get(key);
     const input = isObj(record) ? { ...record } : record;
 
-    this.validateInput(input);
+    this.validate(input);
 
     for (const fieldName of Object.keys(this.coll.schema.fields)) {
       const field = this.coll.schema.fields[fieldName];
@@ -201,8 +192,9 @@ export class SunMemoryImmer<RecordType, KeyType>
   delete(key: KeyType) {
     // If the collection is locked, queue the delete operation
     if (this.#locked) {
-      this.#queueEvent(() => this.delete(key));
-      return;
+      throw new Error(
+        'SunMemoryImmmer - cannot delete while locked - usually during mutation',
+      );
     }
 
     this.#data.delete(key);
@@ -211,7 +203,9 @@ export class SunMemoryImmer<RecordType, KeyType>
   clear() {
     // If the collection is locked, queue the clear operation
     if (this.#locked) {
-      this.#queueEvent(() => this.clear());
+      throw new Error(
+        'SunMemorImmer: cannot clear during locked stat - usually during mutation',
+      );
       return;
     }
 

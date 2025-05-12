@@ -1,7 +1,7 @@
 import { ExtendedMap } from '@wonderlandlabs/atmo-utils';
 import { produce } from 'immer';
 import { MUTATION_ACTIONS } from '../constants';
-import { isObj } from '../typeguards.multiverse';
+import { isMutatorAction, isObj } from '../typeguards.multiverse';
 import type { CollAsyncIF, CollBaseIF } from '../types.coll';
 import type { MutationAction, SunIF, SunIfAsync } from '../types.multiverse';
 import { SunBase } from './SunFBase.ts';
@@ -106,7 +106,7 @@ export class SunMemoryImmerAsync<R, K>
       );
       this.#data.set(key, filtered as R);
     } else {
-      this.validateInput(result);
+      this.validate(result);
       this.#data.set(key, result);
     }
   }
@@ -125,13 +125,13 @@ export class SunMemoryImmerAsync<R, K>
       collection: CollAsyncIF<R, K>,
     ) => R | void | MutationAction | Promise<R | void | MutationAction>,
   ): Promise<R | undefined> {
-    // Lock the collection during synchronous part of mutation
     this.#locked = true;
-
     try {
+      const record = await this.get(key);
+      // note - the mutator has to be sync even thoul this is an async Sun.
+      const result = produce(record, (draft: R) => mutator(draft, this.coll));
       this.#locked = false;
-      // Process the synchronous result
-      return this.#afterMutate(key, result);
+      return this.#afterMutate(result, key);
     } finally {
       // Ensure the collection is unlocked
       this.#locked = false;
@@ -146,43 +146,23 @@ export class SunMemoryImmerAsync<R, K>
    * @private
    */
   async #afterMutate(
-    key: K,
     result: R | void | MutationAction,
+    key: K,
   ): Promise<R | undefined> {
     // Handle special actions
-    if (result && typeof result === 'object' && 'action' in result) {
-      // Queue the action to be processed after unlocking
-      this.#queueEvent(() => this.#processAction(result as MutationAction));
-
-      // For DELETE action, return undefined
-      if ((result as MutationAction).action === MUTATION_ACTIONS.DELETE) {
-        return undefined;
-      }
-
-      // For NOOP action, return the current value
-      if ((result as MutationAction).action === MUTATION_ACTIONS.NOOP) {
-        return this.get(key);
-      }
-
-      // For other actions, return the current value
-      return this.get(key);
+    if (isMutatorAction(result)) {
+      return this.#processAction(result as MutationAction, key);
     }
-
-    // Set the result if it's not undefined
-    if (result !== undefined) {
-      // Queue the set operation to be processed after unlocking
-      this.#queueEvent(() => this.set(key, result as R));
-    }
-
-    // Return the result (will be the current value until the queued set is processed)
-    return (result as R) || this.get(key);
+    await this.set(key, result);
+    return this.get(key);
   }
 
   async delete(key: K) {
     // If the collection is locked, queue the delete operation
     if (this.#locked) {
-      this.#queueEvent(() => this.delete(key));
-      return;
+      throw new Error(
+        'SnMemorymmmer: cannot delete during locked operation - usually during mutation',
+      );
     }
 
     this.#data.delete(key);
@@ -191,29 +171,26 @@ export class SunMemoryImmerAsync<R, K>
   clear() {
     // If the collection is locked, queue the clear operation
     if (this.#locked) {
-      this.#queueEvent(() => this.clear());
-      return;
+      throw new Error(
+        'SunMemoryImmerAsync: cannot clear during locked state - usually during mutation',
+      );
     }
 
     this.#data.clear();
   }
 
-  /**
-   * Process a mutation action
-   * @param action - The action to process
-   * @private
-   */
-  #processAction(action: MutationAction): void {
-    if (action.action === MUTATION_ACTIONS.DELETE) {
-      if (action.key !== undefined) {
-        // Use the key from the action to delete the record
-        this.delete(action.key);
-      }
-    } else if (action.action === MUTATION_ACTIONS.LOCK) {
-      this.#locked = true;
-    } else if (action.action === MUTATION_ACTIONS.UNLOCK) {
-      this.#locked = false;
+  #processAction(action: MutationAction, key: K): void {
+    switch (action.key) {
+      case MUTATION_ACTIONS.DELETE:
+        this.delete(key);
+        return undefined;
+        break;
+
+      case MUTATION_ACTIONS.NOOP:
+        break;
     }
+
+    return this.get(key);
     // NOOP action does nothing
   }
 }

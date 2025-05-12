@@ -27,8 +27,11 @@ describe('SunMemoryAsync', () => {
       name: 'users',
       schema,
       universe: univ,
+      sunF(coll) {
+        sun = new SunMemoryAsync<User, number>(coll);
+        return sun;
+      },
     });
-    sun = new SunMemoryAsync<User, number>(coll);
   });
 
   describe('constructor', () => {
@@ -112,15 +115,9 @@ describe('SunMemoryAsync', () => {
     });
 
     it('should validate field types for id', async () => {
-      try {
-        // @ts-ignore - Testing runtime behavior
+      await expect(async () => {
         await sun.set(1, { id: 'not a number', name: 'John Doe' });
-        // If we get here, the test should fail
-        expect('should have thrown').toBe('but did not throw');
-      } catch (error) {
-        // Verify the error message
-        expect(String(error)).toMatch(/validation error/);
-      }
+      }).rejects.toThrow(/validation.*id/);
     });
 
     it('should validate field types for name', async () => {
@@ -179,9 +176,11 @@ describe('SunMemoryAsync', () => {
         name: 'users',
         schema,
         universe: univ,
+        sunF(coll) {
+          sun = new SunMemoryAsync<User, number>(coll);
+          return sun;
+        },
       });
-
-      sun = new SunMemoryAsync<User, number>(coll);
     });
 
     it('should apply field filters when setting a record', async () => {
@@ -238,9 +237,13 @@ describe('SunMemoryAsync', () => {
         name: 'users',
         schema,
         universe: univ,
+        sunF(coll) {
+          sun = new SunMemoryAsync<User & { lastUpdated?: string }, number>(
+            coll,
+          );
+          return sun;
+        },
       });
-
-      sun = new SunMemoryAsync<User & { lastUpdated?: string }, number>(coll);
     });
 
     it('should apply record filter when setting a record', async () => {

@@ -99,14 +99,13 @@ export abstract class SunBase<
     }
   }
 
-  protected validateInput(input: any) {
+  protected validate(input: any) {
     if (isObj(input)) {
       const inputObj = input as Record<string, any>;
       this.eachField((field, fieldName) => {
         if (field.meta?.optional && inputObj[fieldName] === undefined) {
           return;
         }
-
         const result = validateField(
           inputObj[fieldName],
           fieldName,

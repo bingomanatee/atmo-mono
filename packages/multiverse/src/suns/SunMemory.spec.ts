@@ -27,8 +27,11 @@ describe('SunMemory', () => {
       name: 'users',
       schema,
       universe: univ,
+      sunF(coll) {
+        sun = new SunMemory<User, number>(coll);
+        return sun;
+      },
     });
-    sun = new SunMemory<User, number>(coll);
   });
 
   describe('constructor', () => {
@@ -311,15 +314,13 @@ describe('SunMemory', () => {
       });
     });
 
-    describe.only('Collection locking', () => {
-      it.only('should throw on set operations during mutation', () => {
-        console.log('----- starting -----', expect.getState().currentTestName);
+    describe('Collection locking', () => {
+      it('should throw on set operations during mutation', () => {
         expect(() =>
           sun.mutate(1, (draft, collection) => {
             if (draft) {
               // Try to set another record during mutation
               collection.set(4, { id: 4, name: 'New User', age: 22 });
-
               // Update the draft
               draft.name = 'Updated Name';
             }
@@ -329,30 +330,25 @@ describe('SunMemory', () => {
         expect(sun.has(4)).toBeFalsy();
       });
 
-      it('should queue delete operations during mutation', () => {
-        // Create a spy on the delete method
-        const deleteSpy = vi.spyOn(sun, 'delete');
-
-        // Mutate with a function that tries to delete another record
-        sun.mutate(1, (draft, collection) => {
-          if (draft) {
-            // Try to delete another record during mutation
+      it('should throw on delete operations during mutation', () => {
+        expect(() => {
+          sun.mutate(1, (draft, collection) => {
             collection.delete(2);
+            if (draft) {
+              // Try to delete another record during mutation
 
-            // Update the draft
-            draft.name = 'Updated Name';
-            return draft;
-          }
-        });
+              // Update the draft
+              draft.name = 'Updated Name';
+              return draft;
+            }
+          });
+        }).toThrow();
 
         // Check that the original record was updated
-        expect(sun.get(1)?.name).toBe('Updated Name');
+        expect(sun.get(1)?.name).toBe('John Doe');
 
         // Check that the other record was deleted (after the mutation completed)
-        expect(sun.has(2)).toBe(false);
-
-        // Check that delete was called once for the queued operation
-        expect(deleteSpy).toHaveBeenCalledTimes(1);
+        expect(sun.has(2)).toBe(true);
       });
     });
   });
@@ -383,9 +379,6 @@ describe('SunMemory', () => {
         expect(() => sun.mutate(1, errorMutator)).toThrow(
           'Test error in sync mutator',
         );
-
-        // Verify that console.error was called
-        expect(consoleSpy).toHaveBeenCalled();
 
         // Verify that the original record is unchanged
         expect(sun.get(1)).toEqual({

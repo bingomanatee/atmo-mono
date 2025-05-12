@@ -404,7 +404,7 @@ class RxJSSun<RecordType, KeyType>
   }
 
   set(key: KeyType, record: RecordType) {
-    this.validateInput(record);
+    this.validate(record);
     this.getSubject(key).next(record);
   }
 
@@ -510,7 +510,7 @@ class RemoteAPISun<RecordType, KeyType>
   }
 
   async set(key: KeyType, record: RecordType) {
-    this.validateInput(record);
+    this.validate(record);
 
     // Send to API
     try {
@@ -648,7 +648,7 @@ class PassthroughAPISun<RecordType, KeyType>
   }
 
   async set(key: KeyType, record: RecordType) {
-    this.validateInput(record);
+    this.validate(record);
 
     // Send to API, don't store locally
     try {

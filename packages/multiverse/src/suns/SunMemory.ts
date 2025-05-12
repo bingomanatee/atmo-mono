@@ -11,11 +11,13 @@ export class SunMemory<RecordType, KeyType>
 {
   // Private data storage
   #data: ExtendedMap<KeyType, RecordType>;
+  id: string;
 
   constructor(coll: CollSyncIF<RecordType, KeyType>) {
     super();
     this.coll = coll;
     this.#data = new ExtendedMap();
+    this.id = 'sun' + Math.random();
   }
 
   /**
@@ -33,8 +35,6 @@ export class SunMemory<RecordType, KeyType>
   }
 
   set(key: KeyType, record: RecordType) {
-    // If the collection is locked, queue the set operation
-    console.log('sun memory set', key, record, this._locked, this);
     if (this._locked) {
       throw new Error(
         'cannot set during locked operations - usually mutations',
@@ -43,7 +43,7 @@ export class SunMemory<RecordType, KeyType>
 
     let existing = this.#data.get(key);
 
-    this.validateInput(record);
+    this.validate(record);
 
     if (isObj(record)) {
       for (const fieldName of Object.keys(this.coll.schema.fields)) {
@@ -78,18 +78,15 @@ export class SunMemory<RecordType, KeyType>
   delete(key: KeyType) {
     // If the collection is locked, queue the delete operation
     if (this._locked) {
-      this._queueEvent(() => this.delete(key));
-      return;
+      throw new Error('cannot delete during lock -- usually during mutation');
     }
 
     this.#data.delete(key);
   }
 
   clear() {
-    // If the collection is locked, queue the clear operation
     if (this._locked) {
-      this._queueEvent(() => this.clear());
-      return;
+      throw new Error('cannot clear during lock -- usually during mutation');
     }
 
     this.#data.clear();
@@ -204,9 +201,7 @@ export class SunMemory<RecordType, KeyType>
 
     try {
       const existing = this.#data.get(key);
-      console.log('sun memory starting mutate', this._locked);
       const result = mutator(existing, this.coll);
-      console.log('sun memory done with mutate', this._locked);
       this._locked = false;
       return this._afterMutate(key, result);
     } finally {

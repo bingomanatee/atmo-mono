@@ -55,8 +55,11 @@ describe('SunMemoryImmer', () => {
       name: 'users',
       schema,
       universe: univ,
+      sunF(coll) {
+        sun = new SunMemoryImmer<User, number>(coll);
+        return sun;
+      },
     });
-    sun = new SunMemoryImmer<User, number>(coll);
   });
 
   describe('constructor', () => {
@@ -195,8 +198,11 @@ describe('SunMemoryImmer', () => {
         name: 'users',
         schema,
         universe: univ,
+        sunF(coll) {
+          sun = new SunMemoryImmer<any, string>(coll);
+          return sun;
+        },
       });
-      sun = new SunMemoryImmer<any, string>(coll);
 
       // Set up initial data
       sun.set('user1', { id: 'user1', name: 'John Doe', age: 30 });
@@ -548,9 +554,11 @@ describe('SunMemoryImmer', () => {
         name: 'entities',
         schema,
         universe: univ,
+        sunF(coll) {
+          sun = new SunMemoryImmer<any, string>(coll);
+          return sun;
+        },
       });
-
-      sun = new SunMemoryImmer<any, string>(coll);
     });
 
     describe('PositionEntity class', () => {
