@@ -1,3 +1,4 @@
+import { Observable, type Subject, type Subscribable } from 'rxjs';
 import type {
   CollBaseIF,
   SchemaLocalIF,
@@ -111,4 +112,12 @@ export abstract class CollBase<RecordType, KeyType = string>
       collection: CollIF<RecordType, KeyType>,
     ) => RecordType | void | any | Promise<RecordType | void | any>,
   ): number | Promise<number>;
+
+  abstract getMany$?(
+    keys: KeyType[],
+  ): Observable<{ key: KeyType; value: RecordType }>;
+  abstract getAll$?(): Observable<{ key: KeyType; value: RecordType }>;
+  abstract sendMany?(
+    keys: KeyType[],
+  ): Subscribable<{ key: KeyType; value: RecordType; sent: boolean }>;
 }

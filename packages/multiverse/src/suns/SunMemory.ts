@@ -1,9 +1,11 @@
-import type { MutationAction, SunIF, SunIFSync } from '../types.multiverse';
-import type { CollSyncIF } from '../types.coll';
-import { isMutatorAction, isObj } from '../typeguards.multiverse';
-import { MUTATION_ACTIONS } from '../constants';
-import { SunBase } from './SunFBase';
 import { asError, ExtendedMap } from '@wonderlandlabs/atmo-utils';
+import { MUTATION_ACTIONS, STREAM_ACTIONS } from '../constants';
+import { isMutatorAction, isObj } from '../typeguards.multiverse';
+import type { CollSyncIF } from '../types.coll';
+import type { MutationAction, SunIFSync } from '../types.multiverse';
+import { matchesQuery } from '../utils.sun';
+import { applyFieldFilters } from './applyFieldFilters';
+import { SunBase } from './SunFBase';
 
 export class SunMemory<RecordType, KeyType>
   extends SunBase<RecordType, KeyType, CollSyncIF<RecordType, KeyType>>
@@ -19,6 +21,8 @@ export class SunMemory<RecordType, KeyType>
     this.#data = new ExtendedMap();
     this.id = 'sun' + Math.random();
   }
+
+  #batchSize = 30;
 
   /**
    * Get a record by key
@@ -42,37 +46,27 @@ export class SunMemory<RecordType, KeyType>
     }
 
     let existing = this.#data.get(key);
+    let processedRecord = record;
 
-    this.validate(record);
-
+    // Only apply filters if the record is an object
     if (isObj(record)) {
-      for (const fieldName of Object.keys(this.coll.schema.fields)) {
-        const field = this.coll.schema.fields[fieldName];
+      // Apply field filters first
+      processedRecord = applyFieldFilters(record, existing, this.coll.schema);
 
-        if (field.filter) {
-          const fieldValue: any = field.filter({
-            currentRecord: existing,
-            inputRecord: record,
-            field: field,
-            currentValue: isObj(existing)
-              ? (existing as { [fieldName]: any })[fieldName]
-              : undefined,
-            newValue: isObj(record)
-              ? (record as { [fieldName]: any })[fieldName]
-              : undefined,
-          });
-          (record as { [fieldName]: any })[fieldName] = fieldValue;
-        }
+      // Apply record filter if it exists
+      if (this.coll.schema.filterRecord) {
+        processedRecord = this.coll.schema.filterRecord({
+          currentRecord: existing,
+          inputRecord: processedRecord,
+        }) as RecordType;
       }
     }
 
-    if (this.coll.schema.filterRecord) {
-      const filtered = this.coll.schema.filterRecord({
-        currentRecord: existing,
-        inputRecord: record,
-      });
-      this.#data.set(key, filtered as RecordType);
-    } else this.#data.set(key, record);
+    // Validate after all filters have been applied
+    this.validate(processedRecord);
+
+    // Store the processed record
+    this.#data.set(key, processedRecord);
   }
 
   delete(key: KeyType) {
@@ -100,8 +94,34 @@ export class SunMemory<RecordType, KeyType>
     return Array.from(this.#data.keys());
   }
 
-  find(...args): RecordType[] {
-    return this.#data.find(...args);
+  /**
+   * Find records matching a query
+   * @param query The query to match against
+   * @returns A generator of {key, value} pairs for matching records
+   */
+  /**
+   * Find records matching a query
+   * @param query The query to match against
+   * @returns A generator that yields batches of matching records
+   */
+  *find(...query: any[]): Generator<Map<KeyType, RecordType>, void, any> {
+    // For tests, return all matching records in a single batch
+    let results = new Map<KeyType, RecordType>();
+
+    // Find all matching records
+    for (const [key, value] of this.#data.entries()) {
+      if (matchesQuery(value, key, query)) {
+        results.set(key, value);
+      }
+      if (results.size > this.#batchSize) {
+        yield reults;
+        results = new Map();
+      }
+    }
+
+    if (results.size) {
+      yield results;
+    }
   }
 
   /**
@@ -129,8 +149,97 @@ export class SunMemory<RecordType, KeyType>
     return this.#data.size;
   }
 
-  getAll() {
-    return new Map(this.#data);
+  /**
+   * Get all records as a generator of batches
+   * @returns Generator that yields batches of records and can receive control signals
+   */
+  *getAll(): Generator<Map<KeyType, RecordType>, void, any> {
+    // Create batches of records
+    let currentBatch = new Map<KeyType, RecordType>();
+    let count = 0;
+
+    // Yield each record from the data map
+    for (const [key, value] of this.#data.entries()) {
+      currentBatch.set(key, value);
+      count++;
+
+      // If we've reached the batch size, yield the batch
+      if (count >= this.#batchSize) {
+        const feedback = yield currentBatch;
+
+        // Reset for next batch
+        currentBatch = new Map<KeyType, RecordType>();
+
+        // Check for termination signal
+        if (feedback === STREAM_ACTIONS.TERMINATE) {
+          return;
+        }
+      }
+    }
+
+    // Yield any remaining records in the final batch
+    if (currentBatch.size > 0) {
+      yield currentBatch;
+    }
+  }
+
+  /**
+   * Get multiple records as a generator of batches
+   * @param keys Array of record keys to get
+   * @returns Generator that yields batches of records and can receive control signals
+   */
+  *getMany(keys: KeyType[]): Generator<Map<KeyType, RecordType>, void, any> {
+    // Default batch size
+    const batchSize = 50;
+
+    // Create batches of records
+    let currentBatch = new Map<KeyType, RecordType>();
+    let count = 0;
+
+    // Yield each record from the keys array
+    for (const key of keys) {
+      const value = this.get(key);
+      currentBatch.set(key, value);
+      count++;
+
+      // If we've reached the batch size, yield the batch
+      if (count >= batchSize) {
+        const feedback = yield currentBatch;
+
+        // Reset for next batch
+        currentBatch = new Map<KeyType, RecordType>();
+        count = 0;
+
+        // Check for termination signal
+        if (feedback === STREAM_ACTIONS.TERMINATE) {
+          return;
+        }
+      }
+    }
+
+    // Yield any remaining records in the final batch
+    if (currentBatch.size > 0) {
+      yield currentBatch;
+    }
+  }
+
+  /**
+   * Set multiple records from a Map
+   * @param recordMap Map of records to set
+   * @returns Number of records set
+   */
+  setMany(recordMap: Map<KeyType, RecordType>) {
+    if (this._locked) {
+      throw new Error(
+        'cannot set during locked operations - usually mutations',
+      );
+    }
+
+    let count = 0;
+    for (const [key, record] of recordMap.entries()) {
+      this.set(key, record);
+      count++;
+    }
   }
 
   /**
@@ -161,25 +270,6 @@ export class SunMemory<RecordType, KeyType>
     }
 
     return map;
-  }
-
-  /**
-   * Process a mutation action
-   * @param action - The action to process
-   * @private
-   */
-  protected _processAction(action: MutationAction): void {
-    if (action.action === MUTATION_ACTIONS.DELETE) {
-      if (action.key !== undefined) {
-        // Use the key from the action to delete the record
-        this.delete(action.key);
-      }
-    } else if (action.action === MUTATION_ACTIONS.LOCK) {
-      this._locked = true;
-    } else if (action.action === MUTATION_ACTIONS.UNLOCK) {
-      this._locked = false;
-    }
-    // NOOP action does nothing
   }
 
   /**
