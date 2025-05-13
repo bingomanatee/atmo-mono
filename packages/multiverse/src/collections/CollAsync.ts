@@ -66,15 +66,14 @@ export class CollAsync<RecordType, KeyType = string>
     }
   }
 
-  /**
-   * Find records matching a query
-   * The implementation of this method is engine-dependent
-   * @param query - The query to match against
-   * @returns A promise that resolves to an array of records matching the query
-   * @throws Error if the engine does not implement find
-   */
-  async find(...query: any[]) {
-    // If the engine has a find method, use it
+  getAll(): Generator<Map<KeyType, RecordType>, void, any> {
+    if (!this.#engine.getAll) {
+      throw new Error('getAll method not implemented by engine');
+    }
+    return this.#engine.getAll();
+  }
+
+  find(...query: any[]): Generator<Map<KeyType, RecordType>> {
     if (typeof this.#engine.find === 'function') {
       return this.#engine.find(...query);
     }

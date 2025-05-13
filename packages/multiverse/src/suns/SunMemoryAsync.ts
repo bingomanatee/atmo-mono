@@ -1,56 +1,67 @@
 import { ExtendedMap } from '@wonderlandlabs/atmo-utils';
-import { MUTATION_ACTIONS } from '../constants';
+import { MUTATION_ACTIONS, STREAM_ACTIONS } from '../constants';
 import { isMutatorAction, isObj } from '../typeguards.multiverse';
 import type { CollAsyncIF } from '../types.coll';
 import type { MutationAction, SunIF, SunIfAsync } from '../types.multiverse';
+import { matchesQuery } from '../utils.sun';
 import { applyFieldFilters } from './applyFieldFilters';
 import { SunBase } from './SunFBase.ts';
 
-export class SunMemoryAsync<R, K>
-  extends SunBase<R, K, CollAsyncIF<R, K>>
-  implements SunIF<R, K>
+export class SunMemoryAsync<RecordType, KeyType>
+  extends SunBase<RecordType, KeyType, CollAsyncIF<RecordType, KeyType>>
+  implements SunIF<RecordType, KeyType>
 {
-  #data: ExtendedMap<K, R>;
+  #batchSize = 30;
+  #data: ExtendedMap<KeyType, RecordType>;
 
-  constructor(coll: CollAsyncIF<R, K>) {
+  constructor(coll: CollAsyncIF<RecordType, KeyType>) {
     super();
     this.coll = coll;
-    this.#data = new ExtendedMap<K, R>();
+    this.#data = new ExtendedMap<KeyType, RecordType>();
   }
 
-  async get(key: K) {
+  async get(key: KeyType) {
     return this.#data.get(key);
   }
 
-  async has(key: K) {
+  async has(key: KeyType) {
     return this.#data.has(key);
   }
 
-  async set(key: K, record: R) {
+  async set(key: KeyType, record: RecordType) {
     // If the collection is locked, queue the set operation
     if (this._locked) {
       throw new Error('cannot set when locked - usually during mutation');
     }
 
     let existing = this.#data.get(key);
+    let processedRecord = record;
+
+    // Apply field filters first
     if (isObj(record)) {
-      record = applyFieldFilters(record, existing, this.coll.schema);
+      processedRecord = applyFieldFilters(
+        { ...record },
+        existing,
+        this.coll.schema,
+      );
     }
 
+    // Apply record filter if it exists
     if (this.coll.schema.filterRecord) {
-      const filtered = this.coll.schema.filterRecord({
+      processedRecord = this.coll.schema.filterRecord({
         currentRecord: existing,
-        inputRecord: record,
-      });
-      this.validate(filtered);
-      this.#data.set(key, filtered as R);
-    } else {
-      this.validate(record);
-      this.#data.set(key, record);
+        inputRecord: processedRecord,
+      }) as RecordType;
     }
+
+    // Validate after all filters have been applied
+    this.validate(processedRecord);
+
+    // Store the processed record
+    this.#data.set(key, processedRecord);
   }
 
-  async delete(key: K) {
+  async delete(key: KeyType) {
     // If the collection is locked, queue the delete operation
     if (this._locked) {
       throw new Error('cannot delete when locked - usually during a mutation');
@@ -74,7 +85,7 @@ export class SunMemoryAsync<R, K>
    * Get all keys in the collection
    * @returns A promise that resolves to an array of keys
    */
-  async keys(): Promise<K[]> {
+  async keys(): Promise<KeyType[]> {
     return Array.from(this.#data.keys());
   }
 
@@ -83,8 +94,29 @@ export class SunMemoryAsync<R, K>
    * @param query - The query to match against
    * @returns A promise that resolves to an array of records matching the query
    */
-  async find(...query: any[]): Promise<Map<K, R>> {
-    return this.#data.find(...query);
+  *find(...query: any[]): Generator<Map<KeyType, RecordType>> {
+    // For tests, return all matching records in a single batch
+    let results;
+
+    // Find all matching records
+    for (const [key, value] of this.#data.entries()) {
+      if (matchesQuery(value, key, query)) {
+        if (!results) results = new Map();
+        results.set(key, value);
+      } else {
+        continue;
+      }
+      if (results.size > this.#batchSize) {
+        const interrupt = yield results;
+        if (interrupt === STREAM_ACTIONS.TERMINATE) {
+          return;
+        }
+        results = new Map();
+      }
+    }
+
+    if (!results) yield new Map();
+    else if (results.size) yield results;
   }
 
   /**
@@ -93,7 +125,11 @@ export class SunMemoryAsync<R, K>
    * @returns A promise that resolves when all callbacks have been called
    */
   async each(
-    callback: (record: R, key: K, collection: CollAsyncIF<R, K>) => void,
+    callback: (
+      record: RecordType,
+      key: KeyType,
+      collection: CollAsyncIF<RecordType, KeyType>,
+    ) => void,
   ): Promise<void> {
     // Iterate through all records
     for (const [key, record] of this.#data.entries()) {
@@ -117,11 +153,15 @@ export class SunMemoryAsync<R, K>
    */
   async map(
     mapper: (
-      record: R,
-      key: K,
-      collection: CollAsyncIF<R, K>,
-    ) => R | void | MutationAction | Promise<R | void | MutationAction>,
-  ): Promise<Map<K, R>> {
+      record: RecordType,
+      key: KeyType,
+      collection: CollAsyncIF<RecordType, KeyType>,
+    ) =>
+      | RecordType
+      | void
+      | MutationAction
+      | Promise<RecordType | void | MutationAction>,
+  ): Promise<Map<KeyType, RecordType>> {
     const keys = await this.keys();
 
     const recordsAndKeys = await Promise.all(
@@ -161,12 +201,16 @@ export class SunMemoryAsync<R, K>
    * @returns A promise that resolves to the mutated record or undefined if deleted
    */
   async mutate(
-    key: K,
+    key: KeyType,
     mutator: (
-      draft: R | undefined,
-      collection: CollAsyncIF<R, K>,
-    ) => R | void | MutationAction | Promise<R | void | MutationAction>,
-  ): Promise<R | undefined> {
+      draft: RecordType | undefined,
+      collection: CollAsyncIF<RecordType, KeyType>,
+    ) =>
+      | RecordType
+      | void
+      | MutationAction
+      | Promise<RecordType | void | MutationAction>,
+  ): Promise<RecordType | undefined> {
     // Lock the collection during synchronous part of mutation
     this._locked = true;
     const value = await this.get(key);
@@ -191,9 +235,9 @@ export class SunMemoryAsync<R, K>
    * @private
    */
   async #afterMutate(
-    key: K,
-    result: R | void | MutationAction,
-  ): Promise<R | undefined> {
+    key: KeyType,
+    result: RecordType | void | MutationAction,
+  ): Promise<RecordType | undefined> {
     this._locked = false;
     if (!isMutatorAction(result)) {
       await this.set(key, result);

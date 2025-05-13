@@ -255,7 +255,7 @@ describe('CollAsync', () => {
       });
     });
 
-    it('should throw an error if find is not implemented', async () => {
+    it('should throw an error if find is not implemented', () => {
       // Create a mock engine without find method
       const mockEngine = {
         get: vi.fn(),
@@ -267,7 +267,7 @@ describe('CollAsync', () => {
       };
 
       // Create a collection with the mock engine
-      const mockColl = new CollAsync({
+      const coll = new CollAsync({
         name: 'mock-users',
         schema,
         universe: univ,
@@ -275,14 +275,20 @@ describe('CollAsync', () => {
       });
 
       // Expect find to throw an error
-      await expect(mockColl.find({})).rejects.toThrow(
-        'Find method not implemented',
-      );
+      expect(() => coll.find({})).toThrow(/Find method not/);
     });
 
     it('should find records by parameter query', async () => {
-      console.log(" Find users with status 'active'");
-      const results = await coll.find('status', 'active');
+      const generator = coll.find('status', 'active');
+      let results = new Map();
+      let data = generator.next();
+      let limit = 0;
+      while (!data.done) {
+        console.log('find.next value = ', data.value);
+        results = new Map([...results.entries(), ...data.value.entries()]);
+        data = generator.next();
+      }
+
       // Should return 2 users
       expect(results.size).toBe(2);
       expect(
@@ -294,9 +300,21 @@ describe('CollAsync', () => {
 
     it('should find records by function predicate', async () => {
       // Find users over 30
-      const results = await coll.find(
-        (user) => user.age !== undefined && user.age > 30,
-      );
+      const generator = coll.find((user) => user.age > 30);
+
+      const pop = await coll.getAll();
+      let results = new Map();
+
+      let data = generator.next();
+
+      while (!data.done) {
+        if (!data.done) {
+          results = new Map([...results.entries(), ...data.value.entries()]);
+          data = generator.next();
+        } else {
+          break;
+        }
+      }
 
       // Should return 2 users
       expect(results.size).toBe(2);
@@ -307,12 +325,12 @@ describe('CollAsync', () => {
       ).toEqual(['user3', 'user4'].sort());
     });
 
-    it('should return empty array if no records match', async () => {
+    it('should return empty map if no records match', async () => {
       // Find users with non-existent status
-      const results = await coll.find({ status: 'inactive' });
-
+      const generator = await coll.find('status', 'inactive');
+      const { value } = generator.next();
       // Should return empty array
-      expect(results.size).toBe(0);
+      expect(value.size).toBe(0);
     });
   });
 
