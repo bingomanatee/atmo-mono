@@ -3,7 +3,8 @@ import { MUTATION_ACTIONS } from '../constants';
 import { isMutatorAction, isObj } from '../typeguards.multiverse';
 import type { CollBaseIF, CollSyncIF } from '../types.coll';
 import type { MutationAction, SunIF, SunIFSync } from '../types.multiverse';
-import { SunBase } from './SunFBase.ts';
+import { applyFieldFilters } from './applyFieldFilters';
+import { SunBase } from './SunFBase';
 
 // Helper function for tests
 const delay = (fn: () => void) => setTimeout(fn, 0);
@@ -69,6 +70,31 @@ export class SunMemoryImmer<RecordType, KeyType>
     });
   }
 
+  #batchSize: number = 30;
+  *getMany(keys: KeyType[]): Generator<Map<KeyType, RecordType>> {
+    let out: Map<KeyType, RecordType> | undefined;
+
+    for (const key of keys) {
+      const value = this.#data.get(key);
+      if (value) {
+        if (!out) {
+          out = new Map();
+        }
+        out.set(key, value);
+        if (out.size > this.#batchSize) {
+          yield out;
+          out.clear();
+        }
+      }
+    }
+    if (!out) {
+      yield new Map();
+    }
+    if (out.size) {
+      yield out;
+    }
+  }
+
   getAll() {
     return new Map(this.#data);
   }
@@ -100,36 +126,34 @@ export class SunMemoryImmer<RecordType, KeyType>
     }
 
     let existing = this.#data.get(key);
-    const input = isObj(record) ? { ...record } : record;
+    let processedRecord = record;
 
-    this.validate(input);
+    // Only apply filters if the record is an object
+    if (isObj(record)) {
+      // Create a shallow copy to avoid mutating the original
+      processedRecord = { ...record };
 
-    for (const fieldName of Object.keys(this.coll.schema.fields)) {
-      const field = this.coll.schema.fields[fieldName];
+      // Apply field filters first
+      processedRecord = applyFieldFilters(
+        processedRecord,
+        existing,
+        this.coll.schema,
+      );
 
-      if (field.filter) {
-        const fieldValue: any = field.filter({
+      // Apply record filter if it exists
+      if (this.coll.schema.filterRecord) {
+        processedRecord = this.coll.schema.filterRecord({
           currentRecord: existing,
-          inputRecord: record,
-          field: field,
-          currentValue: isObj(existing)
-            ? (existing as { [fieldName]: any })[fieldName]
-            : undefined,
-          newValue: isObj(record)
-            ? (record as { [fieldName]: any })[fieldName]
-            : undefined,
-        });
-        (input as { [fieldName]: any })[fieldName] = fieldValue;
+          inputRecord: processedRecord,
+        }) as RecordType;
       }
     }
 
-    if (this.coll.schema.filterRecord) {
-      const filtered = this.coll.schema.filterRecord({
-        currentRecord: existing,
-        inputRecord: input,
-      });
-      this.#data.set(key, filtered as RecordType);
-    } else this.#data.set(key, input);
+    // Validate after all filters have been applied
+    this.validate(processedRecord);
+
+    // Store the processed record
+    this.#data.set(key, processedRecord);
   }
 
   /**

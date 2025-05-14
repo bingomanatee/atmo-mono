@@ -30,3 +30,11 @@ export const MUTATION_ACTIONS = {
 export const MUTATION_ACTIONS_VALUES = Array.from(
   Object.values(MUTATION_ACTIONS),
 );
+
+/**
+ * Special symbols for stream operations
+ */
+export const STREAM_ACTIONS = {
+  /** Terminate the stream immediately */
+  TERMINATE: Symbol('TERMINATE_STREAM'),
+} as const;

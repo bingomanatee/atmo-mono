@@ -1,11 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { SchemaLocal } from '../SchemaLocal.ts';
-import { FIELD_TYPES } from '../constants.ts';
-import type {
-  FieldLocalIF,
-  SchemaLocalIF,
-  PostParams,
-} from '../type.schema.ts';
+import { FIELD_TYPES } from '../constants';
+import { SchemaLocal } from '../SchemaLocal';
+import type { PostParams } from '../type.schema';
 
 describe('SchemaLocal', () => {
   describe('constructor', () => {

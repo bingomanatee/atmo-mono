@@ -1,29 +1,36 @@
-import type { SchemaBaseIF } from '../type.schema';
+import type { FieldLocalIF, SchemaBaseIF } from '../type.schema';
 import { isObj } from '../typeguards.multiverse';
 
 export function applyFieldFilters<R>(
-  record: R,
+  input: R,
   existing: R,
   schema: SchemaBaseIF,
 ) {
-  if (!isObj(record)) return record;
-  record = { ...record };
-  for (const fieldName of Object.keys(schema.fields)) {
-    const field = schema.fields[fieldName];
+  if (!isObj(input)) return input;
 
-    if (field.filter) {
+  let record = { ...input };
+
+  for (const fieldName of Object.keys(schema.fields)) {
+    const field: FieldLocalIF<R> | undefined = schema.fields[fieldName];
+
+    if (field && typeof field.filter === 'function') {
       const newValue = (record as { [fieldName]: any })[fieldName];
       const currentValue = isObj(existing)
         ? (existing as { [fieldName]: any })[fieldName]
         : undefined;
-      const fieldValue: any = field.filter({
-        currentRecord: existing,
-        inputRecord: record,
-        field,
-        currentValue,
-        newValue,
-      });
-      (record as { [fieldName]: any })[fieldName] = fieldValue;
+      try {
+        const fieldValue: any = field.filter({
+          currentRecord: existing,
+          inputRecord: record,
+          field,
+          currentValue,
+          newValue,
+        });
+        (record as { [fieldName]: any })[fieldName] = fieldValue;
+      } catch (err) {
+        console.error('field filter error:', err, fieldName, record);
+        throw err;
+      }
     }
   }
   return record;

@@ -50,8 +50,11 @@ export type FieldLocalIF<T = any> = FieldBaseIF & {
   name: string;
   universalName?: string;
   isLocal?: boolean; // if true, this field is not in the universal schema
+  exportOnly?: boolean; // if true, this field is only used during toUniversal conversion and not written to local records
   filter?: (params: PostParams) => T; // when a record is set,
   // this is called immediately before writing to update or generate the field
+  export?: (params: PostParams) => T; // used specifically during toUniversal conversion
+  // to transform the value for the universal schema
 };
 
 export type FieldLocalInputIF = FieldLocalIF;

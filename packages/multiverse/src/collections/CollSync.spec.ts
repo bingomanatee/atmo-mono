@@ -1,13 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { Multiverse } from '../Multiverse.ts';
-import { CollSync } from './CollSync.ts';
-import { Universe } from '../Universe.ts';
-import { FIELD_TYPES, MUTATION_ACTIONS } from '../constants.ts';
-import type { CollSyncIF } from '../types.coll.ts';
-import type { UniverseIF } from '../types.multiverse.ts';
-import { SchemaUniversal } from '../SchemaUniversal.ts';
-import { SchemaLocal } from '../SchemaLocal.ts';
-import memoryImmerSunF from '../suns/SunMemoryImmer.ts';
+import { FIELD_TYPES, MUTATION_ACTIONS } from '../constants';
+import { Multiverse } from '../Multiverse';
+import { SchemaLocal } from '../SchemaLocal';
+import { SchemaUniversal } from '../SchemaUniversal';
+import memoryImmerSunF from '../suns/SunMemoryImmer';
+import type { CollSyncIF } from '../types.coll';
+import type { UniverseIF } from '../types.multiverse';
+import { Universe } from '../Universe';
+import { deGenerateMaps } from '../utils/deGenerateMaps';
+import { CollSync } from './CollSync';
 
 // Helper function for tests
 const delayMs = (ms: number) =>
@@ -479,11 +480,6 @@ describe('CollSync', () => {
           return draft;
         });
 
-        console.log(
-          'should mutate an existing record: result of mutate is ',
-          result,
-        );
-
         // Check the result
         expect(result).toEqual({ id: 1, name: 'Jane Doe', age: 30 });
 
@@ -621,6 +617,50 @@ describe('CollSync', () => {
         expect(user.address.city).toBe('Anytown');
         expect('zip' in user.address).toBe(false);
       });
+    });
+  });
+
+  describe('getMany', () => {
+    let univ: Universe;
+    let schema: SchemaLocal;
+    let coll: CollSync<any, string>;
+
+    beforeEach(() => {
+      univ = new Universe('test-universe');
+      schema = new SchemaLocal('users', {
+        id: { type: FIELD_TYPES.string },
+        name: { type: FIELD_TYPES.string },
+        age: { type: FIELD_TYPES.number, meta: { optional: true } },
+        status: { type: FIELD_TYPES.string, meta: { optional: true } },
+      });
+      coll = new CollSync({
+        name: 'users',
+        schema,
+        universe: univ,
+        sunF: memoryImmerSunF,
+      });
+
+      // Set up initial data
+      coll.set('user1', { id: 'user1', name: 'John Doe', age: 30 });
+      coll.set('user2', { id: 'user2', name: 'Jane Smith', age: 25 });
+      coll.set('user3', {
+        id: 'user3',
+        name: 'Bob Johnson',
+        age: 40,
+        status: 'locked',
+      });
+    });
+
+    it('retrieves selected record', () => {
+      const many = deGenerateMaps(coll.getMany(['user1', 'user3']));
+      const keysOfMany = Array.from(many.keys()).sort();
+      expect(keysOfMany).toEqual(['user1', 'user3'].sort());
+    });
+
+    it('only retrieves present record', () => {
+      const many = deGenerateMaps(coll.getMany(['user1', 'user300']));
+      const keysOfMany = Array.from(many.keys()).sort();
+      expect(keysOfMany).toEqual(['user1'].sort());
     });
   });
 });

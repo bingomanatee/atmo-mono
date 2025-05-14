@@ -1,5 +1,5 @@
-import { FieldTypeValue, SchemaBaseIF } from '../type.schema';
 import { FIELD_TYPES } from '../constants';
+import { FieldTypeValue, SchemaBaseIF } from '../type.schema';
 import { isObj } from '../typeguards.multiverse';
 
 const isType = (s: string) => (value: any) => typeof value === s;
@@ -22,7 +22,8 @@ export function validateField(
 ) {
   const fieldSchema = schema.fields[key];
   if (!fieldSchema) {
-    throw new Error(`Field ${key} not found in schema`);
+    console.warn(`Field ${key} not found in schema of ${schema.name}`);
+    return;
   }
   const { type: fieldType, validator: fieldValidator } = fieldSchema;
   if (fieldValidator) {

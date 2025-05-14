@@ -1,11 +1,11 @@
-import { describe, expect, it, beforeEach, afterEach, vi } from 'vitest';
-import { SunMemory } from './SunMemory.ts';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { CollSync } from '../collections/CollSync';
 import { FIELD_TYPES, MUTATION_ACTIONS } from '../constants';
-import type { CollSyncIF } from '../types.coll';
 import { SchemaLocal } from '../SchemaLocal';
-import { CollSync } from '../collections/CollSync.ts';
+import type { PostParams } from '../type.schema';
+import type { CollSyncIF } from '../types.coll';
 import { Universe } from '../Universe';
-import type { PostParams, FieldLocalIF } from '../type.schema';
+import { SunMemory } from './SunMemory';
 
 type User = { id: number; name: string; age?: number; email?: string };
 

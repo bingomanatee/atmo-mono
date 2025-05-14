@@ -1,5 +1,5 @@
-import type { CollBaseIF, FieldLocalIF, SunIF } from '../types.multiverse';
 import { isObj } from '../typeguards.multiverse';
+import type { CollBaseIF, FieldLocalIF, SunIF } from '../types.multiverse';
 import { validateField } from '../utils/validateField';
 
 /**
@@ -107,6 +107,7 @@ export abstract class SunBase<
           if (field.meta?.optional && inputObj[fieldName] === undefined) {
             return;
           }
+
           const result = validateField(
             inputObj[fieldName],
             fieldName,

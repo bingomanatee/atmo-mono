@@ -1,14 +1,11 @@
 import type {
   DataRecord,
   FieldAnnotation,
-  FieldTypeValue,
-  LocalFieldRecord,
-  PostParams,
   FieldBaseIF,
   FieldBaseInputIF,
   FieldLocalIF,
-  FieldLocalInputIF,
-  SchemaLocalIF,
+  FieldTypeValue,
+  PostParams,
   SchemaUnivIF,
 } from './type.schema';
 import { isObj } from './typeguards.multiverse';
@@ -34,7 +31,8 @@ export class UnivCollField<T = any> implements FieldBaseIF<T> {
     params: LocalCollAddParams<T>,
     private coll: SchemaLocal,
   ) {
-    const { name, type, meta, universalName, isLocal, filter } = params;
+    const { name, type, meta, universalName, isLocal, exportOnly, filter } =
+      params;
 
     this.name = name;
     this.type = type;
@@ -45,6 +43,7 @@ export class UnivCollField<T = any> implements FieldBaseIF<T> {
       this.universalName = universalName;
     }
     this.isLocal = !!isLocal;
+    this.exportOnly = !!exportOnly;
     if (filter && typeof filter === 'function') {
       this.filter = filter;
     }
@@ -55,6 +54,7 @@ export class UnivCollField<T = any> implements FieldBaseIF<T> {
   meta?: FieldAnnotation | undefined;
   universalName?: string | undefined;
   isLocal?: boolean | undefined;
+  exportOnly?: boolean | undefined;
   filter?: (params: PostParams) => T;
 
   get c() {
@@ -97,5 +97,6 @@ type LocalCollAddParams<T> = {
   meta?: FieldAnnotation;
   universalName?: string | undefined;
   isLocal?: boolean | undefined;
+  exportOnly?: boolean | undefined;
   filter?: (params: PostParams) => T;
 };

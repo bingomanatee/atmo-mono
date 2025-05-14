@@ -5,7 +5,7 @@ export default defineConfig({
   build: {
     lib: {
       entry: resolve(__dirname, 'src/index.ts'),
-      name: 'atmo-plates',
+      name: 'atmoPlates',
       fileName: 'index',
       formats: ['es'],
     },
@@ -15,6 +15,12 @@ export default defineConfig({
     rollupOptions: {
       external: ['@wonderlandlabs/multiverse', 'h3-js', 'lodash-es', 'three'],
       output: {
+        globals: {
+          '@wonderlandlabs/multiverse': 'multiverse',
+          'h3-js': 'h3',
+          'lodash-es': '_',
+          three: 'THREE',
+        },
         preserveModules: true,
       },
     },

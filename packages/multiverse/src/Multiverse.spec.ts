@@ -1,11 +1,11 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { Multiverse } from './Multiverse';
-import type { DataRecord, MultiverseIF, UniverseIF } from './types.multiverse';
+import { CollSync } from './collections/CollSync';
 import { FIELD_TYPES } from './constants';
+import { Multiverse } from './Multiverse';
+import { SchemaLocal } from './SchemaLocal';
+import { SchemaUniversal } from './SchemaUniversal';
+import type { DataRecord, MultiverseIF, UniverseIF } from './types.multiverse';
 import { Universe } from './Universe';
-import { CollSync } from './collections/CollSync.ts';
-import { SchemaUniversal } from './SchemaUniversal.ts';
-import { SchemaLocal } from './SchemaLocal.ts';
 
 // Define types for our test cases
 type SnakeCaseUser = {
@@ -307,6 +307,10 @@ describe('Multiverse', () => {
           },
         }),
       });
+
+      // Add the collections to the universes
+      upperUniv.add(upperUsers);
+      snakeUniv.add(snakeUsers);
     });
 
     it('should transport a record from one universe to another', () => {
@@ -317,9 +321,15 @@ describe('Multiverse', () => {
       };
 
       upperUsers.set(record.ID, record);
-      const result = m.transport(1, 'users', upperUniv.name, snakeUniv.name);
+      m.transport(1, {
+        collectionName: 'users',
+        fromU: upperUniv.name,
+        toU: snakeUniv.name,
+      });
 
-      expect(result).toEqual({
+      const snakeUser = snakeUniv!.get('users')!.get(1);
+
+      expect(snakeUser).toEqual({
         id: 1,
         'full-name': 'John Doe',
         'home-address': '123 Main St',
@@ -333,7 +343,13 @@ describe('Multiverse', () => {
         'home-address': '123 Main St',
       };
       snakeUsers.set(record.id, record);
-      const result = m.transport(1, 'users', snakeUniv.name, upperUniv.name);
+      m.transport(1, {
+        collectionName: 'users',
+        fromU: snakeUniv.name,
+        toU: upperUniv.name,
+      });
+
+      const result = upperUniv.get('users')!.get(1);
 
       expect(result).toEqual({
         ID: 1,

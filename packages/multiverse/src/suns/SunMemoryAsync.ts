@@ -5,7 +5,7 @@ import type { CollAsyncIF } from '../types.coll';
 import type { MutationAction, SunIF, SunIfAsync } from '../types.multiverse';
 import { matchesQuery } from '../utils.sun';
 import { applyFieldFilters } from './applyFieldFilters';
-import { SunBase } from './SunFBase.ts';
+import { SunBase } from './SunFBase';
 
 export class SunMemoryAsync<RecordType, KeyType>
   extends SunBase<RecordType, KeyType, CollAsyncIF<RecordType, KeyType>>

@@ -1,38 +1,34 @@
 // a system has a collection of uniform records
-import type { SchemaLocalIF, DataKey, DataRecord } from './type.schema';
-import type { MutationAction, UniverseName } from './types.multiverse';
+import type { Observable } from 'rxjs';
+import type { DataKey, DataRecord, SchemaLocalIF } from './type.schema';
+import type { MutationAction, SendProps, TransportResult, UniverseName } from './types.multiverse';
 
 // ------------------- collection nodes -------------------
 
 export interface CollBaseIF {
   name: CollName;
   schema: SchemaLocalIF;
+
+  /**
+   * Find records matching a query and return as a stream
+   * @param batchSize Optional batch size for processing records
+   * @param query - The query to match against
+   * @returns Observable that emits {key, value} pairs for matching records
+   */
+  find?<RecordType = DataRecord, KeyType = DataKey>(
+    ...query: any[]
+  ): Generator<Map<KeyType, RecordType>>;
+  batchSize?: number;
 }
 
 export interface CollSyncIF<RecordType = DataRecord, KeyType = DataKey>
   extends CollBaseIF {
-  name: CollName;
-  schema: SchemaLocalIF;
-
-  get(key: KeyType): RecordType | undefined;
-  set(key: KeyType, value: RecordType): void;
-  getAll(): Map<KeyType, RecordType>;
-  has(key: KeyType): boolean;
-  mutate(
-    key: KeyType,
-    mutator: (
-      draft: RecordType | undefined,
-      collection: CollSyncIF<RecordType, KeyType>,
-    ) => RecordType | void | any,
-  ): RecordType | undefined;
-  send(key: KeyType, target: UniverseName): void;
   /**
-   * Find records matching a query
-   * The implementation of this method is engine-dependent
-   * @param query - The query to match against
-   * @returns An array of records matching the query
+   * Get the number of records in the collection
+   * @returns The number of records
    */
-  find(query: any): RecordType[];
+  count(): number;
+
   /**
    * Iterate over each record in the collection
    * @param callback - Function to call for each record
@@ -44,18 +40,30 @@ export interface CollSyncIF<RecordType = DataRecord, KeyType = DataKey>
       collection: CollSyncIF<RecordType, KeyType>,
     ) => void,
   ): void;
+
   /**
-   * Get the number of records in the collection
-   * @returns The number of records
+   * Find records matching a query
+   * The implementation of this method is engine-dependent
+   * @param query - The query to match against
+   * @param options - Optional parameters for the query
+   * @returns A map of records matching the query or an Observable stream of records
    */
-  count(): number;
-  /**
-   * Map over each record in the collection and apply a transformation
-   * @param mapper - Function to transform each record
-   * @param noTransaction - If true, changes are applied immediately without transaction support
-   * @returns The number of records processed
-   * @throws MapError if any mapper function throws and noTransaction is false
-   */
+  find(
+    ...query: any
+  ):
+    | Generator<KeyType, RecordType>
+    | Observable<{ key: KeyType; value: RecordType }>;
+
+  get(key: KeyType): RecordType | undefined;
+
+  getAll(): Generator<Map<KeyType, RecordType>>;
+
+  getMany(keys: KeyType[]): Generator<{ key: KeyType; value: RecordType }>;
+
+  has(key: KeyType): boolean;
+
+  isAsync: false;
+
   map(
     mapper: (
       record: RecordType,
@@ -64,36 +72,38 @@ export interface CollSyncIF<RecordType = DataRecord, KeyType = DataKey>
     ) => RecordType | void | any,
     noTransaction?: boolean,
   ): number;
-  isAsync: false;
-}
 
-export interface CollAsyncIF<RecordType = DataRecord, KeyType = DataKey>
-  extends CollBaseIF {
-  isAsync: true;
-  get(key: KeyType): Promise<RecordType | undefined>;
-  getAll(): Promise<Map<KeyType, RecordType>>;
-  set(key: KeyType, value: RecordType): Promise<void>;
-  has(key: KeyType): Promise<boolean>;
   mutate(
     key: KeyType,
     mutator: (
       draft: RecordType | undefined,
-      collection: CollAsyncIF<RecordType, KeyType>,
-    ) => Promise<RecordType | MutationAction>,
-  ): Promise<RecordType | undefined>;
-  send(key: KeyType, target: UniverseName): Promise<void>;
+      collection: CollSyncIF<RecordType, KeyType>,
+    ) => RecordType | void | any,
+  ): RecordType | undefined;
+
+  name: CollName;
+
+  schema: SchemaLocalIF;
+
+  send(key: KeyType, target: UniverseName): void;
+
+  sendAll(props: SendProps<RecordType, KeyType>): TransportResult;
+
+  sendMany(keys: KeyType[], props: SendProps<RecordType, K>): TransportResult;
+
+  set(key: KeyType, value: RecordType): void;
+
+  setMany(values: Map<KeyType, RecordType>): void;
+}
+
+export interface CollAsyncIF<RecordType = DataRecord, KeyType = DataKey>
+  extends CollBaseIF {
   /**
-   * Find records matching a query
-   * The implementation of this method is engine-dependent
-   * @param query - The query to match against
-   * @returns A promise that resolves to an array of records matching the query
+   * Get the number of records in the collection
+   * @returns A promise that resolves to the number of records
    */
-  find(query: any): Promise<RecordType[]>;
-  /**
-   * Iterate over each record in the collection
-   * @param callback - Function to call for each record
-   * @returns A promise that resolves when all callbacks have been called
-   */
+  count(): Promise<number>;
+
   each(
     callback: (
       record: RecordType,
@@ -101,18 +111,21 @@ export interface CollAsyncIF<RecordType = DataRecord, KeyType = DataKey>
       collection: CollAsyncIF<RecordType, KeyType>,
     ) => void | Promise<void>,
   ): Promise<void>;
-  /**
-   * Get the number of records in the collection
-   * @returns A promise that resolves to the number of records
-   */
-  count(): Promise<number>;
-  /**
-   * Map over each record in the collection and apply a transformation
-   * @param mapper - Function to transform each record
-   * @param noTransaction - If true, changes are applied immediately without transaction support
-   * @returns A promise that resolves to the number of records processed
-   * @throws MapError if any mapper function throws and noTransaction is false
-   */
+
+  find(...query: any[]): Generator<Map<KeyType, RecordType>>;
+
+  get(key: KeyType): Promise<RecordType | undefined>;
+
+  getAll(): Generator<Map<KeyType, RecordType>>;
+
+  getMany(
+    keys: KeyType[],
+    batchSize?: number,
+  ): Generator<Map<KeyType, RecordType>;
+
+  has(key: KeyType): Promise<boolean>;
+
+  isAsync: true;
   map(
     mapper: (
       record: RecordType,
@@ -120,6 +133,29 @@ export interface CollAsyncIF<RecordType = DataRecord, KeyType = DataKey>
       collection: CollAsyncIF<RecordType, KeyType>,
     ) => RecordType | void | any | Promise<RecordType | void | any>,
   ): Promise<Map<KeyType, RecordType>>;
+
+  mutate(
+    key: KeyType,
+    mutator: (
+      draft: RecordType | undefined,
+      collection: CollAsyncIF<RecordType, KeyType>,
+    ) => Promise<RecordType | MutationAction>,
+  ): Promise<RecordType | undefined>;
+
+  send(key: KeyType, target: UniverseName): TransportResult;
+
+  sendAll(
+    props: SendProps<RecordType, KeyType>
+  ): TransportResult;
+
+  sendMany(
+    keys: KeyType[],
+    props: SendProps<RecordType, KeyType>
+  ): TransportResult;
+
+  set(key: KeyType, value: RecordType): Promise<void>;
+
+  setMany(input: Map<KeyType, RecordType>): Promise<void>;
 }
 
 export type CollName = string;

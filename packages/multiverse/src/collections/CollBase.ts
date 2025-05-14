@@ -1,12 +1,12 @@
-import { Observable, type Subject, type Subscribable } from 'rxjs';
+import { Observable, type Subscribable } from 'rxjs';
+import type { CollIF } from '../types.coll';
 import type {
   CollBaseIF,
   SchemaLocalIF,
   SunIF,
   UniverseIF,
   UniverseName,
-} from '../types.multiverse.ts';
-import type { CollIF } from '../types.coll.ts';
+} from '../types.multiverse';
 
 /**
  * Base class for collections with common functionality

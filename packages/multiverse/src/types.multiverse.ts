@@ -1,3 +1,5 @@
+import type { Subscription } from 'rxjs';
+import { PartialObserver } from 'rxjs';
 import type { DataKey, DataRecord, UnivSchemaMap } from './type.schema';
 import type { CollBaseIF, CollIF, CollName } from './types.coll';
 
@@ -22,7 +24,12 @@ export interface SunIF<RecordType = DataRecord, KeyType = DataKey> {
       draft: RecordType | undefined,
     ) => Promise<RecordType | MutationAction>,
   ): any;
-  find?(...query: any[]): RecordType[] | Promise<Map<KeyType, RecordType>>;
+  /**
+   * Find records matching a query
+   * @param query - The query to match against
+   * @returns A generator of {key, value} pairs for matching records
+   */
+  find?(query: any): Generator<{ key: KeyType; value: RecordType }>;
 
   keys?(): any;
 
@@ -46,11 +53,33 @@ export interface SunIF<RecordType = DataRecord, KeyType = DataKey> {
     ) => RecordType | void | any,
     noTransaction?: boolean,
   ): any;
+
+  /**
+   * Get multiple records as a generator of {key, value} pairs
+   * @param keys Array of record keys to get
+   * @returns A generator of {key, value} pairs for matching records
+   */
+  getMany?(keys: KeyType[]): Generator<{ key: KeyType; value: RecordType }>;
+
+  /**
+   * Get all records as a generator of {key, value} pairs
+   * @returns A generator of {key, value} pairs for all records
+   */
+  getAll():
+    | Generator<{ key: KeyType; value: RecordType }>
+    | Promise<Generator<{ key: KeyType; value: RecordType }>>;
+
+  /**
+   * Set multiple records from a Map
+   * @param recordMap Map of records to set
+   * @returns Number of records set
+   */
+  setMany?(recordMap: Map<KeyType, RecordType>): number | Promise<number>;
 }
 export interface SunIFSync<RecordType = DataRecord, KeyType = DataKey>
   extends SunIF<RecordType, KeyType> {
   get(key: KeyType): RecordType | undefined;
-  getAll(): Map<KeyType, RecordType>;
+  getAll(): Generator<{ key: KeyType; value: RecordType }>;
   set(key: KeyType, value: RecordType): void;
   delete(key: KeyType): void;
   clear(): void;
@@ -66,11 +95,11 @@ export interface SunIFSync<RecordType = DataRecord, KeyType = DataKey>
     mutator: (draft: RecordType | undefined) => RecordType | void | any,
   ): RecordType;
   /**
-   * Optional method to find records matching a query
+   * Find records matching a query
    * @param query - The query to match against
-   * @returns An array of records matching the query
+   * @returns A generator of {key, value} pairs for matching records
    */
-  find?(...query: any[]): RecordType[] | Map<KeyType, RecordType>;
+  find?(query: any): Generator<{ key: KeyType; value: RecordType }>;
   /**
    * Optional method to get all keys in the collection
    * @returns An array of keys
@@ -101,33 +130,16 @@ export interface SunIFSync<RecordType = DataRecord, KeyType = DataKey>
 
 export interface SunIfAsync<RecordType = DataRecord, KeyType = DataKey>
   extends SunIF {
-  get(key: KeyType): Promise<RecordType | undefined>;
-  getAll(): Promise<Map<KeyType, RecordType>>;
-  set(key: KeyType, value: RecordType): Promise<void>;
-  delete(key: KeyType): Promise<void>;
   clear(): Promise<void>;
-  has(key: KeyType): Promise<boolean>;
+
   /**
-   * Optional method to mutate a record
-   * @param key - The key of the record to mutate
-   * @param mutator - A function that accepts the previous record (or undefined) and returns a new record
-   * @returns The mutated record or undefined if deleted
+   * Get the number of records in the collection
+   * @returns The number of records for sync collections, Promise<number> for async collections
    */
-  mutate?(
-    key: KeyType,
-    mutator: (draft: RecordType | undefined) => RecordType | void | any,
-  ): Promise<RecordType>;
-  /**
-   * Optional method to find records matching a query
-   * @param query - The query to match against
-   * @returns An array of records matching the query
-   */
-  find?(...query: any[]): RecordType[] | Promise<Map<KeyType, RecordType>>;
-  /**
-   * Optional method to get all keys in the collection
-   * @returns An array of keys
-   */
-  keys?(): KeyType[] | Promise<KeyType[]>;
+  count(): number | Promise<number>;
+
+  delete(key: KeyType): Promise<void>;
+
   /**
    * Iterate over each record in the collection
    * @param callback - Function to call for each record
@@ -140,18 +152,27 @@ export interface SunIfAsync<RecordType = DataRecord, KeyType = DataKey>
       collection: CollBaseIF,
     ) => void,
   ): void | Promise<void>;
+
   /**
-   * Get the number of records in the collection
-   * @returns The number of records for sync collections, Promise<number> for async collections
+   * Optional method to find records matching a query
+   * @param query - The query to match against
+   * @returns An array of records matching the query
    */
-  count(): number | Promise<number>;
+  find?(...query: any[]): RecordType[] | Promise<Map<KeyType, RecordType>>;
+
+  get(key: KeyType): Promise<RecordType | undefined>;
+
+  getMany(keys: KeyType[]): AsyncGenerator<Map<KeyType, RecordType>>;
+  getAll(): AsyncGenerator<{ key: KeyType; value: RecordType }>;
+
+  has(key: KeyType): Promise<boolean>;
+
   /**
-   * Map over each record in the collection and apply a transformation
-   * @param mapper - Function to transform each record
-   * @param noTransaction - If true, changes are applied immediately without transaction support
-   * @returns The number of records processed for sync collections, Promise<number> for async collections
-   * @throws MapError if any mapper function throws and noTransaction is false
+   * Optional method to get all keys in the collection
+   * @returns An array of keys
    */
+  keys?(): KeyType[] | Promise<KeyType[]>;
+
   map?(
     mapper: (
       record: RecordType,
@@ -160,6 +181,13 @@ export interface SunIfAsync<RecordType = DataRecord, KeyType = DataKey>
     ) => RecordType | void | any,
     noTransaction?: boolean,
   ): Map<KeyType, RecordType> | Promise<Map<KeyType, RecordType>>;
+
+  mutate?(
+    key: KeyType,
+    mutator: (draft: RecordType | undefined) => RecordType | void | any,
+  ): Promise<RecordType>;
+
+  set(key: KeyType, value: RecordType): Promise<void>;
 }
 
 export interface UniverseIF {
@@ -179,18 +207,37 @@ export interface MultiverseIF {
   add(u: UniverseIF): UniverseIF;
   baseSchemas: UnivSchemaMap;
 
-  transport(
+  transport<RecordType = DataRecord, KeyType = any>(
     keyK: any,
-    collectionName: string,
-    fromU: UniverseName,
-    toU: UniverseName,
+    props: TransportProps<RecordType, KeyType>,
   ): void | Promise<void>;
-  localToUnivFieldMap(coll: CollIF): Record<string, string>;
-  univToLocalFieldMap(coll: CollIF): Record<string, string>;
+  localToUnivFieldMap(coll: CollIF, univName: string): Record<string, string>;
+  univToLocalFieldMap(coll: CollIF, univName: string): Record<string, string>;
   toLocal(record: any, coll: CollBaseIF, uName: string): any; //convert record from a "multiversal" record to a collection
   toUniversal(record: any, coll: CollBaseIF, uName: string): any; //convert record from a collection to a "multiversal" record
+  transportGenerator<RecordType = DataRecord, KeyType = any>(
+    props: TransportProps<KeyType, RecordType>,
+  ): TransportResult;
 }
 
+type Listener<T> = PartialObserver<T> | ((value: T) => void);
+
+export type TransportProps<KeyType, RecordType> = {
+  generator: Generator<Map<KeyType, RecordType>>;
+  collectionName: string;
+  fromU: UniverseName;
+  toU: UniverseName;
+  listener?: Listener<StreamMsg>;
+};
+
+export type TransportResult = Subscription | undefined;
+
+export type SendProps<R, K> = Omit<TransportProps<R, K>, 'generator'>;
+export type StreamMsg = {
+  current?: number;
+  total?: number;
+  error?: Error;
+};
 export * from './type.schema';
 export * from './types.coll';
 

@@ -1,13 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { FIELD_TYPES, MUTATION_ACTIONS } from '../constants.ts';
-import { Multiverse } from '../Multiverse.ts';
-import { SchemaLocal } from '../SchemaLocal.ts';
-import { SchemaUniversal } from '../SchemaUniversal.ts';
-import { memoryImmerAsyncSunF } from '../suns/SunMemoryImmerAsync.ts';
-import type { CollAsyncIF } from '../types.coll.ts';
-import type { UniverseIF } from '../types.multiverse.ts';
-import { Universe } from '../Universe.ts';
-import { CollAsync } from './CollAsync.ts';
+import { FIELD_TYPES, MUTATION_ACTIONS } from '../constants';
+import { Multiverse } from '../Multiverse';
+import { SchemaLocal } from '../SchemaLocal';
+import { SchemaUniversal } from '../SchemaUniversal';
+import { memoryImmerAsyncSunF } from '../suns/SunMemoryImmerAsync';
+import type { CollAsyncIF } from '../types.coll';
+import type { UniverseIF } from '../types.multiverse';
+import { Universe } from '../Universe';
+import { CollAsync } from './CollAsync';
 
 const TEST_ERROR = 'Test Error';
 // Helper function for tests
@@ -284,7 +284,6 @@ describe('CollAsync', () => {
       let data = generator.next();
       let limit = 0;
       while (!data.done) {
-        console.log('find.next value = ', data.value);
         results = new Map([...results.entries(), ...data.value.entries()]);
         data = generator.next();
       }

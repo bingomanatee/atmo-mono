@@ -1,11 +1,11 @@
+import { immerable } from 'immer';
 import { Vector3 } from 'three';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { CollSync } from '../collections/CollSync.ts';
+import { beforeEach, describe, expect, it } from 'vitest';
+import { CollSync } from '../collections/CollSync';
 import { FIELD_TYPES, MUTATION_ACTIONS } from '../constants';
 import { SchemaLocal } from '../SchemaLocal';
 import { Universe } from '../Universe';
 import { SunMemoryImmer } from './SunMemoryImmer';
-import { immerable } from 'immer';
 
 interface User {
   id: number;

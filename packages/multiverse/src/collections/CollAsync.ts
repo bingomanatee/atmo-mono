@@ -1,11 +1,11 @@
-import sunMemoryAsyncF from '../suns/SunMemoryAsync.ts';
-import type { CollIF } from '../types.coll.ts';
+import sunMemoryAsyncF from '../suns/SunMemoryAsync';
+import type { CollIF } from '../types.coll';
 import type {
   CollAsyncIF,
   SchemaLocalIF,
   SunIfAsync,
   UniverseIF,
-} from '../types.multiverse.ts';
+} from '../types.multiverse';
 
 type CollParms<RecordType, KeyType = string> = {
   name: string;
@@ -66,7 +66,14 @@ export class CollAsync<RecordType, KeyType = string>
     }
   }
 
-  getAll(): Generator<Map<KeyType, RecordType>, void, any> {
+  getMany(keys: KeyType[]) {
+    if (!this.#engine.getMany) {
+      throw new Error('getAll method not implemented by engine');
+    }
+    return this.#engine.getMany(keys);
+  }
+
+  getAll(): AsyncGenerator<Map<KeyType, RecordType>, void, any> {
     if (!this.#engine.getAll) {
       throw new Error('getAll method not implemented by engine');
     }

@@ -1,12 +1,13 @@
 import type {
-  FieldLocalIF,
-  FieldLocalInputIF,
-  SchemaLocalIF,
   DataRecord,
   FieldAnnotation,
+  FieldLocalIF,
+  FieldLocalInputIF,
   FieldTypeValue,
   LocalFieldRecord,
   PostParams,
+  SchemaLocalIF,
+  ValidatorFn,
 } from './type.schema';
 import { isObj } from './typeguards.multiverse';
 import { inputToSchema } from './utils/inputToSchema';
@@ -31,7 +32,17 @@ class LocalCollField<T = any> implements FieldLocalIF<T> {
     params: LocalCollAddParams<T>,
     private coll: SchemaLocal,
   ) {
-    const { name, type, meta, universalName, isLocal, filter } = params;
+    const {
+      name,
+      type,
+      meta,
+      universalName,
+      isLocal,
+      exportOnly,
+      filter,
+      export: exportFn,
+      validator,
+    } = params;
     if (!name) {
       throw new Error('name is required in LocalCollField');
     }
@@ -44,8 +55,15 @@ class LocalCollField<T = any> implements FieldLocalIF<T> {
       this.universalName = universalName;
     }
     this.isLocal = !!isLocal;
+    this.exportOnly = !!exportOnly;
     if (filter && typeof filter === 'function') {
       this.filter = filter;
+    }
+    if (exportFn && typeof exportFn === 'function') {
+      this.export = exportFn;
+    }
+    if (validator && typeof validator === 'function') {
+      this.validator = validator;
     }
   }
 
@@ -54,7 +72,10 @@ class LocalCollField<T = any> implements FieldLocalIF<T> {
   meta?: FieldAnnotation | undefined;
   universalName?: string | undefined;
   isLocal?: boolean | undefined;
+  exportOnly?: boolean | undefined;
+  validator?: ValidatorFn | undefined;
   filter?: (params: PostParams) => T;
+  export?: (params: PostParams) => T;
 
   get c() {
     return this.coll;
@@ -99,5 +120,8 @@ type LocalCollAddParams<T> = {
   meta?: FieldAnnotation;
   universalName?: string | undefined;
   isLocal?: boolean | undefined;
+  exportOnly?: boolean | undefined;
   filter?: (params: PostParams) => T;
+  export?: (params: PostParams) => T;
+  validator?: (value: T) => any;
 };

@@ -1,13 +1,12 @@
-import memorySunF from '../suns/SunMemory';
-import type { CollIF, CollSyncIF } from '../types.coll';
+import { Observable } from 'rxjs';
+import memorySunF from '../suns/SunMemory.ts';
+import type { CollIF, CollSyncIF } from '../types.coll.ts';
 import type {
   SchemaLocalIF,
-  SendProps,
   SunIFSync,
-  TransportResult,
   UniverseIF,
   UniverseName,
-} from '../types.multiverse';
+} from '../types.multiverse.ts';
 
 type CollParms<RecordType, KeyType = string> = {
   name: string;
@@ -29,24 +28,24 @@ export class CollSync<RecordType, KeyType = string>
     this.name = name;
     this.schema = schema;
     this.#universe = universe;
-    this.sun = (sunF ?? memorySunF)(this);
+    this.#engine = (sunF ?? memorySunF)(this);
     if (universe) {
       universe.add(this);
     }
   }
 
-  sun: SunIFSync<RecordType, KeyType>;
+  #engine: SunIFSync<RecordType, KeyType>;
 
   get(identity: KeyType): RecordType | undefined {
-    return this.sun.get(identity);
+    return this.#engine.get(identity);
   }
 
   has(key: KeyType): boolean {
-    return this.sun.has(key);
+    return this.#engine.has(key);
   }
 
   set(key: KeyType, value: RecordType): void {
-    this.sun.set(key, value);
+    this.#engine.set(key, value);
   }
 
   mutate(
@@ -56,12 +55,12 @@ export class CollSync<RecordType, KeyType = string>
       collection: CollSyncIF<RecordType, KeyType>,
     ) => RecordType | void | any,
   ): RecordType | undefined {
-    if (typeof this.sun.mutate !== 'function') {
+    if (typeof this.#engine.mutate !== 'function') {
       throw new Error(
         `collection ${this.name} engine does not support mutation`,
       );
     }
-    return this.sun.mutate(key, mutator);
+    return this.#engine.mutate(key, mutator);
   }
 
   /**
@@ -69,11 +68,12 @@ export class CollSync<RecordType, KeyType = string>
    * @returns Generator that yields batches of records
    */
   getAll(): Generator<Map<KeyType, RecordType>, void, any> {
-    if (!this.sun.getAll) {
+    if (!this.#engine.getAll) {
       throw new Error('getAll method not implemented by engine');
     }
-    return this.sun.getAll();
+    return this.#engine.getAll();
   }
+
   /**
    * Find records matching a query
    * @param query - The query to match against
@@ -94,8 +94,8 @@ export class CollSync<RecordType, KeyType = string>
     }
 
     // If the engine has a find method, use it
-    if (typeof this.sun.find === 'function') {
-      return this.sun.find(query);
+    if (typeof this.#engine.find === 'function') {
+      return this.#engine.find(query);
     }
 
     // Throw an error if find is not implemented
@@ -115,18 +115,18 @@ export class CollSync<RecordType, KeyType = string>
       collection: CollSyncIF<RecordType, KeyType>,
     ) => RecordType,
   ): Map<KeyType, RecordType> {
-    if (typeof this.sun.map === 'function') {
-      return this.sun.map((record, key) => mapper(record, key, this));
+    if (typeof this.#engine.map === 'function') {
+      return this.#engine.map((record, key) => mapper(record, key, this));
     }
 
-    if (typeof this.sun.keys !== 'function') {
+    if (typeof this.#engine.keys !== 'function') {
       throw new Error(
         'This collection cannot implement map: engine as no keys or map  functions',
       );
     }
 
     return new Map(
-      Array.from(this.sun.keys()).map((key) => {
+      Array.from(this.#engine.keys()).map((key) => {
         const record = this.get(key)!;
         return [key, mapper(record, key, this)];
       }),
@@ -160,18 +160,18 @@ export class CollSync<RecordType, KeyType = string>
     ) => void,
   ): void {
     // If the engine has an each method, use it
-    if (typeof this.sun.each === 'function') {
-      this.sun.each((record, key) => callback(record, key, this));
+    if (typeof this.#engine.each === 'function') {
+      this.#engine.each((record, key) => callback(record, key, this));
       return;
     }
 
     // Fallback implementation using keys
-    if (typeof this.sun.keys !== 'function') {
+    if (typeof this.#engine.keys !== 'function') {
       throw new Error(
         `Each method not implemented for collection ${this.name}`,
       );
     }
-    const keys = this.sun.keys();
+    const keys = this.#engine.keys();
     for (const key of keys) {
       const record = this.get(key)!;
       callback(record, key, this);
@@ -179,10 +179,19 @@ export class CollSync<RecordType, KeyType = string>
     return;
   }
 
+  /**
+   * Get the number of records in the collection
+   * @returns The number of records
+   */
   count(): number {
     // If the engine has a count method, use it
-    if (typeof this.sun.count === 'function') {
-      return this.sun.count();
+    if (typeof this.#engine.count === 'function') {
+      return this.#engine.count();
+    }
+
+    // Fallback implementation using keys
+    if (typeof this.#engine.keys === 'function') {
+      return this.#engine.keys().length;
     }
 
     // Throw an error if neither count nor keys is implemented
@@ -190,22 +199,15 @@ export class CollSync<RecordType, KeyType = string>
   }
 
   /**
-   * Get multiple records as a generator of {key, value} pairs
+   * Get multiple records as a generator of batches
    * @param keys Array of record keys to get
-   * @returns Generator that yields records one by one
+   * @returns Generator that yields batches of records
    */
-  getMany(keys: KeyType[]): Generator<Map<KeyType, RecordType>> {
-    // If the engine has a getMany method, use it
-    if (typeof this.sun.getMany !== 'function') {
-      console.log(
-        'cannot getMany from engine',
-        this.sun,
-        typeof this.sun.getMany,
-      );
-      throw new Error(`sun ${this.name} does not have getMany implementation`);
+  getMany(keys: KeyType[]): Generator<Map<KeyType, RecordType>, void, any> {
+    if (!this.#engine.getMany) {
+      throw new Error('getMany method not implemented by engine');
     }
-
-    return this.sun.getMany(keys);
+    return this.#engine.getMany(keys);
   }
 
   /**
@@ -213,40 +215,91 @@ export class CollSync<RecordType, KeyType = string>
    * @param recordMap Map of records to set
    * @returns Number of records set
    */
-  setMany(recordMap: Map<KeyType, RecordType>): void {
+  setMany(recordMap: Map<KeyType, RecordType>): number {
     // If the engine has a setMany method, use it
-    if (typeof this.sun.setMany === 'function') {
-      return this.sun.setMany(recordMap);
+    if (typeof this.#engine.setMany === 'function') {
+      return this.#engine.setMany(recordMap);
     }
 
-    recordMap.forEach((record, key) => {
-      this.set(key, record);
-    });
+    // Fallback implementation using set
+    let count = 0;
+    for (const [key, record] of recordMap.entries()) {
+      try {
+        this.set(key, record);
+        count++;
+      } catch (error) {
+        console.error(`Error setting record ${key}:`, error);
+      }
+    }
+
+    return count;
   }
 
+  /**
+   * Send multiple records to another universe
+   * @param keys Array of record keys to send
+   * @param target Target universe name
+   * @returns Observable that emits progress updates
+   */
   sendMany(
     keys: KeyType[],
-    props: SendProps<RecordType, KeyType>,
-  ): TransportResult {
-    // Get the multiverse instance
-    const multiverse = this.#universe.multiverse;
-    if (!multiverse) {
-      throw new Error('sendManny: Multiverse not found');
-    }
-
-    const generator = this.getMany(keys);
-    return multiverse.transportGenerator({ ...props, generator });
-  }
-
-  sendAll(props: SendProps<RecordType, KeyType>): TransportResult {
+    target: UniverseName,
+  ): Observable<{
+    processed: number;
+    successful: number;
+    failed: number;
+    total: number;
+    key?: KeyType;
+    error?: Error;
+  }> {
     // Get the multiverse instance
     const multiverse = this.#universe.multiverse;
     if (!multiverse) {
       throw new Error('Multiverse not found');
     }
 
-    // Get all keys from the collection
-    const generator = this.getAll();
-    return multiverse.transportGenerator({ ...props, generator });
+    // Use the generator-based approach for better performance and memory usage
+    const recordGenerator = this.getMany(keys);
+
+    // Use transportGenerator to send the records to the target universe
+    return multiverse.transportGenerator(
+      recordGenerator,
+      this.name,
+      this.#universe.name,
+      target,
+    );
+  }
+
+  /**
+   * Send all records to another universe
+   * @param target Target universe name
+   * @returns Observable that emits progress updates
+   */
+  sendAll(
+    target: UniverseName,
+  ): Observable<{
+    processed: number;
+    successful: number;
+    failed: number;
+    total: number;
+    key?: KeyType;
+    error?: Error;
+  }> {
+    // Get the multiverse instance
+    const multiverse = this.#universe.multiverse;
+    if (!multiverse) {
+      throw new Error('Multiverse not found');
+    }
+
+    // Use the generator-based approach for better performance and memory usage
+    const recordGenerator = this.getAll();
+
+    // Use transportGenerator to send the records to the target universe
+    return multiverse.transportGenerator(
+      recordGenerator,
+      this.name,
+      this.#universe.name,
+      target,
+    );
   }
 }

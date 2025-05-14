@@ -189,26 +189,23 @@ export class SunMemory<RecordType, KeyType>
    * @returns Generator that yields batches of records and can receive control signals
    */
   *getMany(keys: KeyType[]): Generator<Map<KeyType, RecordType>, void, any> {
-    // Default batch size
-    const batchSize = 50;
-
     // Create batches of records
-    let currentBatch = new Map<KeyType, RecordType>();
-    let count = 0;
-
+    let currentBatch: Map<KeyType, RecordType>;
+    //@TODO: find?
     // Yield each record from the keys array
     for (const key of keys) {
-      const value = this.get(key);
+      const value = this.#data.get(key);
+      if (!currentBatch) {
+        currentBatch = new Map();
+      }
       currentBatch.set(key, value);
-      count++;
 
       // If we've reached the batch size, yield the batch
-      if (count >= batchSize) {
+      if (currentBatch.size >= this.#batchSize) {
         const feedback = yield currentBatch;
 
         // Reset for next batch
         currentBatch = new Map<KeyType, RecordType>();
-        count = 0;
 
         // Check for termination signal
         if (feedback === STREAM_ACTIONS.TERMINATE) {
@@ -217,8 +214,9 @@ export class SunMemory<RecordType, KeyType>
       }
     }
 
-    // Yield any remaining records in the final batch
-    if (currentBatch.size > 0) {
+    if (!currentBatch) {
+      yield new Map();
+    } else if (currentBatch.size) {
       yield currentBatch;
     }
   }

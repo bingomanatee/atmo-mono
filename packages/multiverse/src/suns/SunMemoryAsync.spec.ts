@@ -1,11 +1,11 @@
-import { beforeEach, describe, expect, it, afterEach, vi } from 'vitest';
-import { SunMemoryAsync } from './SunMemoryAsync.ts';
+import { beforeEach, describe, expect, it } from 'vitest';
+import { CollAsync } from '../collections/CollAsync';
 import { FIELD_TYPES, MUTATION_ACTIONS } from '../constants';
-import type { CollAsyncIF } from '../types.coll';
 import { SchemaLocal } from '../SchemaLocal';
-import { CollAsync } from '../collections/CollAsync.ts';
-import { Universe } from '../Universe';
 import type { PostParams } from '../type.schema';
+import type { CollAsyncIF } from '../types.coll';
+import { Universe } from '../Universe';
+import { SunMemoryAsync } from './SunMemoryAsync';
 
 type User = { id: number; name: string; age?: number; email?: string };
 const TEST_ERROR = 'Test Error';
