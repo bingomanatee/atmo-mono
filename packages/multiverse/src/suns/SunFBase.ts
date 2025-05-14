@@ -1,3 +1,4 @@
+import { get } from 'lodash-es';
 import { isObj } from '../typeguards.multiverse';
 import type { CollBaseIF, FieldLocalIF, SunIF } from '../types.multiverse';
 import { validateField } from '../utils/validateField';
@@ -108,8 +109,10 @@ export abstract class SunBase<
             return;
           }
 
+          const value = get(input, fieldName);
+
           const result = validateField(
-            inputObj[fieldName],
+            value,
             fieldName,
             this.coll.schema,
             input,

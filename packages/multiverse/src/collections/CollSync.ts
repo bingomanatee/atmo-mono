@@ -74,6 +74,12 @@ export class CollSync<RecordType, KeyType = string>
     }
     return this.sun.getAll();
   }
+  delete(key: KeyType) {
+    if (this.sun.delete) {
+      return this.sun.delete(key);
+    }
+    throw new Error('delete method not implemented by engine');
+  }
   /**
    * Find records matching a query
    * @param query - The query to match against

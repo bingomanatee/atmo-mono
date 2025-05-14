@@ -40,9 +40,24 @@ export function validateField(
     return false;
   }
 
-  const validator = validatorMap.get(fieldType as FieldTypeValue);
-  if (!validator) {
+  const typeValidator = validatorMap.get(fieldType as FieldTypeValue);
+  if (!typeValidator) {
     return false;
   }
-  return validator(value) ? false : `${key} is not a valid ${fieldType}`;
+  const isValid = typeValidator(value);
+  if (!isValid) {
+    console.log(
+      'cannot validate field',
+      key,
+      'of',
+      record,
+      ', value of ',
+      value,
+      'of type',
+      fieldType,
+      ':',
+      isValid,
+    );
+  }
+  return isValid ? false : `${key} is not a valid ${fieldType}`;
 }

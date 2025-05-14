@@ -68,12 +68,6 @@ export interface SchemaBaseIF {
   fields: Record<FieldName, FieldBaseIF>;
 }
 
-export interface SchemaBaseInputIF {
-  name?: CollName;
-  fields: Record<FieldName, FieldLocalInputIF>;
-  filterRecord?: (params: PostParams) => DataRecord;
-}
-
 export interface SchemaLocalIF<RecordType = DataRecord> extends SchemaBaseIF {
   name?: CollName; // name may be inferred from container
   fields: Record<FieldName, FieldLocalIF>;

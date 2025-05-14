@@ -46,9 +46,9 @@ describe('Multiverse with Async Collections', () => {
       name: 'users',
       universe: syncUniverse,
       schema: new SchemaLocal('users', {
-        id: { type: FIELD_TYPES.number },
-        name: { type: FIELD_TYPES.string },
-        address: { type: FIELD_TYPES.string },
+        id: { name: 'id', type: FIELD_TYPES.number },
+        name: { name: 'name', type: FIELD_TYPES.string },
+        address: { name: 'address', type: FIELD_TYPES.string },
       }),
     });
 
@@ -56,9 +56,9 @@ describe('Multiverse with Async Collections', () => {
       name: 'users',
       universe: asyncUniverse,
       schema: new SchemaLocal('users', {
-        id: { type: FIELD_TYPES.number },
-        name: { type: FIELD_TYPES.string },
-        address: { type: FIELD_TYPES.string },
+        id: { name: 'id', type: FIELD_TYPES.number },
+        name: { name: 'name', type: FIELD_TYPES.string },
+        address: { name: 'address', type: FIELD_TYPES.string },
       }),
     });
   });
@@ -106,9 +106,9 @@ describe('Multiverse with Async Collections', () => {
         name: 'users',
         universe: anotherAsyncUniverse,
         schema: new SchemaLocal('users', {
-          id: { type: FIELD_TYPES.number },
-          name: { type: FIELD_TYPES.string },
-          address: { type: FIELD_TYPES.string },
+          id: { name: 'id', type: FIELD_TYPES.number },
+          name: { name: 'name', type: FIELD_TYPES.string },
+          address: { name: 'address', type: FIELD_TYPES.string },
         }),
       });
 

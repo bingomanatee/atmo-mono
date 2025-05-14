@@ -73,6 +73,15 @@ export class CollAsync<RecordType, KeyType = string>
     return this.#engine.getMany(keys);
   }
 
+  delete(key: KeyType): Promise<void> {
+    if (this.#engine.delete) {
+      return this.#engine.delete(key);
+    }
+    throw new Error(
+      `delete method not implemented for collection ${this.name}`,
+    );
+  }
+
   getAll(): AsyncGenerator<Map<KeyType, RecordType>, void, any> {
     if (!this.#engine.getAll) {
       throw new Error('getAll method not implemented by engine');

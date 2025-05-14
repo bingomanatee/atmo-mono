@@ -1,7 +1,12 @@
 // a system has a collection of uniform records
 import type { Observable } from 'rxjs';
 import type { DataKey, DataRecord, SchemaLocalIF } from './type.schema';
-import type { MutationAction, SendProps, TransportResult, UniverseName } from './types.multiverse';
+import type {
+  MutationAction,
+  SendProps,
+  TransportResult,
+  UniverseName,
+} from './types.multiverse';
 
 // ------------------- collection nodes -------------------
 
@@ -11,13 +16,12 @@ export interface CollBaseIF {
 
   /**
    * Find records matching a query and return as a stream
-   * @param batchSize Optional batch size for processing records
    * @param query - The query to match against
-   * @returns Observable that emits {key, value} pairs for matching records
+   * @returns Generator that emits batches of matching records
    */
   find?<RecordType = DataRecord, KeyType = DataKey>(
     ...query: any[]
-  ): Generator<Map<KeyType, RecordType>>;
+  ): Generator<Map<KeyType, RecordType>, void, any>;
   batchSize?: number;
 }
 
@@ -121,7 +125,7 @@ export interface CollAsyncIF<RecordType = DataRecord, KeyType = DataKey>
   getMany(
     keys: KeyType[],
     batchSize?: number,
-  ): Generator<Map<KeyType, RecordType>;
+  ): Generator<Map<KeyType, RecordType>>;
 
   has(key: KeyType): Promise<boolean>;
 
@@ -144,13 +148,11 @@ export interface CollAsyncIF<RecordType = DataRecord, KeyType = DataKey>
 
   send(key: KeyType, target: UniverseName): TransportResult;
 
-  sendAll(
-    props: SendProps<RecordType, KeyType>
-  ): TransportResult;
+  sendAll(props: SendProps<RecordType, KeyType>): TransportResult;
 
   sendMany(
     keys: KeyType[],
-    props: SendProps<RecordType, KeyType>
+    props: SendProps<RecordType, KeyType>,
   ): TransportResult;
 
   set(key: KeyType, value: RecordType): Promise<void>;

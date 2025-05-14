@@ -1,6 +1,7 @@
 import { asError } from '@wonderlandlabs/atmo-utils';
 import { get, set } from 'lodash-es';
 import { Subject, Subscription } from 'rxjs';
+import { FIELD_TYPES } from './constants';
 import type {
   CollBaseIF,
   DataRecord,
@@ -131,6 +132,24 @@ export class Multiverse implements MultiverseIF {
   toLocal(record: any, coll: CollBaseIF, univName: string): any {
     const out: Record<string, any> = {};
     const map = this.univToLocalFieldMap(coll, univName);
+
+    for (const univField of Object.keys(map)) {
+      const localName = map[univField];
+      const fieldDef = coll.schema.fields[localName] as FieldLocalIF;
+
+      if (fieldDef?.isLocal) {
+        if (get(out, localName) === undefined) {
+          switch (fieldDef.type) {
+            case FIELD_TYPES.object:
+              set(out, localName, {});
+              break;
+            case FIELD_TYPES.array:
+              set(out, localName, []);
+              break;
+          }
+        }
+      }
+    }
 
     for (const univField of Object.keys(map)) {
       const localField = map[univField];

@@ -5,10 +5,9 @@
     "rootDir": "./src",
     "declaration": true,
     "declarationDir": "./dist/types",
-    "noEmit": false,
+    "emitDeclarationOnly": true,
     "moduleResolution": "node",
     "resolveJsonModule": true,
-    "allowImportingTsExtensions": true,
     "verbatimModuleSyntax": false,
     "skipLibCheck": true,
     "noEmitOnError": false

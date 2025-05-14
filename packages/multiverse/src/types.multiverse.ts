@@ -211,8 +211,14 @@ export interface MultiverseIF {
     keyK: any,
     props: TransportProps<RecordType, KeyType>,
   ): void | Promise<void>;
-  localToUnivFieldMap(coll: CollIF, univName: string): Record<string, string>;
-  univToLocalFieldMap(coll: CollIF, univName: string): Record<string, string>;
+  localToUnivFieldMap(
+    collection: CollBaseIF,
+    univName: string,
+  ): Record<string, string>;
+  univToLocalFieldMap(
+    collection: CollBaseIF,
+    univName: string,
+  ): Record<string, string>;
   toLocal(record: any, coll: CollBaseIF, uName: string): any; //convert record from a "multiversal" record to a collection
   toUniversal(record: any, coll: CollBaseIF, uName: string): any; //convert record from a collection to a "multiversal" record
   transportGenerator<RecordType = DataRecord, KeyType = any>(
