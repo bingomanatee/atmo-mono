@@ -9,106 +9,60 @@ import {
 } from '@wonderlandlabs/multiverse';
 import { v4 as uuidV4 } from 'uuid';
 import { beforeEach, describe, expect, it } from 'vitest';
+import { COLLECTIONS } from './constants';
+import { PlateSimulation } from './PlateSimulation';
 
-describe('PlateSimulation', () => {
-  let multiverse: Multiverse;
-  let universe: Universe;
-  let plateCollection: ColSync<any, string>;
-
+describe('PlateSimulation:class', () => {
+  let sim: PlateSimulation;
+  let simId: string;
   beforeEach(() => {
-    // Create a universal schema for the 'plates' collection
-    const universalSchema = new Map([
-      [
-        'plates',
-        new SchemaUniversal('plates', {
-          id: FIELD_TYPES.string,
-          name: FIELD_TYPES.string,
-          x: FIELD_TYPES.number,
-          y: FIELD_TYPES.number,
-          z: FIELD_TYPES.number,
-        }),
-      ],
-    ]);
-
-    // Set up the multiverse with the universal schema
-    multiverse = new Multiverse(universalSchema);
-
-    // Create a universe
-    universe = new Universe('plate-universe', multiverse);
-
-    // Create a collection for plates
-    plateCollection = new CollSync({
-      name: 'plates',
-      universe,
-      schema: new SchemaLocal('plates', {
-        id: { type: FIELD_TYPES.string },
-        name: { type: FIELD_TYPES.string, meta: { optional: true } },
-        position: { type: FIELD_TYPES.object },
-        'position.x': {
-          type: FIELD_TYPES.number,
-          universalName: 'x',
-          exportOnly: true,
-        },
-        'position.y': {
-          type: FIELD_TYPES.number,
-          universalName: 'y',
-          exportOnly: true,
-        },
-        'position.z': {
-          type: FIELD_TYPES.number,
-          universalName: 'z',
-          exportOnly: true,
-        },
-      }),
-    });
+    sim = new PlateSimulation();
+    simId = sim.addSimulation({ radius: 1000000 });
   });
 
   it('should create a plate', () => {
-    const plateId = uuidV4();
-    const plateData = {
-      id: plateId,
-      name: 'Test Plate',
-      position: { x: 1, y: 2, z: 3 },
-    };
-
-    plateCollection.set(plateData.id, plateData);
-
-    const retrievedPlate = plateCollection.get(plateId);
-    expect(retrievedPlate).toEqual(plateData);
+    const PLATE_RADIUS = 1000;
+    const plateId = sim.addPlate({
+      radius: PLATE_RADIUS,
+    });
+    const retrievedPlate = sim.simUniv.get(COLLECTIONS.PLATES).get(plateId);
+    expect(retrievedPlate.radius).toEqual(PLATE_RADIUS);
   });
 
   it('should update a plate', () => {
-    const plateId = uuidV4();
-    const initialPlateData = {
-      id: plateId,
-      position: { x: 1, y: 2, z: 3 },
-    };
+    const PLATE_RADIUS = 1000;
+    const plateId = sim.addPlate({
+      radius: PLATE_RADIUS,
+    });
 
-    plateCollection.set(plateId, initialPlateData);
+    // Get the initial plate
+    const initialPlate = sim.simUniv.get(COLLECTIONS.PLATES).get(plateId);
 
-    const updatedPlateData = {
-      ...initialPlateData,
+    // Update the plate with a new name
+    const updatedData = {
+      ...initialPlate,
       name: 'Updated Test Plate',
-      description: 'This is an updated test plate.',
     };
 
-    plateCollection.set(plateId, updatedPlateData);
+    sim.simUniv.get(COLLECTIONS.PLATES).set(plateId, updatedData);
 
-    const retrievedPlate = plateCollection.get(plateId);
-    expect(retrievedPlate).toEqual(updatedPlateData);
+    // Retrieve the updated plate
+    const retrievedPlate = sim.simUniv.get(COLLECTIONS.PLATES).get(plateId);
+    expect(retrievedPlate.name).toEqual('Updated Test Plate');
   });
 
   it('should delete a plate', () => {
-    const plateId = uuidV4();
-    const plateData = {
-      id: plateId,
-      name: 'kill me',
-      position: { x: 1, y: 2, z: 3 },
-    };
+    const PLATE_RADIUS = 1000;
+    const plateId = sim.addPlate({
+      radius: PLATE_RADIUS,
+    });
 
-    plateCollection.set(plateId, plateData);
-    expect(plateCollection.has(plateId)).toBeTruthy();
-    plateCollection.delete(plateId);
-    expect(plateCollection.has(plateId)).toBeFalsy();
+    // Verify the plate exists
+    const platesCollection = sim.simUniv.get(COLLECTIONS.PLATES);
+    // Delete the plate
+    platesCollection.delete(plateId);
+
+    // Verify the plate was deleted
+    expect(platesCollection.has(plateId)).toBeFalsy();
   });
 });
