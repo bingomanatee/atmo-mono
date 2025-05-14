@@ -85,7 +85,7 @@ function simUniverse(mv: Multiverse) {
           optional: true,
         },
       },
-      position: FIELD_TYPES.object,
+      position: { type: FIELD_TYPES.object, isLocal: true },
       'position.x': {
         exportOnly: true,
         type: FIELD_TYPES.number,
