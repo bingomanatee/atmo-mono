@@ -1,14 +1,5 @@
-import { Vector3, Quaternion } from 'three';
+import { Vector3, Quaternion, type Vector3Like } from 'three';
 import { DataKey, DataRecord } from '@wonderlandlabs/multiverse';
-
-/**
- * Interface for a point in 3D space
- */
-export interface Point3D {
-  x: number;
-  y: number;
-  z: number;
-}
 
 /**
  * Interface for a quaternion representing orientation
@@ -26,7 +17,7 @@ export interface Orientation {
 export interface TreeNodeData extends DataRecord {
   id: string;
   parentId?: string;
-  position: Point3D;
+  position: Vector3Like;
   orientation: Orientation;
   children?: string[];
 }
@@ -39,27 +30,23 @@ export interface TreeNodeIF {
   parentId?: string;
   parent?: TreeNodeIF;
   children: TreeNodeIF[];
-  
+
   // Local properties
   position: Vector3;
-  orientation: Quaternion;
-  
+  quaternion: Quaternion;
+
   // World properties
   worldPosition: Vector3;
-  worldOrientation: Quaternion;
-  
+  worldQuaternion: Quaternion;
+
   // Methods
-  setPosition(position: Vector3 | Point3D): void;
-  setOrientation(orientation: Quaternion | Orientation): void;
-  setWorldPosition(position: Vector3 | Point3D): void;
-  setWorldOrientation(orientation: Quaternion | Orientation): void;
-  
-  addChild(node: TreeNodeIF): void;
-  removeChild(node: TreeNodeIF): void;
-  
-  localToWorld(point: Vector3 | Point3D): Vector3;
-  worldToLocal(point: Vector3 | Point3D): Vector3;
-  
+  // Use Object3D methods directly for manipulating position and quaternion
+  // add(object: Object3D): this;
+  // remove(object: Object3D): this;
+
+  localToWorld(point: Vector3Like): Vector3;
+  worldToLocal(point: Vector3Like): Vector3;
+
   toData(): TreeNodeData;
   updateFromData(data: TreeNodeData): void;
 }
@@ -69,12 +56,12 @@ export interface TreeNodeIF {
  */
 export interface ThreeTreeIF {
   nodes: Map<string, TreeNodeIF>;
-  
+
   createNode(data: Partial<TreeNodeData>): TreeNodeIF;
   getNode(id: string): TreeNodeIF | undefined;
   removeNode(id: string): boolean;
   moveNode(id: string, newParentId?: string): boolean;
-  
+
   toData(): TreeNodeData[];
   fromData(data: TreeNodeData[]): void;
 }

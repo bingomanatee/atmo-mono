@@ -144,7 +144,10 @@ export class PlateSimulation {
         position,
       });
     }
+    this.#initPlateSteps(id);
   }
+
+  #initPlateSteps(plateId: string) {}
 
   makePlanet(radius: number) {
     if (radius < 1000) {
