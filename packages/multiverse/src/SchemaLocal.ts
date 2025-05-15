@@ -41,7 +41,9 @@ class LocalCollField<T = any> implements FieldLocalIF<T> {
       exportOnly,
       filter,
       export: exportFn,
+      import: importFn,
       validator,
+      univFields,
     } = params;
     if (!name) {
       throw new Error('name is required in LocalCollField');
@@ -62,8 +64,14 @@ class LocalCollField<T = any> implements FieldLocalIF<T> {
     if (exportFn && typeof exportFn === 'function') {
       this.export = exportFn;
     }
+    if (importFn && typeof importFn === 'function') {
+      this.import = importFn;
+    }
     if (validator && typeof validator === 'function') {
       this.validator = validator;
+    }
+    if (univFields && isObj(univFields)) {
+      this.univFields = univFields;
     }
   }
 
@@ -76,6 +84,8 @@ class LocalCollField<T = any> implements FieldLocalIF<T> {
   validator?: ValidatorFn | undefined;
   filter?: (params: PostParams) => T;
   export?: (params: PostParams) => T;
+  import?: (params: PostParams) => T;
+  univFields?: Record<string, string>;
 
   get c() {
     return this.coll;
@@ -123,5 +133,7 @@ type LocalCollAddParams<T> = {
   exportOnly?: boolean | undefined;
   filter?: (params: PostParams) => T;
   export?: (params: PostParams) => T;
+  import?: (params: PostParams) => T;
   validator?: (value: T) => any;
+  univFields?: Record<string, string>;
 };

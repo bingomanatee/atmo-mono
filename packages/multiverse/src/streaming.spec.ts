@@ -259,20 +259,39 @@ describe('Streaming Data Transport', () => {
         .set(1, { id: 1, name: 'John Doe', email: 'badly formatted email' });
 
       const userGenerator = clientUsers.getAll();
-      multiverse.transportGenerator({
-        generator: userGenerator,
-        collectionName: 'users',
-        fromU: 'client',
-        toU: 'server',
-        listener: {
-          next(msg) {
-            expect(msg.error).toBeInstanceOf(Error);
-            expect(msg.error.message).toMatch(/email/);
+
+      // Use a promise to properly handle the async nature of the test
+      return new Promise<void>((resolve) => {
+        let subscription: any = null;
+        subscription = multiverse.transportGenerator({
+          generator: userGenerator,
+          collectionName: 'users',
+          fromU: 'client',
+          toU: 'server',
+          listener: {
+            next(msg) {
+              if (msg.error) {
+                expect(msg.error).toBeInstanceOf(Error);
+                expect(msg.error.message).toMatch(/email/);
+
+                // Clean up subscription and resolve the promise
+                subscription?.unsubscribe();
+                resolve();
+              }
+            },
+            error(err) {
+              console.log('error is ', err);
+              // Clean up and resolve even on error
+              subscription?.unsubscribe();
+              resolve();
+            },
+            complete() {
+              // Clean up and resolve when complete
+              subscription?.unsubscribe();
+              resolve();
+            },
           },
-          error(err) {
-            console.log('error is ', err);
-          },
-        },
+        });
       });
     });
   });

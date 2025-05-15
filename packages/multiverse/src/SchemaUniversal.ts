@@ -31,8 +31,16 @@ export class UnivCollField<T = any> implements FieldBaseIF<T> {
     params: LocalCollAddParams<T>,
     private coll: SchemaLocal,
   ) {
-    const { name, type, meta, universalName, isLocal, exportOnly, filter } =
-      params;
+    const {
+      name,
+      type,
+      meta,
+      universalName,
+      isLocal,
+      exportOnly,
+      filter,
+      import: importFn,
+    } = params;
 
     this.name = name;
     this.type = type;
@@ -47,6 +55,9 @@ export class UnivCollField<T = any> implements FieldBaseIF<T> {
     if (filter && typeof filter === 'function') {
       this.filter = filter;
     }
+    if (importFn && typeof importFn === 'function') {
+      this.import = importFn;
+    }
   }
 
   name?: string | undefined;
@@ -56,6 +67,7 @@ export class UnivCollField<T = any> implements FieldBaseIF<T> {
   isLocal?: boolean | undefined;
   exportOnly?: boolean | undefined;
   filter?: (params: PostParams) => T;
+  import?: (params: PostParams) => T;
 
   get c() {
     return this.coll;
@@ -78,6 +90,7 @@ export class SchemaUniversal<RecordType = DataRecord>
   }
 
   fields: Record<string, FieldBaseIF>;
+  import?: (params: PostParams) => RecordType;
 
   add<T = any>(params: LocalCollAddParams<T>) {
     const { name, type, meta } = params;
@@ -99,4 +112,5 @@ type LocalCollAddParams<T> = {
   isLocal?: boolean | undefined;
   exportOnly?: boolean | undefined;
   filter?: (params: PostParams) => T;
+  import?: (params: PostParams) => T;
 };

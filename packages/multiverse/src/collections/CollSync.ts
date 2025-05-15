@@ -1,4 +1,5 @@
 import memorySunF from '../suns/SunMemory';
+import { CollBase } from './CollBase';
 import type { CollIF, CollSyncIF } from '../types.coll';
 import type {
   SchemaLocalIF,
@@ -17,36 +18,38 @@ type CollParms<RecordType, KeyType = string> = {
 };
 
 export class CollSync<RecordType, KeyType = string>
+  extends CollBase<RecordType, KeyType>
   implements CollSyncIF<RecordType, KeyType>
 {
-  name: string;
-  #universe: UniverseIF;
-  schema: SchemaLocalIF;
   isAsync: false = false;
+  _sun: SunIFSync<RecordType, KeyType>;
+
+  // Define the sun property required by CollBase
+  protected get sun(): SunIF<RecordType, KeyType> {
+    return this._sun;
+  }
 
   constructor(params: CollParms<RecordType, KeyType>) {
     const { name, sunF, schema, universe } = params;
-    this.name = name;
-    this.schema = schema;
-    this.#universe = universe;
-    this.sun = (sunF ?? memorySunF)(this);
+    super(name, schema, universe);
+    this._sun = (sunF ?? memorySunF)(this);
     if (universe) {
       universe.add(this);
     }
   }
 
-  sun: SunIFSync<RecordType, KeyType>;
-
   get(identity: KeyType): RecordType | undefined {
-    return this.sun.get(identity);
+    return this._sun.get(identity);
   }
 
   has(key: KeyType): boolean {
-    return this.sun.has(key);
+    return this._sun.has(key);
   }
 
   set(key: KeyType, value: RecordType): void {
-    this.sun.set(key, value);
+    // Validate the record before setting it
+    this.validate(value);
+    this._sun.set(key, value);
   }
 
   mutate(
@@ -56,12 +59,10 @@ export class CollSync<RecordType, KeyType = string>
       collection: CollSyncIF<RecordType, KeyType>,
     ) => RecordType | void | any,
   ): RecordType | undefined {
-    if (typeof this.sun.mutate !== 'function') {
-      throw new Error(
-        `collection ${this.name} engine does not support mutation`,
-      );
+    if (typeof this._sun.mutate !== 'function') {
+      throw new Error(`collection ${this.name} sun does not support mutation`);
     }
-    return this.sun.mutate(key, mutator);
+    return this._sun.mutate(key, mutator);
   }
 
   /**
@@ -69,22 +70,22 @@ export class CollSync<RecordType, KeyType = string>
    * @returns Generator that yields batches of records
    */
   getAll(): Generator<Map<KeyType, RecordType>, void, any> {
-    if (!this.sun.getAll) {
-      throw new Error('getAll method not implemented by engine');
+    if (!this._sun.getAll) {
+      throw new Error('getAll method not implemented by sun');
     }
-    return this.sun.getAll();
+    return this._sun.getAll();
   }
   delete(key: KeyType) {
-    if (this.sun.delete) {
-      return this.sun.delete(key);
+    if (this._sun.delete) {
+      return this._sun.delete(key);
     }
-    throw new Error('delete method not implemented by engine');
+    throw new Error('delete method not implemented by sun');
   }
   /**
    * Find records matching a query
    * @param query - The query to match against
    * @returns Generator that yields batches of matching records
-   * @throws Error if the engine does not implement find
+   * @throws Error if the sun does not implement find
    */
   find(...args: any[]): Generator<Map<KeyType, RecordType>, void, any> {
     // Process arguments
@@ -99,9 +100,9 @@ export class CollSync<RecordType, KeyType = string>
       query = args[0];
     }
 
-    // If the engine has a find method, use it
-    if (typeof this.sun.find === 'function') {
-      return this.sun.find(query);
+    // If the sun has a find method, use it
+    if (typeof this._sun.find === 'function') {
+      return this._sun.find(query);
     }
 
     // Throw an error if find is not implemented
@@ -121,18 +122,18 @@ export class CollSync<RecordType, KeyType = string>
       collection: CollSyncIF<RecordType, KeyType>,
     ) => RecordType,
   ): Map<KeyType, RecordType> {
-    if (typeof this.sun.map === 'function') {
-      return this.sun.map((record, key) => mapper(record, key, this));
+    if (typeof this._sun.map === 'function') {
+      return this._sun.map((record, key) => mapper(record, key, this));
     }
 
-    if (typeof this.sun.keys !== 'function') {
+    if (typeof this._sun.keys !== 'function') {
       throw new Error(
-        'This collection cannot implement map: engine as no keys or map  functions',
+        'This collection cannot implement map: sun has no keys or map functions',
       );
     }
 
     return new Map(
-      Array.from(this.sun.keys()).map((key) => {
+      Array.from(this._sun.keys()).map((key) => {
         const record = this.get(key)!;
         return [key, mapper(record, key, this)];
       }),
@@ -140,18 +141,17 @@ export class CollSync<RecordType, KeyType = string>
   }
 
   send(key: KeyType, target: UniverseName): void {
-    if (!this.#universe.multiverse) {
+    if (!this.universe.multiverse) {
       throw new Error(
-        'CollSync.send: multiverse not set on universe ' + this.#universe.name,
+        'CollSync.send: multiverse not set on universe ' + this.universe.name,
       );
     }
     if (!this.has(key)) throw new Error(this.name + 'does not have key ' + key);
-    this.#universe.multiverse.transport(
-      key,
-      this.name,
-      this.#universe.name,
-      target,
-    );
+    this.universe.multiverse.transport(key, {
+      collectionName: this.name,
+      fromU: this.universe.name,
+      toU: target,
+    });
   }
 
   /**
@@ -165,19 +165,19 @@ export class CollSync<RecordType, KeyType = string>
       collection: CollSyncIF<RecordType, KeyType>,
     ) => void,
   ): void {
-    // If the engine has an each method, use it
-    if (typeof this.sun.each === 'function') {
-      this.sun.each((record, key) => callback(record, key, this));
+    // If the sun has an each method, use it
+    if (typeof this._sun.each === 'function') {
+      this._sun.each((record, key) => callback(record, key, this));
       return;
     }
 
     // Fallback implementation using keys
-    if (typeof this.sun.keys !== 'function') {
+    if (typeof this._sun.keys !== 'function') {
       throw new Error(
         `Each method not implemented for collection ${this.name}`,
       );
     }
-    const keys = this.sun.keys();
+    const keys = this._sun.keys();
     for (const key of keys) {
       const record = this.get(key)!;
       callback(record, key, this);
@@ -186,9 +186,9 @@ export class CollSync<RecordType, KeyType = string>
   }
 
   count(): number {
-    // If the engine has a count method, use it
-    if (typeof this.sun.count === 'function') {
-      return this.sun.count();
+    // If the sun has a count method, use it
+    if (typeof this._sun.count === 'function') {
+      return this._sun.count();
     }
 
     // Throw an error if neither count nor keys is implemented
@@ -201,17 +201,17 @@ export class CollSync<RecordType, KeyType = string>
    * @returns Generator that yields records one by one
    */
   getMany(keys: KeyType[]): Generator<Map<KeyType, RecordType>> {
-    // If the engine has a getMany method, use it
-    if (typeof this.sun.getMany !== 'function') {
+    // If the sun has a getMany method, use it
+    if (typeof this._sun.getMany !== 'function') {
       console.log(
-        'cannot getMany from engine',
-        this.sun,
-        typeof this.sun.getMany,
+        'cannot getMany from sun',
+        this._sun,
+        typeof this._sun.getMany,
       );
       throw new Error(`sun ${this.name} does not have getMany implementation`);
     }
 
-    return this.sun.getMany(keys);
+    return this._sun.getMany(keys);
   }
 
   /**
@@ -220,9 +220,9 @@ export class CollSync<RecordType, KeyType = string>
    * @returns Number of records set
    */
   setMany(recordMap: Map<KeyType, RecordType>): void {
-    // If the engine has a setMany method, use it
-    if (typeof this.sun.setMany === 'function') {
-      return this.sun.setMany(recordMap);
+    // If the sun has a setMany method, use it
+    if (typeof this._sun.setMany === 'function') {
+      return this._sun.setMany(recordMap);
     }
 
     recordMap.forEach((record, key) => {
@@ -235,7 +235,7 @@ export class CollSync<RecordType, KeyType = string>
     props: SendProps<RecordType, KeyType>,
   ): TransportResult {
     // Get the multiverse instance
-    const multiverse = this.#universe.multiverse;
+    const multiverse = this.universe.multiverse;
     if (!multiverse) {
       throw new Error('sendManny: Multiverse not found');
     }
@@ -246,7 +246,7 @@ export class CollSync<RecordType, KeyType = string>
 
   sendAll(props: SendProps<RecordType, KeyType>): TransportResult {
     // Get the multiverse instance
-    const multiverse = this.#universe.multiverse;
+    const multiverse = this.universe.multiverse;
     if (!multiverse) {
       throw new Error('Multiverse not found');
     }

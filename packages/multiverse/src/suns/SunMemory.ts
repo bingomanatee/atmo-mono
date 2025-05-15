@@ -62,8 +62,7 @@ export class SunMemory<RecordType, KeyType>
       }
     }
 
-    // Validate after all filters have been applied
-    this.validate(processedRecord);
+    // Skip validation here since it's now done at the collection level
 
     // Store the processed record
     this.#data.set(key, processedRecord);

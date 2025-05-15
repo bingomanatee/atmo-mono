@@ -1,5 +1,5 @@
 /**
- * Multiverse - A synchronization engine for sending records and signals between multiple scopes
+ * Multiverse - A synchronization system for sending records and signals between multiple scopes
  * @packageDocumentation
  */
 

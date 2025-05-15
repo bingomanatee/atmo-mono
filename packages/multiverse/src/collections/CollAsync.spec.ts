@@ -256,8 +256,8 @@ describe('CollAsync', () => {
     });
 
     it('should throw an error if find is not implemented', () => {
-      // Create a mock engine without find method
-      const mockEngine = {
+      // Create a mock sun without find method
+      const mockSun = {
         get: vi.fn(),
         set: vi.fn(),
         has: vi.fn(),
@@ -266,12 +266,12 @@ describe('CollAsync', () => {
         // No find method
       };
 
-      // Create a collection with the mock engine
+      // Create a collection with the mock sun
       const coll = new CollAsync({
         name: 'mock-users',
         schema,
         universe: univ,
-        sunF: () => mockEngine,
+        sunF: () => mockSun,
       });
 
       // Expect find to throw an error

@@ -11,7 +11,7 @@ export type FieldTypeValue = (typeof FIELD_TYPES)[keyof typeof FIELD_TYPES];
 // ------------------- schema field types -------------------
 
 /**
- * This information is not used by engines but may
+ * This information is not used by suns but may
  * influence filters or validation
  */
 export type FieldAnnotation = {
@@ -21,6 +21,7 @@ export type FieldAnnotation = {
   index?: boolean;
   values?: Set<any>; // limit values localize a fixed set
   absent?: boolean;
+  mapTo?: string[]; // Array of field names to map to/from for bidirectional mapping
 } & Record<string, any>; // other meta data
 
 /**
@@ -31,6 +32,7 @@ export interface FieldBaseIF<RecordType = DataRecord> {
   type: string;
   meta?: FieldAnnotation;
   validator?: ValidatorFn<RecordType>;
+  import?: (params: PostParams) => any; // Used for universal → local transformations
 }
 
 export interface FieldUnivIF<RecordType> extends FieldBaseIF<RecordType> {}
@@ -55,6 +57,10 @@ export type FieldLocalIF<T = any> = FieldBaseIF & {
   // this is called immediately before writing to update or generate the field
   export?: (params: PostParams) => T; // used specifically during toUniversal conversion
   // to transform the value for the universal schema
+  import?: (params: PostParams) => T; // used specifically during toLocal conversion
+  // to transform the value from the universal schema
+  univFields?: Record<string, string>; // Simple mapping of local field names to universal field names
+  // Used to pre-populate complex objects during toLocal conversion
 };
 
 export type FieldLocalInputIF = FieldLocalIF;
@@ -82,6 +88,8 @@ export interface SchemaUnivIF extends SchemaBaseIF {
   // name may be inferred from container
   name?: CollName;
   fields: Record<FieldName, FieldBaseIF>;
+  // Used to transform values during toLocal conversion
+  import?: (params: PostParams) => any;
 }
 
 export type PostParams = {

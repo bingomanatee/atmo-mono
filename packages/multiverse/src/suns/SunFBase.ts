@@ -100,7 +100,7 @@ export abstract class SunBase<
     }
   }
 
-  protected validate(input: any) {
+  validate(input: any) {
     if (isObj(input)) {
       const inputObj = input as Record<string, any>;
       try {

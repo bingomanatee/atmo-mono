@@ -18,7 +18,7 @@ export class CollAsync<RecordType, KeyType = string>
   implements CollAsyncIF<RecordType, KeyType>
 {
   name: string;
-  #universe: UniverseIF;
+  protected _universe: UniverseIF;
   schema: SchemaLocalIF;
   isAsync: true = true;
 
@@ -26,25 +26,25 @@ export class CollAsync<RecordType, KeyType = string>
     const { name, sunF, schema, universe } = params;
     this.name = name;
     this.schema = schema;
-    this.#universe = universe;
-    this.#engine = (sunF ?? sunMemoryAsyncF)(this);
+    this._universe = universe;
+    this._sun = (sunF ?? sunMemoryAsyncF)(this);
     if (universe) {
       universe.add(this);
     }
   }
 
-  #engine: SunIfAsync<RecordType, KeyType>;
+  protected _sun: SunIfAsync<RecordType, KeyType>;
 
   async get(identity: KeyType) {
-    return this.#engine.get(identity);
+    return this._sun.get(identity);
   }
 
   async has(key: KeyType) {
-    return this.#engine.has(key);
+    return this._sun.has(key);
   }
 
   async set(key: KeyType, value: RecordType) {
-    this.#engine.set(key, value);
+    this._sun.set(key, value);
   }
 
   async mutate(
@@ -54,10 +54,10 @@ export class CollAsync<RecordType, KeyType = string>
       collection: CollAsyncIF<RecordType, KeyType>,
     ) => RecordType | void | any | Promise<RecordType | void | any>,
   ): Promise<RecordType | undefined> {
-    if (this.#engine.mutate) {
-      return this.#engine.mutate(key, (draft) => mutator(draft, this));
+    if (this._sun.mutate) {
+      return this._sun.mutate(key, (draft) => mutator(draft, this));
     } else {
-      // Fallback for engines that don't support mutate
+      // Fallback for suns that don't support mutate
       const existing = await this.get(key);
       if (!existing) return undefined;
       const result = await mutator(existing, this);
@@ -67,15 +67,15 @@ export class CollAsync<RecordType, KeyType = string>
   }
 
   getMany(keys: KeyType[]) {
-    if (!this.#engine.getMany) {
-      throw new Error('getAll method not implemented by engine');
+    if (!this._sun.getMany) {
+      throw new Error('getAll method not implemented by sun');
     }
-    return this.#engine.getMany(keys);
+    return this._sun.getMany(keys);
   }
 
   delete(key: KeyType): Promise<void> {
-    if (this.#engine.delete) {
-      return this.#engine.delete(key);
+    if (this._sun.delete) {
+      return this._sun.delete(key);
     }
     throw new Error(
       `delete method not implemented for collection ${this.name}`,
@@ -83,20 +83,20 @@ export class CollAsync<RecordType, KeyType = string>
   }
 
   getAll(): AsyncGenerator<Map<KeyType, RecordType>, void, any> {
-    if (!this.#engine.getAll) {
-      throw new Error('getAll method not implemented by engine');
+    if (!this._sun.getAll) {
+      throw new Error('getAll method not implemented by sun');
     }
-    return this.#engine.getAll();
+    return this._sun.getAll();
   }
 
   find(...query: any[]): Generator<Map<KeyType, RecordType>> {
-    if (typeof this.#engine.find === 'function') {
-      return this.#engine.find(...query);
+    if (typeof this._sun.find === 'function') {
+      return this._sun.find(...query);
     }
 
     // Throw an error if find is not implemented
     throw new Error(
-      `Find method not implemented for engine in collection ${this.name}`,
+      `Find method not implemented for sun in collection ${this.name}`,
     );
   }
 
@@ -112,15 +112,15 @@ export class CollAsync<RecordType, KeyType = string>
       collection: CollAsyncIF<RecordType, KeyType>,
     ) => void | Promise<void>,
   ): Promise<void> {
-    // If the engine has an each method, use it
-    if (typeof this.#engine.each === 'function') {
-      await this.#engine.each((record, key) => callback(record, key, this));
+    // If the sun has an each method, use it
+    if (typeof this._sun.each === 'function') {
+      await this._sun.each((record, key) => callback(record, key, this));
       return;
     }
 
     // Fallback implementation using keys
-    if (typeof this.#engine.keys === 'function') {
-      const keys = await this.#engine.keys();
+    if (typeof this._sun.keys === 'function') {
+      const keys = await this._sun.keys();
 
       // Process all keys in parallel
       await Promise.all(
@@ -144,20 +144,20 @@ export class CollAsync<RecordType, KeyType = string>
    * @returns A promise that resolves to the number of records
    */
   async count(): Promise<number> {
-    // If the engine has a count method, use it
-    if (typeof this.#engine.count === 'function') {
-      return this.#engine.count();
+    // If the sun has a count method, use it
+    if (typeof this._sun.count === 'function') {
+      return this._sun.count();
     }
 
     // Fallback implementation using keys
-    if (typeof this.#engine.keys === 'function') {
-      const keys = await this.#engine.keys();
+    if (typeof this._sun.keys === 'function') {
+      const keys = await this._sun.keys();
       return keys.length;
     }
 
     // Throw an error if neither count nor keys is implemented
     throw new Error(
-      `Count method not implemented for collection ${this.name} no each or keys method in engine`,
+      `Count method not implemented for collection ${this.name} no each or keys method in sun`,
     );
   }
 
@@ -175,17 +175,17 @@ export class CollAsync<RecordType, KeyType = string>
       collection: CollAsyncIF<RecordType, KeyType>,
     ) => Promise<RecordType>,
   ): Promise<Map<KeyType, RecordType>> {
-    // If the engine has a map method, use it
-    if (typeof this.#engine.map === 'function') {
-      return this.#engine.map(mapper);
+    // If the sun has a map method, use it
+    if (typeof this._sun.map === 'function') {
+      return this._sun.map(mapper);
     }
-    if (!(typeof this.#engine.keys === 'function')) {
+    if (!(typeof this._sun.keys === 'function')) {
       throw new Error(
-        `each not implemented in ${this.name}; engine has no keys or map function`,
+        `each not implemented in ${this.name}; sun has no keys or map function`,
       );
     }
 
-    const keys = await this.#engine.keys();
+    const keys = await this._sun.keys();
     const values: RecordType[] = Promise.all(
       Array.from(keys).map(async () => {
         const record = await this.get(record);
@@ -199,13 +199,13 @@ export class CollAsync<RecordType, KeyType = string>
   }
 
   async send(key: KeyType, target: UniverseName) {
-    if (!this.#universe.multiverse) {
+    if (!this._universe.multiverse) {
       throw new Error(
-        'CollSync.send: multiverse not set on universe ' + this.#universe.name,
+        'CollSync.send: multiverse not set on universe ' + this._universe.name,
       );
     }
 
-    const multiverse = this.#universe.multiverse;
-    return multiverse.transport(key, this.name, this.#universe.name, target);
+    const multiverse = this._universe.multiverse;
+    return multiverse.transport(key, this.name, this._universe.name, target);
   }
 }

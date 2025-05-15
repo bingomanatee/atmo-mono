@@ -105,9 +105,16 @@ describe('Multiverse', () => {
       expect(m.get('foo')).toEqual(u);
     });
 
-    it('should throw an error if universe already exists', () => {
+    it('should not throw an error when adding the same universe instance twice', () => {
       m.add(u);
-      expect(() => m.add(u)).toThrowError(/already exists/);
+      // Adding the same universe instance should be a no-op
+      expect(() => m.add(u)).not.toThrow();
+    });
+
+    it('should throw an error when adding a different universe with the same name', () => {
+      m.add(u);
+      const u2 = new Universe('foo');
+      expect(() => m.add(u2)).toThrowError(/already exists/);
     });
 
     it('should replace an existing universe if replace is true', () => {

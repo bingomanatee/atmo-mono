@@ -23,6 +23,14 @@ export interface CollBaseIF {
     ...query: any[]
   ): Generator<Map<KeyType, RecordType>, void, any>;
   batchSize?: number;
+
+  /**
+   * Validate a record against the schema
+   * @param record - The record to validate
+   * @throws Error if validation fails
+   * @returns void if validation passes
+   */
+  validate<RecordType = DataRecord>(record: RecordType): void;
 }
 
 export interface CollSyncIF<RecordType = DataRecord, KeyType = DataKey>
@@ -47,7 +55,7 @@ export interface CollSyncIF<RecordType = DataRecord, KeyType = DataKey>
 
   /**
    * Find records matching a query
-   * The implementation of this method is engine-dependent
+   * The implementation of this method is sun-dependent
    * @param query - The query to match against
    * @param options - Optional parameters for the query
    * @returns A map of records matching the query or an Observable stream of records
@@ -98,6 +106,12 @@ export interface CollSyncIF<RecordType = DataRecord, KeyType = DataKey>
   set(key: KeyType, value: RecordType): void;
 
   setMany(values: Map<KeyType, RecordType>): void;
+
+  /**
+   * Delete a record by key
+   * @param key The key of the record to delete
+   */
+  delete(key: KeyType): void;
 }
 
 export interface CollAsyncIF<RecordType = DataRecord, KeyType = DataKey>

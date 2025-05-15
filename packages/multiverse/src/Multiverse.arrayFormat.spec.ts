@@ -170,8 +170,6 @@ describe('Multiverse array format', () => {
         'array-universe',
       );
 
-      console.log('Array universal format:', arrayUniversal);
-
       // Check the object format
       expect(objectUniversal).toEqual({
         id: 'event1',
@@ -222,8 +220,6 @@ describe('Multiverse array format', () => {
         arrayCollection,
         'array-universe',
       );
-
-      console.log('Local record from array:', localRecord);
 
       // Check that the record was properly converted back to object format
       // Note: The exportOnly field should not be included in the local record

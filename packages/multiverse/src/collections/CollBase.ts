@@ -7,6 +7,8 @@ import type {
   UniverseIF,
   UniverseName,
 } from '../types.multiverse';
+import { validateField } from '../utils/validateField';
+import { get } from 'lodash-es';
 
 /**
  * Base class for collections with common functionality
@@ -25,9 +27,9 @@ export abstract class CollBase<RecordType, KeyType = string>
   }
 
   /**
-   * The engine that powers this collection
+   * The sun that powers this collection
    */
-  protected abstract engine: SunIF<RecordType, KeyType>;
+  protected abstract sun: SunIF<RecordType, KeyType>;
 
   /**
    * Get a record by key
@@ -112,6 +114,37 @@ export abstract class CollBase<RecordType, KeyType = string>
       collection: CollIF<RecordType, KeyType>,
     ) => RecordType | void | any | Promise<RecordType | void | any>,
   ): number | Promise<number>;
+
+  /**
+   * Validate a record against the schema
+   * @param record - The record to validate
+   * @throws Error if validation fails
+   * @returns void if validation passes
+   */
+  validate<R = RecordType>(record: R): void {
+    // Validate each field in the schema
+    if (record && typeof record === 'object') {
+      for (const fieldName in this.schema.fields) {
+        const field = this.schema.fields[fieldName];
+
+        // Skip optional fields that are undefined
+        if (field.meta?.optional && record[fieldName] === undefined) {
+          continue;
+        }
+
+        // Get the field value using lodash get for nested paths
+        const value = fieldName.includes('.')
+          ? get(record, fieldName)
+          : record[fieldName];
+
+        // Validate the field
+        const result = validateField(value, fieldName, this.schema, record);
+        if (result) {
+          throw new Error(`Field '${fieldName}' validation failed: ${result}`);
+        }
+      }
+    }
+  }
 
   abstract getMany$?(
     keys: KeyType[],

@@ -13,6 +13,13 @@ export interface SunIF<RecordType = DataRecord, KeyType = DataKey> {
   clear(): any;
   has(key: KeyType): any;
   /**
+   * Validate a record against the schema
+   * @param record - The record to validate
+   * @throws Error if validation fails
+   * @returns void if validation passes
+   */
+  validate(record: RecordType): void;
+  /**
    * Optional method to mutate a record
    * @param key - The key of the record to mutate
    * @param mutator - A function that accepts the previous record (or undefined) and returns a new record
@@ -84,6 +91,7 @@ export interface SunIFSync<RecordType = DataRecord, KeyType = DataKey>
   delete(key: KeyType): void;
   clear(): void;
   has(key: KeyType): boolean;
+  validate(record: RecordType): void;
   /**
    * Optional method to mutate a record
    * @param key - The key of the record to mutate
@@ -131,6 +139,7 @@ export interface SunIFSync<RecordType = DataRecord, KeyType = DataKey>
 export interface SunIfAsync<RecordType = DataRecord, KeyType = DataKey>
   extends SunIF {
   clear(): Promise<void>;
+  validate(record: RecordType): void;
 
   /**
    * Get the number of records in the collection
