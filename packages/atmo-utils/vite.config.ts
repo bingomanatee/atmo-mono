@@ -15,7 +15,7 @@ export default defineConfig({
     rollupOptions: {
       external: ['lodash-es', 'h3-js', 'three'],
       output: {
-        preserveModules: true,
+        // Remove preserveModules to bundle everything into a single file
       },
     },
   },

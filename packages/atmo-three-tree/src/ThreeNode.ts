@@ -41,6 +41,7 @@ export class ThreeNode extends Object3D {
     if (position) {
       this.position.copy(position);
       this.#alignQuaternionToPosition();
+      this.up.copy(this.localToWorld(new Vector3(0, 1, 0)..sub(this.worldPosiiton).normalize()));
     }
   }
 
@@ -48,10 +49,8 @@ export class ThreeNode extends Object3D {
    * Set the node's local position from either Vector3 or Point3D
    */
   reposition(position: Vector3Like): this {
-    const oldTarget = this.upTarget;
     this.position.copy(position);
     this.#alignQuaternionToPosition();
-    this.upTarget = this.localToWorld(oldTarget);
     return this;
   }
 
@@ -62,12 +61,21 @@ export class ThreeNode extends Object3D {
   }
 
   #alignQuaternionToPosition() {
-    const lookAt = this.worldPosition
-      .sub(this.origin)
-      .multiplyScalar(2)
-      .add(this.origin);
-    console.log('looking at ', lookAt, 'from', this.worldPosition);
-    this.lookAt(lookAt);
+    this.lookAt(this.origin);
+    const newTarget = this.localToWorld(new Vector3(0, 1, 0));
+    const forward = new Vector3();
+    this.getWorldDirection(forward); // direction this node is facing
+    forward.normalize();
+
+// start with a global up reference
+    const worldUp = new Vector3(0, 1, 0);
+
+// get a perpendicular to forward that's as close to worldUp as possible
+    const right = new Vector3().crossVectors(worldUp, forward).normalize();
+
+// now get the final orthogonal up vector
+    const newUp = new Vector3().crossVectors(forward, right).normalize();
+    this.up.copy(newUp);
   }
 
   get worldPosition() {
@@ -77,12 +85,34 @@ export class ThreeNode extends Object3D {
     return this.position.clone();
   }
 
+  get relativeUp() {
+    return this.up.clone().add(this.worldPosition);
+  }
+
   get upTarget() {
-    return this.worldToLocal(this.up.clone().add(this.worldPosition));
+    return this.worldToLocal(this.relativeUp);
   }
 
   // @param target - The target point in world coordinates
   set upTarget(target: Vector3) {
     this.up.copy(target.clone().sub(this.worldPosition).normalize());
+  }
+
+  rotateAroundParent(radians: number) {
+    const frame = new Object3D();
+    this.parent?.add(frame);
+    const target = new Object3D();
+    target.position.copy(this.position);
+    frame.add(target);
+    frame.rotateOnAxis(this.parent?.up ?? new Vector3(0, 1, 0), radians);
+
+    frame.updateMatrixWorld(true);
+    target.updateMatrixWorld(true);
+
+    const newLocal = target.getWorldPosition(new Vector3());
+
+    const newLocalPos = this.parent?.worldToLocal(newLocal) ?? newLocal;
+    this.reposition(newLocalPos);
+    this.parent?.remove(frame);
   }
 }

@@ -8,44 +8,46 @@ This is a visualization of the TreeNode class from the atmo-three-tree package. 
 
 ## Running the Visualization
 
-### Option 1: Using Vite (Recommended)
-
 1. Navigate to this directory:
+
    ```
    cd packages/atmo-three-tree/src/visualization
    ```
 
 2. Install dependencies:
+
    ```
    npm install
    ```
 
 3. Start the development server:
+
    ```
    npm start
    ```
 
 4. Open your browser to the URL shown in the terminal (usually http://localhost:5173)
 
-### Option 2: Using a Simple HTTP Server
+## Building for Production
 
-If you don't want to use Vite, you can use any HTTP server:
+To create a production build:
 
 1. Navigate to this directory:
+
    ```
    cd packages/atmo-three-tree/src/visualization
    ```
 
-2. Start a simple HTTP server:
+2. Build the project:
+
    ```
-   # Using Python 3
-   python -m http.server
-   
-   # Or using Node.js
-   npx serve
+   npm run build
    ```
 
-3. Open your browser to the URL shown in the terminal
+3. The built files will be in the `dist` directory. You can serve them with any static file server:
+   ```
+   npm run preview
+   ```
 
 ## Features
 

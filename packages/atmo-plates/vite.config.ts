@@ -21,7 +21,7 @@ export default defineConfig({
           'lodash-es': '_',
           three: 'THREE',
         },
-        preserveModules: true,
+        // Remove preserveModules to bundle everything into a single file
       },
     },
   },

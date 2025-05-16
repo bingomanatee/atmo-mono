@@ -13,9 +13,13 @@ export default defineConfig({
     emptyOutDir: true,
     sourcemap: true,
     rollupOptions: {
-      external: ['three', '@wonderlandlabs/multiverse', '@wonderlandlabs/atmo-utils'],
+      external: [
+        'three',
+        '@wonderlandlabs/multiverse',
+        '@wonderlandlabs/atmo-utils',
+      ],
       output: {
-        preserveModules: true,
+        // Remove preserveModules to bundle everything into a single file
       },
     },
   },

@@ -15,7 +15,7 @@ export default defineConfig({
     rollupOptions: {
       external: ['@wonderlandlabs/atmo-utils'],
       output: {
-        preserveModules: true,
+        // Remove preserveModules to bundle everything into a single file
       },
     },
   },
