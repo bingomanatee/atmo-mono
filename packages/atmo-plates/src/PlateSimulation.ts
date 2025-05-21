@@ -15,7 +15,7 @@ import type {
 } from './types.atmo-plates';
 import { simUniverse } from './utils';
 import { extendPlate } from './utils/plateUtils';
-import { isPlateExtendedIF } from './utils/typeGuards';
+import { isPlateExtendedIF } from './typeGuards';
 
 // Simulation plate interface with identity and relational links
 export interface SimPlateIF extends PlateExtendedIF, Identifiable {
@@ -129,10 +129,6 @@ export class PlateSimulation {
    * @returns The ID of the added plate
    */
   addPlate(props: AddPlateProps, simId?: string): string {
-    // Check if props is already a PlateExtendedIF
-    const isExtendedPlate =
-      'behavioralType' in props && 'area' in props && 'mass' in props;
-
     // Extract properties with defaults
     let { id, name, radius, density = 1, thickness = 1, planetId } = props;
 
@@ -170,7 +166,7 @@ export class PlateSimulation {
     // Create the plate object with SimPlateIF interface
     let plateData: SimPlateIF;
 
-    if (isExtendedPlate) {
+    if (isPlateExtendedIF(props)) {
       // If it's already an extended plate, just add the simulation-specific properties
       plateData = {
         ...(props as PlateExtendedIF),

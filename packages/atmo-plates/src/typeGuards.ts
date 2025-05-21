@@ -10,7 +10,7 @@ import {
   PlateManifest,
   PlateGeneratorConfig,
   SimSimulation,
-} from '../types.atmo-plates';
+} from './types.atmo-plates';
 
 /**
  * Type guard for Identifiable objects
@@ -104,7 +104,9 @@ export function isPlateSimExtendedIF(obj: unknown): obj is PlateSimExtendedIF {
 /**
  * Type guard for PlateGeneratorConfig objects
  */
-export function isPlateGeneratorConfig(obj: unknown): obj is PlateGeneratorConfig {
+export function isPlateGeneratorConfig(
+  obj: unknown,
+): obj is PlateGeneratorConfig {
   return (
     typeof obj === 'object' &&
     obj !== null &&
@@ -118,7 +120,9 @@ export function isPlateGeneratorConfig(obj: unknown): obj is PlateGeneratorConfi
 /**
  * Type guard for PlateDistributionSummary objects
  */
-export function isPlateDistributionSummary(obj: unknown): obj is PlateDistributionSummary {
+export function isPlateDistributionSummary(
+  obj: unknown,
+): obj is PlateDistributionSummary {
   return (
     typeof obj === 'object' &&
     obj !== null &&
@@ -129,13 +133,15 @@ export function isPlateDistributionSummary(obj: unknown): obj is PlateDistributi
     'planetSurfaceArea' in obj &&
     typeof (obj as PlateDistributionSummary).planetSurfaceArea === 'number' &&
     'continentalLikePlates' in obj &&
-    typeof (obj as PlateDistributionSummary).continentalLikePlates === 'number' &&
+    typeof (obj as PlateDistributionSummary).continentalLikePlates ===
+      'number' &&
     'oceanicLikePlates' in obj &&
     typeof (obj as PlateDistributionSummary).oceanicLikePlates === 'number' &&
     'transitionalPlates' in obj &&
     typeof (obj as PlateDistributionSummary).transitionalPlates === 'number' &&
     'continentalLikeCoverage' in obj &&
-    typeof (obj as PlateDistributionSummary).continentalLikeCoverage === 'number' &&
+    typeof (obj as PlateDistributionSummary).continentalLikeCoverage ===
+      'number' &&
     'oceanicLikeCoverage' in obj &&
     typeof (obj as PlateDistributionSummary).oceanicLikeCoverage === 'number' &&
     'transitionalCoverage' in obj &&
@@ -158,23 +164,23 @@ export function isPlateManifest(obj: unknown): obj is PlateManifest {
   }
 
   const manifest = obj as PlateManifest;
-  
+
   if (!isPlateGeneratorConfig(manifest.config)) {
     return false;
   }
-  
+
   if (!Array.isArray(manifest.plates)) {
     return false;
   }
-  
+
   if (manifest.plates.length > 0 && !isPlateExtendedIF(manifest.plates[0])) {
     return false;
   }
-  
+
   if (!isPlateDistributionSummary(manifest.summary)) {
     return false;
   }
-  
+
   return true;
 }
 
