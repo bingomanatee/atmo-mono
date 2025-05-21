@@ -1,5 +1,5 @@
 import type { Subscription } from 'rxjs';
-import { PartialObserver } from 'rxjs';
+import type { PartialObserver } from 'rxjs';
 import type { DataKey, DataRecord, UnivSchemaMap } from './type.schema';
 import type { CollBaseIF, CollIF, CollName } from './types.coll';
 

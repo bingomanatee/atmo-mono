@@ -2,8 +2,9 @@
  * Utility functions for Sun implementations
  */
 
-import { DataKey, DataRecord } from './types.multiverse';
+import type { DataKey, DataRecord } from './types.multiverse';
 import { STREAM_ACTIONS } from './constants';
+import { isObj } from './typeguards.multiverse';
 
 /**
  * Check if a record matches a property/value pair query
@@ -200,13 +201,4 @@ export function generatorToMap<KeyType, ValueType>(
   }
 
   return map;
-}
-
-/**
- * Check if a value is an object
- * @param value The value to check
- * @returns True if the value is an object, false otherwise
- */
-export function isObj(value: any): value is Record<string, any> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }

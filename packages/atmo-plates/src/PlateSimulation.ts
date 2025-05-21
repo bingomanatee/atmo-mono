@@ -1,7 +1,8 @@
-import { randomNormal } from '@wonderlandlabs/atmo-utils';
-import { Multiverse, Universe } from '@wonderlandlabs/multiverse';
+import { EARTH_RADIUS, randomNormal } from '@wonderlandlabs/atmo-utils';
+import { Multiverse } from '@wonderlandlabs/multiverse';
 import { v4 as uuidV4 } from 'uuid';
 import { COLLECTIONS, UNIVERSAL_SCHEMA, UNIVERSES } from './constants';
+import { PlateSpectrumGenerator } from './generator/PlateSpectrumGenerator';
 import type { SimSimulation } from './types.atmo-plates';
 import { simUniverse } from './utils';
 
@@ -27,24 +28,42 @@ type AddPlateProps = {
   radius: number;
   density?: number;
   thickness?: number;
-  planetId?: string;
-  simId?: string;
 };
 
 export class PlateSimulation {
   #mv: Multiverse;
 
-  constructor() {
+  constructor(
+    private planetRadius = EARTH_RADIUS,
+    plateCount = 0,
+  ) {
     this.#mv = new Multiverse(UNIVERSAL_SCHEMA);
     simUniverse(this.#mv);
+
+    // Create a default simulation with the planet
+    if (plateCount > 0) {
+      // Create a simulation with the specified planet radius
+      this.addSimulation({ radius: this.planetRadius });
+
+      // Generate plates using the plateGenerator
+      const { plates } = this.plateGenerator(plateCount).generate();
+
+      // Add each plate to the simulation
+      for (const plate of plates) {
+        this.addPlate({
+          radius: plate.radius,
+          density: plate.density,
+          thickness: plate.thickness,
+        });
+      }
+    }
   }
 
-  /**
-   * Add a universe to the multiverse
-   * @param universe The universe to add
-   */
-  addUniverse(universe: Universe): void {
-    this.#mv.add(universe);
+  plateGenerator(plateCount: number) {
+    return new PlateSpectrumGenerator({
+      planetRadius: this.planetRadius,
+      plateCount: plateCount,
+    });
   }
 
   get simUniv() {
@@ -93,16 +112,8 @@ export class PlateSimulation {
     return this.simUniv.get(COLLECTIONS.SIMULATIONS).get(simId);
   }
 
-  addPlate(props: AddPlateProps) {
-    let {
-      id,
-      name,
-      radius,
-      density = 1,
-      thickness = 1,
-      planetId,
-      simId,
-    } = props;
+  addPlate(props: AddPlateProps, simId?: string) {
+    let { id, name, radius, density = 1, thickness = 1, planetId } = props;
     if (!id) id = uuidV4();
     if (!simId) simId = this.#defaultSimId;
     if (!name) name = `plate-${id}`;
@@ -149,7 +160,15 @@ export class PlateSimulation {
 
   #initPlateSteps(plateId: string) {}
 
-  makePlanet(radius: number) {
+  #planet;
+  get planet() {
+    if (!this.#planet) {
+      this.#planet = this.makePlanet();
+    }
+    return this.#planet;
+  }
+
+  makePlanet(radius = this.planetRadius) {
     if (radius < 1000) {
       throw new Error('planet radii mus be >= 1000km');
     }

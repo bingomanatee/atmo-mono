@@ -1,5 +1,5 @@
 import { FIELD_TYPES } from '../constants';
-import { FieldTypeValue, SchemaBaseIF } from '../type.schema';
+import type { FieldTypeValue, SchemaBaseIF } from '../type.schema';
 import { isObj } from '../typeguards.multiverse';
 
 const isType = (s: string) => (value: any) => typeof value === s;
