@@ -8,9 +8,6 @@ import type {
   Identifiable,
   PlateIF,
   PlateExtendedIF,
-  PlateBehavioralType,
-  PLATE_TYPES,
-  PlateSimExtendedIF,
   SimSimulation,
 } from './types.atmo-plates';
 import { simUniverse } from './utils';
@@ -207,6 +204,10 @@ export class PlateSimulation {
   }
 
   #initPlateSteps(plateId: string) {}
+
+  getPlate(id: string): SimPlateIF | undefined {
+    return this.simUniv.get(COLLECTIONS.PLATES).get(id);
+  }
 
   #planet: { id: string; radius: number } | undefined;
   get planet() {

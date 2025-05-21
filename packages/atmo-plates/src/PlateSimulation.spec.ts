@@ -87,6 +87,34 @@ describe('PlateSimulation:class', () => {
     expect(platesCollection.has(plateId)).toBeFalsy();
   });
 
+  it('should get a plate by ID using getPlate method', () => {
+    // Add a plate with custom properties
+    const customName = 'Test Plate';
+    const customRadius = 2000;
+    const customDensity = 2.5;
+
+    const plateId = sim.addPlate({
+      name: customName,
+      radius: customRadius,
+      density: customDensity,
+    });
+
+    // Retrieve the plate using the getPlate method
+    const retrievedPlate = sim.getPlate(plateId);
+
+    // Verify the plate was retrieved correctly
+    expect(retrievedPlate).toBeDefined();
+    expect(retrievedPlate?.id).toEqual(plateId);
+    expect(retrievedPlate?.name).toEqual(customName);
+    expect(retrievedPlate?.radius).toEqual(customRadius);
+    expect(retrievedPlate?.density).toEqual(customDensity);
+
+    // Verify that getPlate returns undefined for non-existent plates
+    const nonExistentId = 'non-existent-id';
+    const nonExistentPlate = sim.getPlate(nonExistentId);
+    expect(nonExistentPlate).toBeUndefined();
+  });
+
   it('should automatically generate plates in the constructor', () => {
     // Create a new simulation with auto-generated plates using shared constants
     const autoSim = new PlateSimulation(EARTH_RADIUS, DEFAULT_PLATE_COUNT);
