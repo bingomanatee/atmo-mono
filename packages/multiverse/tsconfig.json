@@ -1,0 +1,17 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "declaration": true,
+    "declarationDir": "./dist/types",
+    "emitDeclarationOnly": true,
+    "moduleResolution": "node",
+    "resolveJsonModule": true,
+    "verbatimModuleSyntax": false,
+    "skipLibCheck": true,
+    "noEmitOnError": false
+  },
+  "include": ["src/**/*"],
+  "exclude": ["**/*.spec.ts", "**/*.test.ts"]
+}

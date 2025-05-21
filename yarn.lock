@@ -799,10 +799,47 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@wonderlandlabs/atmo-utils@workspace:packages/multiverse":
+"@wonderlandlabs/atmo-plates@workspace:packages/atmo-plates":
   version: 0.0.0-use.local
-  resolution: "@wonderlandlabs/atmo-utils@workspace:packages/multiverse"
+  resolution: "@wonderlandlabs/atmo-plates@workspace:packages/atmo-plates"
   dependencies:
+    "@types/lodash-es": "npm:^4"
+    "@types/three": "npm:^0"
+    "@wonderlandlabs/multiverse": "workspace:*"
+    h3-js: "npm:^4.2.1"
+    lodash-es: "npm:^4.17.21"
+    rxjs: "npm:^7.8.1"
+    three: "npm:^0.176.0"
+    typescript: "npm:^5.0.0"
+    uuid: "npm:^11.1.0"
+    vite: "npm:^5.0.0"
+    vitest: "npm:^3.1.3"
+  languageName: unknown
+  linkType: soft
+
+"@wonderlandlabs/atmo-three-orbit@workspace:packages/atmo-three-orbit":
+  version: 0.0.0-use.local
+  resolution: "@wonderlandlabs/atmo-three-orbit@workspace:packages/atmo-three-orbit"
+  dependencies:
+    "@types/three": "npm:^0"
+    "@wonderlandlabs/atmo-utils": "workspace:*"
+    "@wonderlandlabs/multiverse": "workspace:*"
+    three: "npm:^0.176.0"
+    typescript: "npm:^5.0.0"
+    vite: "npm:^5.0.0"
+    vitest: "npm:^3.1.3"
+  languageName: unknown
+  linkType: soft
+
+"@wonderlandlabs/atmo-utils@workspace:*, @wonderlandlabs/atmo-utils@workspace:packages/atmo-utils":
+  version: 0.0.0-use.local
+  resolution: "@wonderlandlabs/atmo-utils@workspace:packages/atmo-utils"
+  dependencies:
+    "@types/lodash-es": "npm:^4"
+    "@types/three": "npm:^0"
+    h3-js: "npm:^4.2.1"
+    lodash-es: "npm:^4.17.21"
+    three: "npm:^0.176.0"
     typescript: "npm:^5.0.0"
     vite: "npm:^5.0.0"
     vitest: "npm:^3.1.3"
@@ -821,15 +858,13 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@wonderlandlabs/multiverse@workspace:packages/atmo-utils":
+"@wonderlandlabs/multiverse@workspace:*, @wonderlandlabs/multiverse@workspace:packages/multiverse":
   version: 0.0.0-use.local
-  resolution: "@wonderlandlabs/multiverse@workspace:packages/atmo-utils"
+  resolution: "@wonderlandlabs/multiverse@workspace:packages/multiverse"
   dependencies:
-    "@types/lodash-es": "npm:^4"
-    "@types/three": "npm:^0"
-    h3-js: "npm:^4.2.1"
-    lodash-es: "npm:^4.17.21"
-    three: "npm:^0.176.0"
+    "@wonderlandlabs/atmo-utils": "workspace:*"
+    immer: "npm:^10.0.3"
+    rxjs: "npm:^7.8.1"
     typescript: "npm:^5.0.0"
     vite: "npm:^5.0.0"
     vitest: "npm:^3.1.3"
@@ -1042,14 +1077,14 @@ __metadata:
   linkType: hard
 
 "debug@npm:4, debug@npm:^4.3.4, debug@npm:^4.4.0":
-  version: 4.4.0
-  resolution: "debug@npm:4.4.0"
+  version: 4.4.1
+  resolution: "debug@npm:4.4.1"
   dependencies:
     ms: "npm:^2.1.3"
   peerDependenciesMeta:
     supports-color:
       optional: true
-  checksum: 10c0/db94f1a182bf886f57b4755f85b3a74c39b5114b9377b7ab375dc2cfa3454f09490cc6c30f829df3fc8042bc8b8995f6567ce5cd96f3bc3688bd24027197d9de
+  checksum: 10c0/d2b44bc1afd912b49bb7ebb0d50a860dc93a4dd7d946e8de94abc957bb63726b7dd5aa48c18c2386c379ec024c46692e15ed3ed97d481729f929201e671fcd55
   languageName: node
   linkType: hard
 
@@ -1464,9 +1499,9 @@ __metadata:
   linkType: hard
 
 "http-cache-semantics@npm:^4.1.1":
-  version: 4.1.1
-  resolution: "http-cache-semantics@npm:4.1.1"
-  checksum: 10c0/ce1319b8a382eb3cbb4a37c19f6bfe14e5bb5be3d09079e885e8c513ab2d3cd9214902f8a31c9dc4e37022633ceabfc2d697405deeaf1b8f3552bb4ed996fdfc
+  version: 4.2.0
+  resolution: "http-cache-semantics@npm:4.2.0"
+  checksum: 10c0/45b66a945cf13ec2d1f29432277201313babf4a01d9e52f44b31ca923434083afeca03f18417f599c9ab3d0e7b618ceb21257542338b57c54b710463b4a53e37
   languageName: node
   linkType: hard
 
@@ -1496,6 +1531,13 @@ __metadata:
   dependencies:
     safer-buffer: "npm:>= 2.1.2 < 3.0.0"
   checksum: 10c0/98102bc66b33fcf5ac044099d1257ba0b7ad5e3ccd3221f34dd508ab4070edff183276221684e1e0555b145fce0850c9f7d2b60a9fcac50fbb4ea0d6e845a3b1
+  languageName: node
+  linkType: hard
+
+"immer@npm:^10.0.3":
+  version: 10.1.1
+  resolution: "immer@npm:10.1.1"
+  checksum: 10c0/b749e10d137ccae91788f41bd57e9387f32ea6d6ea8fd7eb47b23fd7766681575efc7f86ceef7fe24c3bc9d61e38ff5d2f49c2663b2b0c056e280a4510923653
   languageName: node
   linkType: hard
 
@@ -2077,6 +2119,15 @@ __metadata:
   languageName: node
   linkType: hard
 
+"rxjs@npm:^7.8.1":
+  version: 7.8.2
+  resolution: "rxjs@npm:7.8.2"
+  dependencies:
+    tslib: "npm:^2.1.0"
+  checksum: 10c0/1fcd33d2066ada98ba8f21fcbbcaee9f0b271de1d38dc7f4e256bfbc6ffcdde68c8bfb69093de7eeb46f24b1fb820620bf0223706cff26b4ab99a7ff7b2e2c45
+  languageName: node
+  linkType: hard
+
 "safer-buffer@npm:>= 2.1.2 < 3.0.0":
   version: 2.1.2
   resolution: "safer-buffer@npm:2.1.2"
@@ -2085,11 +2136,11 @@ __metadata:
   linkType: hard
 
 "semver@npm:^7.3.5, semver@npm:^7.5.3":
-  version: 7.7.1
-  resolution: "semver@npm:7.7.1"
+  version: 7.7.2
+  resolution: "semver@npm:7.7.2"
   bin:
     semver: bin/semver.js
-  checksum: 10c0/fd603a6fb9c399c6054015433051bdbe7b99a940a8fb44b85c2b524c4004b023d7928d47cb22154f8d054ea7ee8597f586605e05b52047f048278e4ac56ae958
+  checksum: 10c0/aca305edfbf2383c22571cb7714f48cadc7ac95371b4b52362fb8eeffdfbc0de0669368b82b2b15978f8848f01d7114da65697e56cd8c37b0dab8c58e543f9ea
   languageName: node
   linkType: hard
 
@@ -2339,6 +2390,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"tslib@npm:^2.1.0":
+  version: 2.8.1
+  resolution: "tslib@npm:2.8.1"
+  checksum: 10c0/9c4759110a19c53f992d9aae23aac5ced636e99887b51b9e61def52611732872ff7668757d4e4c61f19691e36f4da981cd9485e869b4a7408d689f6bf1f14e62
+  languageName: node
+  linkType: hard
+
 "typescript@npm:^5.0.0, typescript@npm:^5.8.3":
   version: 5.8.3
   resolution: "typescript@npm:5.8.3"
@@ -2374,6 +2432,15 @@ __metadata:
   dependencies:
     imurmurhash: "npm:^0.1.4"
   checksum: 10c0/d324c5a44887bd7e105ce800fcf7533d43f29c48757ac410afd42975de82cc38ea2035c0483f4de82d186691bf3208ef35c644f73aa2b1b20b8e651be5afd293
+  languageName: node
+  linkType: hard
+
+"uuid@npm:^11.1.0":
+  version: 11.1.0
+  resolution: "uuid@npm:11.1.0"
+  bin:
+    uuid: dist/esm/bin/uuid
+  checksum: 10c0/34aa51b9874ae398c2b799c88a127701408cd581ee89ec3baa53509dd8728cbb25826f2a038f9465f8b7be446f0fbf11558862965b18d21c993684297628d4d3
   languageName: node
   linkType: hard
 

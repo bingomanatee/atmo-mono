@@ -1,12 +1,11 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { Multiverse } from './Multiverse.ts';
-import type { DataRecord } from './types/types.multiverse.ts';
-import { FIELD_TYPES } from './constants.ts';
-import { Universe } from './Universe.ts';
-import { CollSync } from './CollSync.ts';
-import { CollAsync } from './CollAsync.ts';
-import { SchemaUniversal } from './SchemaUniversal.ts';
-import { SchemaLocal } from './SchemaLocal.ts';
+import { CollAsync } from './collections/CollAsync';
+import { CollSync } from './collections/CollSync';
+import { FIELD_TYPES } from './constants';
+import { Multiverse } from './Multiverse';
+import { SchemaLocal } from './SchemaLocal';
+import { SchemaUniversal } from './SchemaUniversal';
+import { Universe } from './Universe';
 
 // Define a simple user type for testing
 type User = {
@@ -38,7 +37,7 @@ describe('Multiverse with Async Collections', () => {
     // Set up the multiverse with universes and collections
     multiverse = new Multiverse(universalSchema);
 
-    // Create universes
+    // Create universesyou hwewret
     syncUniverse = new Universe('sync-universe', multiverse);
     asyncUniverse = new Universe('async-universe', multiverse);
 
@@ -47,9 +46,9 @@ describe('Multiverse with Async Collections', () => {
       name: 'users',
       universe: syncUniverse,
       schema: new SchemaLocal('users', {
-        id: { type: FIELD_TYPES.number },
-        name: { type: FIELD_TYPES.string },
-        address: { type: FIELD_TYPES.string },
+        id: { name: 'id', type: FIELD_TYPES.number },
+        name: { name: 'name', type: FIELD_TYPES.string },
+        address: { name: 'address', type: FIELD_TYPES.string },
       }),
     });
 
@@ -57,9 +56,9 @@ describe('Multiverse with Async Collections', () => {
       name: 'users',
       universe: asyncUniverse,
       schema: new SchemaLocal('users', {
-        id: { type: FIELD_TYPES.number },
-        name: { type: FIELD_TYPES.string },
-        address: { type: FIELD_TYPES.string },
+        id: { name: 'id', type: FIELD_TYPES.number },
+        name: { name: 'name', type: FIELD_TYPES.string },
+        address: { name: 'address', type: FIELD_TYPES.string },
       }),
     });
   });
@@ -71,12 +70,11 @@ describe('Multiverse with Async Collections', () => {
       syncUsers.set(1, user);
 
       // Transport from sync to async
-      await multiverse.transport(
-        1,
-        'users',
-        syncUniverse.name,
-        asyncUniverse.name,
-      );
+      await multiverse.transport(1, {
+        collectionName: 'users',
+        fromU: syncUniverse.name,
+        toU: asyncUniverse.name,
+      });
 
       // Verify the record was transported
       const asyncResult = await asyncUsers.get(1);
@@ -90,12 +88,11 @@ describe('Multiverse with Async Collections', () => {
 
       // Transport from async to sync
       // This will fail if transport doesn't properly handle async collections
-      await multiverse.transport(
-        1,
-        'users',
-        asyncUniverse.name,
-        syncUniverse.name,
-      );
+      await multiverse.transport(1, {
+        collectionName: 'users',
+        fromU: asyncUniverse.name,
+        toU: syncUniverse.name,
+      });
 
       // Verify the record was transported
       const syncResult = syncUsers.get(1);
@@ -109,9 +106,9 @@ describe('Multiverse with Async Collections', () => {
         name: 'users',
         universe: anotherAsyncUniverse,
         schema: new SchemaLocal('users', {
-          id: { type: FIELD_TYPES.number },
-          name: { type: FIELD_TYPES.string },
-          address: { type: FIELD_TYPES.string },
+          id: { name: 'id', type: FIELD_TYPES.number },
+          name: { name: 'name', type: FIELD_TYPES.string },
+          address: { name: 'address', type: FIELD_TYPES.string },
         }),
       });
 
@@ -120,12 +117,11 @@ describe('Multiverse with Async Collections', () => {
       await asyncUsers.set(1, user);
 
       // Transport from async to async
-      await multiverse.transport(
-        1,
-        'users',
-        asyncUniverse.name,
-        anotherAsyncUniverse.name,
-      );
+      await multiverse.transport(1, {
+        collectionName: 'users',
+        fromU: asyncUniverse.name,
+        toU: anotherAsyncUniverse.name,
+      });
 
       // Verify the record was transported
       const result = await anotherAsyncUsers.get(1);

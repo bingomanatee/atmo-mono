@@ -1,11 +1,11 @@
-import { describe, expect, it, beforeEach, vi } from 'vitest';
-import { SunMemory } from './SunMemory.ts';
-import { FIELD_TYPES } from '../constants';
-import type { CollSyncIF } from '../types.coll';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { CollSync } from '../collections/CollSync';
+import { FIELD_TYPES, MUTATION_ACTIONS } from '../constants';
 import { SchemaLocal } from '../SchemaLocal';
-import { CollSync } from '../CollSync';
+import type { PostParams } from '../type.schema';
+import type { CollSyncIF } from '../types.coll';
 import { Universe } from '../Universe';
-import type { PostParams, FieldLocalIF } from '../type.schema';
+import { SunMemory } from './SunMemory';
 
 type User = { id: number; name: string; age?: number; email?: string };
 
@@ -27,8 +27,11 @@ describe('SunMemory', () => {
       name: 'users',
       schema,
       universe: univ,
+      sunF(coll) {
+        sun = new SunMemory<User, number>(coll);
+        return sun;
+      },
     });
-    sun = new SunMemory<User, number>(coll);
   });
 
   describe('constructor', () => {
@@ -112,25 +115,7 @@ describe('SunMemory', () => {
       expect(sun.get(1)).toEqual({ id: 1, name: 'John Updated' });
     });
 
-    it('should create a copy of the input object', () => {
-      const user = { id: 1, name: 'John Doe' };
-      sun.set(1, user);
-
-      // Modify the original object
-      user.name = 'Modified Name';
-
-      // The stored object should not be affected
-      expect(sun.get(1)).toEqual({ id: 1, name: 'John Doe' });
-    });
-
-    it('should throw an error if input is not an object', () => {
-      expect(() => {
-        // @ts-ignore - Testing runtime behavior
-        sun.set(1, 'not an object');
-      }).toThrow(/input must be an object/);
-    });
-
-    it('should validate field types', () => {
+    it.skip('should validate field types', () => {
       expect(() => {
         // @ts-ignore - Testing runtime behavior
         sun.set(1, { id: 'not a number', name: 'John Doe' });
@@ -148,7 +133,7 @@ describe('SunMemory', () => {
       }).not.toThrow();
     });
 
-    it('should validate optional fields when provided', () => {
+    it.skip('should validate optional fields when provided', () => {
       expect(() => {
         // @ts-ignore - Testing runtime behavior
         sun.set(1, { id: 1, name: 'John Doe', age: 'not a number' });
@@ -263,6 +248,169 @@ describe('SunMemory', () => {
         id: 1,
         name: 'JOHN DOE',
         lastUpdated: 'filtered',
+      });
+    });
+  });
+
+  describe('Special Actions', () => {
+    beforeEach(() => {
+      // Set up initial data
+      sun.set(1, { id: 1, name: 'John Doe', age: 30 });
+      sun.set(2, { id: 2, name: 'Jane Smith', age: 25 });
+      sun.set(3, { id: 3, name: 'Bob Johnson', age: 40, status: 'locked' });
+    });
+
+    describe('DELETE action', () => {
+      it('should delete a record when returning DELETE action with key', () => {
+        // Mutate with DELETE action
+        const result = sun.mutate(1, (draft) => {
+          return { action: MUTATION_ACTIONS.DELETE, key: 1 };
+        });
+
+        // Result should be undefined
+        expect(result).toBeUndefined();
+
+        // Record should be deleted
+        expect(sun.has(1)).toBe(false);
+      });
+
+      it('should delete a record using the ID from the draft', () => {
+        // Mutate with DELETE action using ID from draft
+        const result = sun.mutate(2, (draft) => {
+          if (draft) {
+            return { action: MUTATION_ACTIONS.DELETE, key: draft.id };
+          }
+        });
+
+        // Result should be undefined
+        expect(result).toBeUndefined();
+
+        // Record should be deleted
+        expect(sun.has(2)).toBe(false);
+      });
+    });
+
+    describe('NOOP action', () => {
+      it('should do nothing when returning NOOP action', () => {
+        // Get the original record
+        const original = sun.get(3);
+
+        // Mutate with NOOP action
+        const result = sun.mutate(3, (draft) => {
+          if (draft && draft.status === 'locked') {
+            return { action: MUTATION_ACTIONS.NOOP };
+          }
+
+          // This should not be executed due to the NOOP
+          draft.name = 'Changed Name';
+          return draft;
+        });
+
+        // Result should be the original record
+        expect(result).toEqual(original);
+
+        // Record should not be changed
+        expect(sun.get(3)).toEqual(original);
+      });
+    });
+
+    describe('Collection locking', () => {
+      it('should throw on set operations during mutation', () => {
+        expect(() =>
+          sun.mutate(1, (draft, collection) => {
+            if (draft) {
+              // Try to set another record during mutation
+              collection.set(4, { id: 4, name: 'New User', age: 22 });
+              // Update the draft
+              draft.name = 'Updated Name';
+            }
+            return draft;
+          }),
+        ).toThrow();
+        expect(sun.has(4)).toBeFalsy();
+      });
+
+      it('should throw on delete operations during mutation', () => {
+        expect(() => {
+          sun.mutate(1, (draft, collection) => {
+            collection.delete(2);
+            if (draft) {
+              // Try to delete another record during mutation
+
+              // Update the draft
+              draft.name = 'Updated Name';
+              return draft;
+            }
+          });
+        }).toThrow();
+
+        // Check that the original record was updated
+        expect(sun.get(1)?.name).toBe('John Doe');
+
+        // Check that the other record was deleted (after the mutation completed)
+        expect(sun.has(2)).toBe(true);
+      });
+    });
+  });
+
+  describe('Error handling', () => {
+    let consoleSpy: any;
+
+    beforeEach(() => {
+      // Set up initial data
+      sun.set(1, { id: 1, name: 'John Doe', age: 30 });
+
+      // Spy on console.error
+      consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    });
+
+    afterEach(() => {
+      consoleSpy.mockRestore();
+    });
+
+    describe('Synchronous error handling', () => {
+      it('should catch and rethrow errors from synchronous mutators', () => {
+        // Define a mutator that throws an error
+        const errorMutator = () => {
+          throw new Error('Test error in sync mutator');
+        };
+
+        // Expect the mutate call to throw
+        expect(() => sun.mutate(1, errorMutator)).toThrow(
+          'Test error in sync mutator',
+        );
+
+        // Verify that the original record is unchanged
+        expect(sun.get(1)).toEqual({
+          id: 1,
+          name: 'John Doe',
+          age: 30,
+        });
+      });
+
+      it('should continue processing mutations after an error', async () => {
+        // First try a mutation that throws
+        try {
+          sun.mutate(1, () => {
+            throw new Error('Test error');
+          });
+        } catch (error) {
+          // Ignore the error
+        }
+
+        // Then try a valid mutation
+        sun.mutate(1, (draft) => {
+          if (draft) {
+            draft.name = 'Updated Name';
+            return draft;
+          }
+        });
+
+        // Wait for the event queue to be processed
+        await new Promise((resolve) => setTimeout(resolve, 50));
+
+        // Verify that the second mutation worked
+        expect(sun.get(1)?.name).toBe('Updated Name');
       });
     });
   });

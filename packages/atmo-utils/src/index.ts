@@ -11,5 +11,6 @@ export * from './vector/flattenVector.js';
 export * from './vector/randomH3Point.js';
 export * from './vary.ts';
 export * from './vectcorString.ts';
+export * from './delay.ts';
 export * from './collections/extended-map.js';
 export * from './collections/indexed-map.js';
