@@ -1,5 +1,6 @@
 import { FIELD_TYPES, SchemaUniversal } from '@wonderlandlabs/multiverse';
 import type { Plate } from './PlateSimulation';
+import type { PlateIF } from './types.atmo-plates';
 import { coord } from './utils';
 
 export const COLLECTIONS = {
@@ -61,7 +62,12 @@ export const UNIVERSAL_SCHEMA = new Map([
     }),
   ],
 ]);
+/**
+ * Schema for plates in the simulation universe
+ * Includes PlateIF properties (radius, density, thickness) and additional fields
+ */
 export const SIM_PLATES_SCHEMA = {
+  // Basic identification
   id: FIELD_TYPES.string,
   name: {
     type: FIELD_TYPES.string,
@@ -69,6 +75,13 @@ export const SIM_PLATES_SCHEMA = {
       optional: true,
     },
   },
+
+  // PlateIF properties
+  radius: FIELD_TYPES.number,
+  density: FIELD_TYPES.number,
+  thickness: FIELD_TYPES.number,
+
+  // Position data
   position: { type: FIELD_TYPES.object, isLocal: true },
   'position.x': {
     exportOnly: true,
@@ -85,6 +98,9 @@ export const SIM_PLATES_SCHEMA = {
     type: FIELD_TYPES.number,
     universalName: 'z',
   },
+
+  // Reference to parent planet
+  planetId: FIELD_TYPES.string,
 };
 export const SIM_PLANETS_SCHEMA = {
   id: FIELD_TYPES.string,

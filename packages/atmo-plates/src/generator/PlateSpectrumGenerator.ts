@@ -8,48 +8,21 @@
  */
 
 import { varyP } from '@wonderlandlabs/atmo-utils';
+import {
+  PLATE_TYPES,
+  PlateGeneratorConfig,
+  PlateManifest,
+  PlateExtendedIF,
+  Identifiable,
+} from '../types.atmo-plates';
+import {
+  calculateSphereSurfaceArea,
+  calculatePlateVolume,
+  calculateMass,
+  determineBehavioralType,
+} from '../utils/plateUtils';
 
-export interface PlateGeneratorConfig {
-  planetRadius: number; // km
-  plateCount: number;
-  targetCoverage?: number; // 0-1
-  powerLawExponent?: number;
-  minDensity?: number; // g/cm³, largest plates
-  maxDensity?: number; // g/cm³, smallest plates
-  minThickness?: number; // km, smallest plates
-  maxThickness?: number; // km, largest plates
-  variationFactor?: number; // 0-1
-}
-
-export interface PlateProperties {
-  id: string;
-  radius: number; // km
-  area: number; // km²
-  coveragePercent: number;
-  density: number; // g/cm³
-  thickness: number; // km
-  mass: number; // kg
-  rank: number; // 1 = largest
-  behavioralType: 'continental-like' | 'oceanic-like' | 'transitional';
-}
-
-export interface PlateDistributionSummary {
-  totalPlates: number;
-  totalCoverage: number;
-  planetSurfaceArea: number;
-  continentalLikePlates: number;
-  oceanicLikePlates: number;
-  transitionalPlates: number;
-  continentalLikeCoverage: number;
-  oceanicLikeCoverage: number;
-  transitionalCoverage: number;
-}
-
-export interface PlateManifest {
-  config: Required<PlateGeneratorConfig>;
-  plates: PlateProperties[];
-  summary: PlateDistributionSummary;
-}
+// Using PlateExtendedIF from types.atmo-plates.ts
 
 export class PlateSpectrumGenerator {
   private config: Required<PlateGeneratorConfig>;
@@ -70,7 +43,7 @@ export class PlateSpectrumGenerator {
       variationFactor: config.variationFactor ?? 0.2,
     };
 
-    this.planetSurfaceArea = 4 * Math.PI * Math.pow(config.planetRadius, 2);
+    this.planetSurfaceArea = calculateSphereSurfaceArea(config.planetRadius);
   }
 
   // Static convenience method to generate plates without creating an instance
@@ -124,7 +97,7 @@ export class PlateSpectrumGenerator {
     };
   }
 
-  private generatePlates(): PlateProperties[] {
+  private generatePlates(): PlateExtendedIF[] {
     const {
       plateCount,
       targetCoverage,
@@ -164,26 +137,21 @@ export class PlateSpectrumGenerator {
         normalizedRank,
       );
 
-      // Calculate mass: volume * density
-      const volume = area * thickness;
-      const densityKgPerM3 = density * 1000; // Convert g/cm³ to kg/m³
-      const volumeM3 = volume * 1e9; // Convert km³ to m³
-      const mass = volumeM3 * densityKgPerM3;
+      // Calculate volume and mass using utility functions
+      const volume = calculatePlateVolume(area, thickness);
+      const mass = calculateMass(volume, density);
 
       // Determine behavioral type based on density thresholds
       const densityRange = maxDensity - minDensity;
       const densityThreshold1 = minDensity + densityRange * 0.33;
       const densityThreshold2 = minDensity + densityRange * 0.66;
 
-      let behavioralType: 'continental-like' | 'oceanic-like' | 'transitional';
-
-      if (density < densityThreshold1) {
-        behavioralType = 'continental-like';
-      } else if (density > densityThreshold2) {
-        behavioralType = 'oceanic-like';
-      } else {
-        behavioralType = 'transitional';
-      }
+      // Determine behavioral type using utility function
+      const behavioralType = determineBehavioralType(
+        density,
+        densityThreshold1,
+        densityThreshold2,
+      );
 
       return {
         id: `plate-${rank}`,

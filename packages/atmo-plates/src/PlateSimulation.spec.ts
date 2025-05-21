@@ -14,30 +14,48 @@ import { PlateSimulation } from './PlateSimulation';
 import { EARTH_RADIUS } from '@wonderlandlabs/atmo-utils';
 
 describe('PlateSimulation:class', () => {
+  // Shared constants
+  const DEFAULT_PLANET_RADIUS = 1000000;
+  const DEFAULT_PLATE_RADIUS = 1000;
+  const DEFAULT_PLATE_COUNT = 10;
+
+  // Test instance variables
   let sim: PlateSimulation;
   let simId: string;
+  let platesCollection: any;
+  let planetsCollection: any;
+  let simulationsCollection: any;
+
   beforeEach(() => {
+    // Create a fresh simulation for each test
     sim = new PlateSimulation();
-    simId = sim.addSimulation({ radius: 1000000 });
+    simId = sim.addSimulation({ radius: DEFAULT_PLANET_RADIUS });
+
+    // Get collections for easier access in tests
+    platesCollection = sim.simUniv.get(COLLECTIONS.PLATES);
+    planetsCollection = sim.simUniv.get(COLLECTIONS.PLANETS);
+    simulationsCollection = sim.simUniv.get(COLLECTIONS.SIMULATIONS);
   });
 
   it('should create a plate', () => {
-    const PLATE_RADIUS = 1000;
+    // Add a plate using the shared constant
     const plateId = sim.addPlate({
-      radius: PLATE_RADIUS,
+      radius: DEFAULT_PLATE_RADIUS,
     });
-    const retrievedPlate = sim.simUniv.get(COLLECTIONS.PLATES).get(plateId);
-    expect(retrievedPlate.radius).toEqual(PLATE_RADIUS);
+
+    // Retrieve the plate using the shared collection
+    const retrievedPlate = platesCollection.get(plateId);
+    expect(retrievedPlate.radius).toEqual(DEFAULT_PLATE_RADIUS);
   });
 
   it('should update a plate', () => {
-    const PLATE_RADIUS = 1000;
+    // Add a plate using the shared constant
     const plateId = sim.addPlate({
-      radius: PLATE_RADIUS,
+      radius: DEFAULT_PLATE_RADIUS,
     });
 
-    // Get the initial plate
-    const initialPlate = sim.simUniv.get(COLLECTIONS.PLATES).get(plateId);
+    // Get the initial plate using the shared collection
+    const initialPlate = platesCollection.get(plateId);
 
     // Update the plate with a new name
     const updatedData = {
@@ -45,21 +63,23 @@ describe('PlateSimulation:class', () => {
       name: 'Updated Test Plate',
     };
 
-    sim.simUniv.get(COLLECTIONS.PLATES).set(plateId, updatedData);
+    // Use the shared collection to update the plate
+    platesCollection.set(plateId, updatedData);
 
     // Retrieve the updated plate
-    const retrievedPlate = sim.simUniv.get(COLLECTIONS.PLATES).get(plateId);
+    const retrievedPlate = platesCollection.get(plateId);
     expect(retrievedPlate.name).toEqual('Updated Test Plate');
   });
 
   it('should delete a plate', () => {
-    const PLATE_RADIUS = 1000;
+    // Add a plate using the shared constant
     const plateId = sim.addPlate({
-      radius: PLATE_RADIUS,
+      radius: DEFAULT_PLATE_RADIUS,
     });
 
-    // Verify the plate exists
-    const platesCollection = sim.simUniv.get(COLLECTIONS.PLATES);
+    // Verify the plate exists using the shared collection
+    expect(platesCollection.has(plateId)).toBeTruthy();
+
     // Delete the plate
     platesCollection.delete(plateId);
 
@@ -68,24 +88,22 @@ describe('PlateSimulation:class', () => {
   });
 
   it('should automatically generate plates in the constructor', () => {
-    // Create a new simulation with auto-generated plates
-    const PLANET_RADIUS = EARTH_RADIUS;
-    const PLATE_COUNT = 10;
+    // Create a new simulation with auto-generated plates using shared constants
+    const autoSim = new PlateSimulation(EARTH_RADIUS, DEFAULT_PLATE_COUNT);
 
-    // Create a simulation with the constructor that should auto-generate plates
-    const sim = new PlateSimulation(PLANET_RADIUS, PLATE_COUNT);
-
-    // Get the plates collection
-    const platesCollection = sim.simUniv.get(COLLECTIONS.PLATES);
+    // Get collections from the new simulation
+    const autoPlatesCollection = autoSim.simUniv.get(COLLECTIONS.PLATES);
+    const autoSimulationsCollection = autoSim.simUniv.get(
+      COLLECTIONS.SIMULATIONS,
+    );
+    const autoPlanetsCollection = autoSim.simUniv.get(COLLECTIONS.PLANETS);
 
     // Verify that plates were automatically created
-    expect(platesCollection.count()).toBe(PLATE_COUNT);
+    expect(autoPlatesCollection.count()).toBe(DEFAULT_PLATE_COUNT);
 
-    // Check that the plates have the expected properties
+    // Collect all plates
     const plates: any[] = [];
-
-    // Use the each method to collect all plates
-    platesCollection.each((plate) => {
+    autoPlatesCollection.each((plate: PlateIF) => {
       plates.push(plate);
     });
 
@@ -112,20 +130,18 @@ describe('PlateSimulation:class', () => {
     expect(uniqueThicknesses.size).toBeGreaterThanOrEqual(1);
 
     // Verify that a simulation was also created
-    const simulationsCollection = sim.simUniv.get(COLLECTIONS.SIMULATIONS);
-    expect(simulationsCollection.count()).toBe(1);
+    expect(autoSimulationsCollection.count()).toBe(1);
 
     // Get the simulation's planetId
     let planetId;
-    simulationsCollection.each((simulation) => {
+    autoSimulationsCollection.each((simulation) => {
       planetId = simulation.planetId;
     });
     expect(planetId).toBeDefined();
 
     // Verify that the planet has the correct radius
-    const planetsCollection = sim.simUniv.get(COLLECTIONS.PLANETS);
-    const planet = planetsCollection.get(planetId);
+    const planet = autoPlanetsCollection.get(planetId);
     expect(planet).toBeDefined();
-    expect(planet.radius).toBe(PLANET_RADIUS);
+    expect(planet.radius).toBe(EARTH_RADIUS);
   });
 });

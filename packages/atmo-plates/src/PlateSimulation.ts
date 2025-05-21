@@ -1,18 +1,32 @@
 import { EARTH_RADIUS, randomNormal } from '@wonderlandlabs/atmo-utils';
 import { Multiverse } from '@wonderlandlabs/multiverse';
 import { v4 as uuidV4 } from 'uuid';
+import type { Vector3Like } from 'three';
 import { COLLECTIONS, UNIVERSAL_SCHEMA, UNIVERSES } from './constants';
 import { PlateSpectrumGenerator } from './generator/PlateSpectrumGenerator';
-import type { SimSimulation } from './types.atmo-plates';
+import type {
+  Identifiable,
+  PlateIF,
+  PlateExtendedIF,
+  PlateBehavioralType,
+  PLATE_TYPES,
+  PlateSimExtendedIF,
+  SimSimulation,
+} from './types.atmo-plates';
 import { simUniverse } from './utils';
+import { extendPlate } from './utils/plateUtils';
+import { isPlateExtendedIF } from './utils/typeGuards';
 
-export interface Plate {
-  x: number;
-  y: number;
-  z: number;
-  radius: number;
-  density: number;
-  thickness: number;
+// Simulation plate interface with identity and relational links
+export interface SimPlateIF extends PlateExtendedIF, Identifiable {
+  name?: string; // display name
+  planetId: string; // planet reference
+  position: Vector3Like; // 3D position
+}
+
+// @deprecated Use SimPlateIF instead
+export interface Plate extends PlateIF {
+  position: Vector3Like; // 3D position
 }
 
 interface SimProps {
@@ -22,39 +36,35 @@ interface SimProps {
   radius?: number;
 }
 
-type AddPlateProps = {
-  id?: string;
-  name?: string;
-  radius: number;
-  density?: number;
-  thickness?: number;
+// Properties for adding a plate to a simulation
+type AddPlateProps = (PlateExtendedIF | PlateIF) & {
+  id?: string; // unique identifier
+  name?: string; // display name
+  planetId?: string; // planet reference
 };
 
 export class PlateSimulation {
   #mv: Multiverse;
 
+  /**
+   * Create a new plate simulation
+   * @param planetRadius - Radius of the planet in kilometers
+   * @param plateCount - Number of plates to generate (0 for none)
+   */
   constructor(
-    private planetRadius = EARTH_RADIUS,
+    public planetRadius = EARTH_RADIUS,
     plateCount = 0,
   ) {
+    // Initialize the multiverse and universe
     this.#mv = new Multiverse(UNIVERSAL_SCHEMA);
     simUniverse(this.#mv);
+    this.addSimulation({ radius: this.planetRadius });
 
-    // Create a default simulation with the planet
     if (plateCount > 0) {
-      // Create a simulation with the specified planet radius
-      this.addSimulation({ radius: this.planetRadius });
-
-      // Generate plates using the plateGenerator
       const { plates } = this.plateGenerator(plateCount).generate();
 
-      // Add each plate to the simulation
       for (const plate of plates) {
-        this.addPlate({
-          radius: plate.radius,
-          density: plate.density,
-          thickness: plate.thickness,
-        });
+        this.addPlate(plate);
       }
     }
   }
@@ -112,55 +122,97 @@ export class PlateSimulation {
     return this.simUniv.get(COLLECTIONS.SIMULATIONS).get(simId);
   }
 
-  addPlate(props: AddPlateProps, simId?: string) {
+  /**
+   * Add a plate to the simulation
+   * @param props - Properties of the plate to add
+   * @param simId - Optional simulation ID (uses default if not provided)
+   * @returns The ID of the added plate
+   */
+  addPlate(props: AddPlateProps, simId?: string): string {
+    // Check if props is already a PlateExtendedIF
+    const isExtendedPlate =
+      'behavioralType' in props && 'area' in props && 'mass' in props;
+
+    // Extract properties with defaults
     let { id, name, radius, density = 1, thickness = 1, planetId } = props;
+
+    // Generate ID if not provided
     if (!id) id = uuidV4();
+
+    // Use default simulation if not specified
     if (!simId) simId = this.#defaultSimId;
+
+    // Generate name if not provided
     if (!name) name = `plate-${id}`;
+
+    // If planetId is not provided, get it from the simulation
     if (!planetId) {
       if (!simId) {
         throw new Error('must define or have created a simulation');
       }
+
+      // Get planetId from the simulation
       planetId = this.#simulation(simId)?.planetId;
       if (!planetId) {
         throw new Error('no planetId found in simulation');
       }
-      const planet = this.simUniv.get(COLLECTIONS.PLANETS).get(planetId);
-
-      if (!planet) {
-        throw new Error(`Planet ${planetId} not found`);
-      }
-
-      const position = randomNormal().setLength(planet.radius);
-      this.simUniv.get(COLLECTIONS.PLATES).set(id, {
-        id,
-        name,
-        radius,
-        density,
-        thickness,
-        planetId,
-        position,
-      });
-      return id;
-    } else {
-      const planet = this.simUniv.get(COLLECTIONS.PLANETS).get(planetId);
-      const position = randomNormal().setLength(planet.radius);
-      this.simUniv.get(COLLECTIONS.PLATES).set(id, {
-        id,
-        name,
-        radius,
-        density,
-        thickness,
-        planetId,
-        position,
-      });
     }
+
+    // Verify the planet exists
+    const planet = this.simUniv.get(COLLECTIONS.PLANETS).get(planetId);
+    if (!planet) {
+      throw new Error(`Planet ${planetId} not found`);
+    }
+
+    // Create position vector on the planet surface
+    const position = randomNormal().setLength(planet.radius);
+
+    // Create the plate object with SimPlateIF interface
+    let plateData: SimPlateIF;
+
+    if (isExtendedPlate) {
+      // If it's already an extended plate, just add the simulation-specific properties
+      plateData = {
+        ...(props as PlateExtendedIF),
+        id,
+        name,
+        planetId,
+        position,
+      };
+    } else {
+      // If it's a basic plate, extend it with derived properties
+      const basicPlate: PlateIF & { id: string } = {
+        id,
+        radius,
+        density,
+        thickness,
+      };
+
+      // Extend the plate with derived properties
+      const extendedPlate = extendPlate(basicPlate, planet.radius);
+
+      // Add simulation-specific properties
+      plateData = {
+        id, // Explicitly add id to ensure TypeScript recognizes it
+        ...extendedPlate,
+        name,
+        planetId,
+        position,
+      };
+    }
+
+    // Add the plate to the collection
+    this.simUniv.get(COLLECTIONS.PLATES).set(id, plateData);
+
+    // Initialize plate steps (currently empty implementation)
     this.#initPlateSteps(id);
+
+    return id;
   }
 
   #initPlateSteps(plateId: string) {}
 
-  #planet;
+  #planet: { id: string; radius: number } | undefined;
   get planet() {
     if (!this.#planet) {
       this.#planet = this.makePlanet();
