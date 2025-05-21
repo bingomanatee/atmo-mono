@@ -1,6 +1,6 @@
-# ThreeNode
+# ThreeOrbitalFrame
 
-`ThreeNode` is a utility class that extends Three.js `Object3D` to provide additional convenience methods for working with 3D transformations. It maintains full compatibility with the Three.js scene graph system while adding helpful methods for working with different position and orientation formats.
+`ThreeOrbitalFrame` is a utility class that extends Three.js `Object3D` to provide additional convenience methods for working with 3D transformations. It maintains full compatibility with the Three.js scene graph system while adding helpful methods for working with different position and orientation formats.
 
 ## Features
 
@@ -15,12 +15,12 @@
 ### Basic Usage
 
 ```typescript
-import { ThreeNode } from '@wonderlandlabs/atmo-three-tree';
+import { ThreeOrbitalFrame } from '@wonderlandlabs/atmo-three-orbit';
 import { Vector3 } from 'three';
 
 // Create nodes
-const root = new ThreeNode('root', { x: 0, y: 0, z: 0 });
-const child = new ThreeNode('child', { x: 5, y: 0, z: 0 });
+const root = new ThreeOrbitalFrame('root', { x: 0, y: 0, z: 0 });
+const child = new ThreeOrbitalFrame('child', { x: 5, y: 0, z: 0 });
 
 // Build hierarchy using standard Object3D methods
 root.add(child);
@@ -65,14 +65,14 @@ node.setWorldOrientation(worldOrientation);
 ### Method Chaining
 
 ```typescript
-const node = new ThreeNode('node')
+const node = new ThreeOrbitalFrame('node')
   .setPosition({ x: 1, y: 2, z: 3 })
   .setOrientation({ x: 0, y: 0, z: 0, w: 1 });
 ```
 
 ### Compatibility with Three.js
 
-Since `ThreeNode` extends `Object3D`, it's fully compatible with all Three.js features:
+Since `ThreeOrbitalFrame` extends `Object3D`, it's fully compatible with all Three.js features:
 
 ```typescript
 // Use with standard Three.js features
@@ -81,8 +81,8 @@ import { Scene, PerspectiveCamera, WebGLRenderer, Euler, MathUtils } from 'three
 // Create a scene
 const scene = new Scene();
 
-// Add ThreeNode to the scene
-const node = new ThreeNode('node');
+// Add ThreeOrbitalFrame to the scene
+const node = new ThreeOrbitalFrame('node');
 scene.add(node);
 
 // Use Euler angles
@@ -134,7 +134,7 @@ Sets the node's orientation in world space.
 
 ### Inherited from Object3D
 
-ThreeNode inherits all properties and methods from Three.js Object3D, including:
+ThreeOrbitalFrame inherits all properties and methods from Three.js Object3D, including:
 
 - `position`, `rotation`, `quaternion`, `scale`
 - `add()`, `remove()`

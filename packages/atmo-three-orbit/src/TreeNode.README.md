@@ -15,7 +15,7 @@
 ### Basic Usage
 
 ```typescript
-import { TreeNode } from '@wonderlandlabs/atmo-three-tree';
+import { TreeNode } from '@wonderlandlabs/atmo-three-orbit';
 
 // Create nodes
 const root = new TreeNode({

@@ -1,18 +1,18 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { ThreeNode } from './ThreeNode';
+import { ThreeOrbitalFrame } from './ThreeOrbitalFrame';
 import { pointsEqual } from './utils';
 
 describe('ThreeTree', () => {
-  let origin: ThreeNode;
+  let origin: ThreeOrbitalFrame;
 
   beforeEach(() => {
-    origin = new ThreeNode();
+    origin = new ThreeOrbitalFrame();
   });
 
   describe('constructor', () => {
-    let newNode: ThreeNode;
+    let newNode: ThreeOrbitalFrame;
     beforeEach(() => {
-      newNode = new ThreeNode({
+      newNode = new ThreeOrbitalFrame({
         parent: origin,
         position: { x: 100, y: 0, z: 0 },
       });
@@ -26,7 +26,7 @@ describe('ThreeTree', () => {
     });
 
     it('should take a new Up', () => {
-      const newNodeWithUp = new ThreeNode({
+      const newNodeWithUp = new ThreeOrbitalFrame({
         parent: origin,
         position: { x: 100, y: 0, z: 0 },
         up: { x: 0, y: 0, z: 10 },
@@ -39,9 +39,9 @@ describe('ThreeTree', () => {
   });
 
   describe('reposition', () => {
-    let newNode: ThreeNode;
+    let newNode: ThreeOrbitalFrame;
     beforeEach(() => {
-      newNode = new ThreeNode({
+      newNode = new ThreeOrbitalFrame({
         parent: origin,
         position: { x: 100, y: 0, z: 0 },
       });

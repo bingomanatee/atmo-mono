@@ -1,5 +1,5 @@
 {
-  "name": "@wonderlandlabs/atmo-three-tree",
+  "name": "@wonderlandlabs/atmo-three-orbit",
   "version": "0.1.0",
   "main": "dist/index.js",
   "module": "dist/index.js",

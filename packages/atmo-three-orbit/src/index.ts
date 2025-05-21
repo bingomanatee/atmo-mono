@@ -1,6 +1,6 @@
 // Export main classes
 
-export * from './ThreeNode';
+export * from './ThreeOrbitalFrame';
 
 // Export utility functions
 export * from './utils';

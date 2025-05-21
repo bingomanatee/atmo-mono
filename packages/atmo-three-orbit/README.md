@@ -14,16 +14,16 @@ A utility package for managing hierarchical 3D nodes in a tree structure, with s
 
 ```bash
 # Using npm
-npm install @wonderlandlabs/atmo-three-tree
+npm install @wonderlandlabs/atmo-three-orbit
 
 # Using yarn
-yarn add @wonderlandlabs/atmo-three-tree
+yarn add @wonderlandlabs/atmo-three-orbit
 ```
 
 ## Basic Usage
 
 ```typescript
-import { TreeNode, ThreeTree } from '@wonderlandlabs/atmo-three-tree';
+import { TreeNode, ThreeTree } from '@wonderlandlabs/atmo-three-orbit';
 import { Vector3 } from 'three';
 
 // Create a tree
@@ -62,7 +62,7 @@ const backToWorld = childNode.localToWorld(localPoint);
 The package integrates with Multiverse for data persistence:
 
 ```typescript
-import { ThreeTree } from '@wonderlandlabs/atmo-three-tree';
+import { ThreeTree } from '@wonderlandlabs/atmo-three-orbit';
 import { Multiverse, memorySunF } from '@wonderlandlabs/multiverse';
 
 // Create a multiverse for data storage
@@ -96,7 +96,7 @@ const rootData = collection?.get('root');
 The package provides methods for transforming points between world and local coordinate spaces:
 
 ```typescript
-import { ThreeTree, Vector3 } from '@wonderlandlabs/atmo-three-tree';
+import { ThreeTree, Vector3 } from '@wonderlandlabs/atmo-three-orbit';
 
 const tree = new ThreeTree();
 
