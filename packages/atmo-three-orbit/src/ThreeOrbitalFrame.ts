@@ -42,6 +42,7 @@ export class ThreeOrbitalFrame extends Object3D {
     this.rotateOnAxis(this.axis, this.velocity / this.radius);
   }
 
+  // @tdprecated do not use / test
   visualize() {
     const plate = new CylinderGeometry(
       this.radius / 5,
@@ -57,6 +58,7 @@ export class ThreeOrbitalFrame extends Object3D {
     plateContainer.lookAt(new Vector3());
   }
 
+  // @deprecated do not use
   pointOnOrbit(): Vector3 {
     const up = new Vector3(0, 1, 0);
     if (Math.abs(this.axis.clone().dot(up)) > 0.99) up.set(1, 0, 0); // fallback

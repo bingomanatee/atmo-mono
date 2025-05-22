@@ -2,8 +2,11 @@ import { COLLECTIONS } from '../../schema';
 import type { PlateSimulationIF, SimPlateIF } from '../types.PlateSimulation';
 import { v4 as uuidV4 } from 'uuid';
 import { randomNormal, varyP } from '@wonderlandlabs/atmo-utils';
-import { Vector3 } from 'three';
+import { Vector3, Object3D } from 'three';
 import { asCoord, varySpeedByRadius } from '../../utils';
+import { ThreeOrbitalFrame } from '@wonderlandlabs/atmo-three-orbit';
+import { deGenerateMaps } from '@wonderlandlabs/multiverse';
+import { createOrbitalFrame } from '../utils/plateMovement';
 
 export type PSPMProps = {
   sim: PlateSimulationIF;
@@ -88,5 +91,63 @@ export default class PlateSimulationPlateManager {
     this.stepsCollection.set(stepId, stepData);
 
     return stepId;
+  }
+
+  /**
+   * Get the current step for the plate
+   */
+  #getCurrentStep() {
+    if (!this.#plate) throw new Error('plate required');
+
+    const stepsGen = this.stepsCollection.find('plateId', this.#plate.id);
+    const stepsMap = deGenerateMaps(stepsGen);
+    if (!stepsMap.size) throw new Error('no steps found for plate');
+
+    return [...stepsMap.values()].reduce((latest, step) => {
+      return step.step > latest.step ? step : latest;
+    });
+  }
+
+  /**
+   * Move the plate to its next position based on its current velocity and speed
+   * Uses ThreeOrbitalFrame to calculate the next position
+   */
+  movePlate() {
+    if (!this.#plate) throw new Error('plate required');
+    if (!this.#sim.simulation) throw new Error('simulation required');
+
+    // Get the current step
+    const currentStep = this.#getCurrentStep();
+
+    // Get the planet for radius
+    const planet = this.#sim.getPlanet(this.#plate.planetId);
+    if (!planet) throw new Error(`Planet ${this.#plate.planetId} not found`);
+
+    // Create and configure the orbital frame at origin
+    const orbitalFrame = createOrbitalFrame(currentStep, planet);
+
+    // Create a proxy object in the frame at (0, 0, radius) in local space
+    const plateProxy = new Object3D();
+    plateProxy.position.set(0, 0, planet.radius);
+    orbitalFrame.add(plateProxy);
+
+    // Move the orbital frame
+    orbitalFrame.orbit();
+
+    // Get the new global position of the proxy object
+    const newPosition = plateProxy.position.clone();
+    orbitalFrame.localToWorld(newPosition);
+
+    // Update the step with new position and velocity
+    const newStep = {
+      ...currentStep,
+      step: currentStep.step + 1,
+      position: newPosition,
+      velocity: orbitalFrame.axis.clone().multiplyScalar(currentStep.speed),
+    };
+
+    this.stepsCollection.set(currentStep.id, newStep);
+
+    return newStep;
   }
 }
