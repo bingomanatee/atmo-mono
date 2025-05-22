@@ -64,6 +64,36 @@ export function determineBehavioralType(
 }
 
 /**
+ * Calculate the isostatic elevation of a plate segment.
+ * @param thicknessKm - Thickness of the plate segment in kilometers.
+ * @param density - Density of the plate segment in g/cm³.
+ * @param mantleDensity - Density of the mantle in g/cm³ (default: 3.3).
+ * @returns Isostatic elevation in kilometers.
+ */
+export function isostaticElevation(
+  thicknessKm: number,
+  density: number,
+  mantleDensity = 3.3,
+): number {
+  return thicknessKm * (1 - density / mantleDensity);
+}
+
+/**
+ * Calculate the floating elevation of a plate segment based on isostasy.
+ * @param thicknessKm - Thickness of the plate segment in kilometers.
+ * @param density - Density of the plate segment in g/cm³.
+ * @param mantleDensity - Density of the mantle in g/cm³ (default: 3.3 g/cm³).
+ * @returns Floating elevation in kilometers relative to the surface at mantle density.
+ */
+export function floatElevation(
+  thicknessKm: number,
+  density: number,
+  mantleDensity = 3.3,
+): number {
+  return thicknessKm * (1 - density / mantleDensity);
+}
+
+/**
  * Extend a basic PlateIF with derived properties to create a PlateExtendedIF
  * @param plate - Basic plate with core properties
  * @param planetRadius - Radius of the planet in kilometers

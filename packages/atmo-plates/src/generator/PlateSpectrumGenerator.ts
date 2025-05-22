@@ -33,8 +33,8 @@ export class PlateSpectrumGenerator {
       ...config,
       targetCoverage: config.targetCoverage ?? 0.85, // 85% default coverage
       powerLawExponent: config.powerLawExponent ?? 2.0,
-      minDensity: config.minDensity ?? 2.7, // g/cm³ (typical continental crust)
-      maxDensity: config.maxDensity ?? 3.0, // g/cm³ (typical oceanic crust)
+      minDensity: config.minDensity ?? 2.6, // g/cm³ (typical continental crust)
+      maxDensity: config.maxDensity ?? 3.3, // g/cm³ (typical oceanic crust)
       minThickness: config.minThickness ?? 7, // km (typical oceanic crust)
       maxThickness: config.maxThickness ?? 35, // km (typical continental crust)
       variationFactor: config.variationFactor ?? 0.2,

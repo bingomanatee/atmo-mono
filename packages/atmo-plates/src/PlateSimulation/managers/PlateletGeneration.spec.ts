@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { Vector3 } from 'three';
 import { PlateletManager } from './PlateletManager';
-import { Plate } from './PlateSimulation';
+import { PlateSimulation } from '../PlateSimulation';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -141,9 +141,10 @@ const SAMPLE_SIMULATION = {
   plates: generatePlates(),
 };
 
-describe('PlateletManager', () => {
+describe('Large Scale Platelet Generation', () => {
   let manager: PlateletManager;
-  let testPlate: Plate;
+  let sim: PlateSimulation;
+  let samplePlates: Plate[];
 
   beforeAll(() => {
     // Save sample simulation to file
@@ -156,61 +157,51 @@ describe('PlateletManager', () => {
       JSON.stringify(SAMPLE_SIMULATION, null, 2),
     );
 
-    // Initialize manager and plates
-    manager = new PlateletManager();
-    testPlate = new Plate({
-      id: 'test_plate',
-      name: 'Test Plate',
-      radius: 5000000, // 5000 km
-      density: 2800,
-      thickness: 100000, // 100 km
-      position: new Vector3(0, 6371000, 0), // North pole
-      planetId: 'earth',
+    // Initialize simulation and manager
+    sim = new PlateSimulation({});
+    sim.init();
+
+    // Create Earth planet first using makePlanet and capture the ID
+    const EARTH_RADIUS = 6371000; // meters
+    const earthPlanet = sim.makePlanet(EARTH_RADIUS, 'Earth');
+
+    manager = new PlateletManager(sim);
+
+    // Add plates to simulation, ensuring they use the generated planet ID
+    samplePlates = SAMPLE_SIMULATION.plates.map((plate) => {
+      const plateId = sim.addPlate({
+        ...plate,
+        planetId: earthPlanet.id, // Use the actual planet ID
+      });
+      return sim.getPlate(plateId)!;
     });
   });
 
-  it('should cache generated platelets', () => {
-    // First generation
-    const firstGen = manager.generatePlatelets(testPlate);
-    expect(firstGen.length).toBeGreaterThan(0);
-
-    // Second generation should use cache
-    const secondGen = manager.generatePlatelets(testPlate);
-    expect(secondGen).toEqual(firstGen);
+  it('should generate platelets for each plate', () => {
+    samplePlates.forEach((plate) => {
+      const platelets = manager.generatePlatelets(plate.id);
+      expect(platelets.length).toBeGreaterThan(0);
+      expect(platelets.every((p) => p.plateId === plate.id)).toBe(true);
+    });
   });
 
-  it('should clear cache when requested', () => {
-    // Generate and cache
-    const firstGen = manager.generatePlatelets(testPlate);
-    expect(manager.getCachedPlatelets(testPlate.id)).toBeDefined();
+  it('should have a reasonable number of platelets per plate', () => {
+    const plateletCounts = samplePlates.map((plate) => {
+      const platelets = manager.generatePlatelets(plate.id);
+      return {
+        plateId: plate.id,
+        count: platelets.length,
+        radius: plate.radius,
+      };
+    });
 
-    // Clear cache
-    manager.clearCache(testPlate.id);
-    expect(manager.getCachedPlatelets(testPlate.id)).toBeUndefined();
-
-    // Regenerate
-    const secondGen = manager.generatePlatelets(testPlate);
-    expect(secondGen).toEqual(firstGen); // Should be same result
-  });
-
-  it('should generate platelets with correct properties', () => {
-    const platelets = manager.generatePlatelets(testPlate);
-
-    platelets.forEach((platelet) => {
-      // Check basic properties
-      expect(platelet.id).toMatch(new RegExp(`^${testPlate.id}-`));
-      expect(platelet.plateId).toBe(testPlate.id);
-      expect(platelet.thickness).toBe(testPlate.thickness);
-      expect(platelet.density).toBe(testPlate.density);
-
-      // Check position is within plate radius
-      expect(
-        platelet.position.distanceTo(testPlate.position),
-      ).toBeLessThanOrEqual(testPlate.radius);
-
-      // Check radius is reasonable (based on H3 level 4 cell size)
-      expect(platelet.radius).toBeGreaterThan(0);
-      expect(platelet.radius).toBeLessThan(testPlate.radius);
+    // Verify each plate has a reasonable number of platelets
+    plateletCounts.forEach(({ count, radius }) => {
+      // Expect at least one platelet per million square kilometers
+      const minExpected = Math.floor(
+        (Math.PI * radius * radius) / 1000000000000,
+      );
+      expect(count).toBeGreaterThanOrEqual(minExpected);
     });
   });
 
@@ -222,42 +213,45 @@ describe('PlateletManager', () => {
       'sample-simulation.json',
     );
     const savedSim = JSON.parse(fs.readFileSync(testDataPath, 'utf-8'));
-    const loadedPlates = savedSim.plates.map(
-      (p: any) =>
-        new Plate({
-          ...p,
-          position: new Vector3(p.position.x, p.position.y, p.position.z),
-        }),
-    );
+    const loadedPlates = savedSim.plates.map((p: any) => ({
+      ...p,
+      position: new Vector3(p.position.x, p.position.y, p.position.z),
+    }));
 
     // Generate platelets for loaded plates
     loadedPlates.forEach((plate) => {
-      const platelets = manager.generatePlatelets(plate);
+      const platelets = manager.generatePlatelets(plate.id);
       expect(platelets.length).toBeGreaterThan(0);
       expect(platelets.every((p) => p.plateId === plate.id)).toBe(true);
     });
   });
 
-  it('should have a reasonable number of platelets per plate', () => {
-    const plateletCounts = SAMPLE_SIMULATION.plates.map((plate) => {
-      const platelets = manager.generatePlatelets(plate);
+  it('should maintain consistent platelet generation across runs', () => {
+    const firstRunCounts = samplePlates.map((plate) => {
+      const platelets = manager.generatePlatelets(plate.id);
       return {
         plateId: plate.id,
         count: platelets.length,
-        radius: plate.radius,
+        positions: platelets.map((p) => p.position.toArray()),
       };
     });
 
-    // Log platelet counts for analysis
-    console.log('Platelet counts:', plateletCounts);
+    // Clear cache and regenerate
+    manager.clearCache();
+    const secondRunCounts = samplePlates.map((plate) => {
+      const platelets = manager.generatePlatelets(plate.id);
+      return {
+        plateId: plate.id,
+        count: platelets.length,
+        positions: platelets.map((p) => p.position.toArray()),
+      };
+    });
 
-    // Verify each plate has a reasonable number of platelets
-    plateletCounts.forEach(({ count, radius }) => {
-      // Expect at least one platelet per million square kilometers
-      const minExpected = Math.floor(
-        (Math.PI * radius * radius) / 1000000000000,
-      );
-      expect(count).toBeGreaterThanOrEqual(minExpected);
+    // Compare results
+    firstRunCounts.forEach((first, index) => {
+      const second = secondRunCounts[index];
+      expect(second.count).toBe(first.count);
+      expect(second.positions).toEqual(first.positions);
     });
   });
 });

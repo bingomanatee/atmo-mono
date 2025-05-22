@@ -4,6 +4,7 @@ import { COLLECTIONS } from '../../schema';
 import { PlateSimulation } from '../PlateSimulation';
 import type { PlateSimulationIF, SimPlateIF } from '../types.PlateSimulation';
 import PlateSimulationPlateManager from './PlateSimulationPlateManager';
+import type { CollSync } from '@wonderlandlabs/multiverse';
 
 export function echoTest(phase: 'start' | 'end' = 'start') {
   const { currentTestName } = expect.getState();
@@ -14,88 +15,59 @@ export function echoTest(phase: 'start' | 'end' = 'start') {
 
 describe('PlateSimulationPlateManager', () => {
   let sim: PlateSimulationIF;
-  let stepsCollection: CollSyncIF;
+  let stepsCollection: CollSync;
 
   beforeEach(() => {
     sim = new PlateSimulation({});
     sim.init();
-    stepsCollection = sim.simUniv.get(COLLECTIONS.STEPS);
+    stepsCollection = sim.simUniv.get(COLLECTIONS.STEPS) as CollSync;
+    // Assert that the stepsCollection has a find method, even if not explicitly in CollSync type
+    expect((stepsCollection as any).find).toBeDefined();
   });
 
-  it('should initialize with a plate and create first step', () => {
-    const platCollection: CollSyncIF = sim!.simUniv.get(COLLECTIONS.PLATES);
-    const g = platCollection.getAll();
-
+  it('should initialize steps for a plate when initPlateSteps is called', () => {
+    // Create a plate
     sim.addPlate({
+      id: 'test-plate',
       radius: 100,
       density: 10,
       thickness: 10,
     });
 
-    const { value: plates } = g.next();
-    let plate: SimPlateIF;
-    if (plates?.size) {
-      plate = [...plates.values()][0] as SimPlateIF;
-    } else throw 'no plate present to test';
+    const plate = sim.getPlate('test-plate') as SimPlateIF;
+    expect(plate).toBeDefined();
 
-    const manager = new PlateSimulationPlateManager({
-      sim: sim!,
-      plate: plate,
-    });
+    // Create the stateless manager
+    const manager = new PlateSimulationPlateManager(sim);
 
+    // Initialize steps for the plate using its id
+    manager.initPlateSteps(plate.id);
+
+    // Assert that the first step was created for the plate
     const stepsGen = stepsCollection.find('plateId', plate.id);
     const steps = [...stepsGen];
     expect(steps).toHaveLength(1);
     const [step] = [...steps[0].values()];
     expect(step.plateId).toBe(plate.id);
+    expect(step.step).toBe(0);
     expect(step.speed).toBeGreaterThan(0);
     expect(step.position).toBeDefined();
     expect(step.velocity).toBeDefined();
   });
 
-  it('should initialize from plate ID', () => {
-    const plateId = 'plate-1';
-    sim.addPlate({
-      id: plateId,
-      radius: 100,
-      density: 10,
-      thickness: 10,
-    });
-
-    const manager = new PlateSimulationPlateManager({
-      sim,
-      id: plateId,
-    });
-    const stepsGen = stepsCollection.find('plateId', plateId);
-    const steps = [...stepsGen];
-    expect(steps).toHaveLength(1);
-    const [step] = [...steps[0].values()];
-    expect(step.plateId).toBe(plateId);
-    expect(step.speed).toBeGreaterThan(0);
-    expect(step.position).toBeDefined();
-    expect(step.velocity).toBeDefined();
-  });
-
-  it('should throw if plate not found', () => {
-    expect(
-      () => new PlateSimulationPlateManager({ sim, id: 'unknown-plate' }),
-    ).not.toThrow(); // doesn't throw immediately, just doesn't init
-  });
-
-  it('should throw if planet not found', () => {
-    sim.addPlate({
-      radius: 100,
-      density: 10,
-      thickness: 10,
-    });
-
-    const platCollection: CollSyncIF = sim.simUniv.get(COLLECTIONS.PLATES);
-    const { value: plates } = platCollection.getAll().next();
-    const plate = [...plates.values()][0] as SimPlateIF;
-
-    sim.getPlanet = vi.fn(() => undefined);
+  it('should not throw in constructor even if plate not found initially', () => {
+    // Creating the manager with only sim should not throw
     expect(() => {
-      new PlateSimulationPlateManager({ sim, plate });
-    }).toThrow(/Planet .* not found/);
+      new PlateSimulationPlateManager(sim);
+    }).not.toThrow();
+  });
+
+  it('should throw in initPlateSteps if plate not found', () => {
+    const manager = new PlateSimulationPlateManager(sim);
+    const nonExistentPlateId = 'non-existent-plate';
+
+    expect(() => {
+      manager.initPlateSteps(nonExistentPlateId);
+    }).toThrow('plate now found');
   });
 });

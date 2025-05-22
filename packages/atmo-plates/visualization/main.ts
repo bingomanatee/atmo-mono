@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import { PlateletManager } from '../src/PlateSimulation/PlateletManager';
+import { PlateletManager } from '../src/PlateSimulation/managers/PlateletManager';
 import { PlateSimulation } from '../src/PlateSimulation/PlateSimulation';
 import { Vector3 } from 'three';
 import type { SimPlateIF } from '../src/PlateSimulation/types.PlateSimulation';
@@ -45,14 +45,23 @@ const testPlate: SimPlateIF = {
   density: 2800,
   thickness: 100000, // 100 km
   position: new Vector3(0, EARTH_RADIUS, 0), // North pole
-  planetId: 'earth',
+  planetId: earthPlanet.id,
   velocity: new Vector3(0, 0, 0),
   isActive: true,
 };
 
+// Initialize simulation and add test plate
+const sim = new PlateSimulation({});
+sim.init();
+
+// Create Earth planet first
+const earthPlanet = sim.makePlanet(EARTH_RADIUS, 'Earth');
+
+const plateId = sim.addPlate(testPlate);
+
 // Create platelet manager and generate platelets
-const manager = new PlateletManager();
-const platelets = manager.generatePlatelets(testPlate);
+const manager = new PlateletManager(sim);
+const platelets = manager.generatePlatelets(plateId);
 
 // Create a color map for plates
 const plateColors = new Map<string, THREE.Color>();

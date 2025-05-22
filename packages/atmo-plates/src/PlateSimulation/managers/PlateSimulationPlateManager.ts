@@ -1,22 +1,22 @@
-import { COLLECTIONS } from '../../schema';
-import type { PlateSimulationIF, SimPlateIF } from '../types.PlateSimulation';
-import { v4 as uuidV4 } from 'uuid';
 import { randomNormal, varyP } from '@wonderlandlabs/atmo-utils';
-import { Vector3, Object3D } from 'three';
-import { asCoord, varySpeedByRadius } from '../../utils';
-import { ThreeOrbitalFrame } from '@wonderlandlabs/atmo-three-orbit';
-import { deGenerateMaps } from '@wonderlandlabs/multiverse';
+import { Object3D, Vector3 } from 'three';
+import { v4 as uuidV4 } from 'uuid';
+import { COLLECTIONS } from '../../schema';
+import { varySpeedByRadius } from '../../utils';
+import type {
+  PlateSimulationIF,
+  SimPlateIF,
+  SimStepIF,
+} from '../types.PlateSimulation';
 import { createOrbitalFrame } from '../utils/plateMovement';
+import { ThreeOrbitalFrame } from '@wonderlandlabs/atmo-three-orbit';
 
 export type PSPMProps = {
   sim: PlateSimulationIF;
-  id?: string;
-  plate?: SimPlateIF;
 };
 
 export default class PlateSimulationPlateManager {
   #sim: PlateSimulationIF;
-  #plate?: SimPlateIF;
 
   /**
    * Get the steps collection from the simulation universe
@@ -27,45 +27,32 @@ export default class PlateSimulationPlateManager {
     return collection;
   }
 
-  constructor(props: PSPMProps) {
-    let { sim, id, plate } = props;
+  constructor(sim: PlateSimulationIF) {
     this.#sim = sim;
-    if (!plate && id) plate = sim.getPlate(id);
-
-    if (plate) this.initPlate(plate);
   }
 
-  initPlate(plate: SimPlateIF) {
-    this.#plate = plate;
-    this.#initPlateSteps();
-  }
-
-  #initPlateSteps() {
-    if (!this.#sim.simulation) throw new Error('simulation required');
-    if (!this.#plate) throw new Error('plate required');
-
-    const steps = this.stepsCollection.find('plateId', this.#plate.id);
+  // Method to initialize steps for a specific plate
+  initPlateSteps(plateId: string) {
+    const steps = this.stepsCollection.find('plateId', plateId);
     if (!steps?.length) {
-      this.#addFirstStep();
+      this.#addFirstStep(plateId);
     } else {
-      console.log('#initPlateSteps: steps already exist');
+      console.log(`initPlateSteps: steps already exist for plate ${plateId}`);
     }
   }
 
-  #addFirstStep() {
-    if (!this.#plate) throw new Error('plate required');
-
-    const planet = this.#sim.getPlanet(this.#plate.planetId);
-    if (!planet) throw new Error(`Planet ${this.#plate.planetId} not found`);
+  // Method to add the first step for a specific plate
+  #addFirstStep(plateId: string) {
+    // @ts-ignore
+    const plate: SimPlateIF = this.#sim.getPlate(plateId);
+    if (!plate) throw new Error('plate now found');
+    const planet = this.#sim.getPlanet(plate.planetId);
+    if (!planet) throw new Error(`Planet ${plate.planetId} not found`);
 
     const stepId = uuidV4();
 
-    const position = this.#plate.position
-      ? new Vector3(
-          this.#plate.position.x,
-          this.#plate.position.y,
-          this.#plate.position.z,
-        )
+    const position = plate.position
+      ? new Vector3(plate.position.x, plate.position.y, plate.position.z)
       : randomNormal().multiplyScalar(planet.radius);
 
     const speed = varyP({ min: 5, max: 250 });
@@ -80,7 +67,7 @@ export default class PlateSimulationPlateManager {
 
     const stepData = {
       id: stepId,
-      plateId: this.#plate.id,
+      plateId: plate.id,
       step: 0,
       speed, // Use provided speed or random between 5-250
       position,
@@ -94,13 +81,13 @@ export default class PlateSimulationPlateManager {
   }
 
   /**
-   * Get the current step for the plate
+   * Get the current step for a specific plate
    */
-  #getCurrentStep() {
-    if (!this.#plate) throw new Error('plate required');
-
-    const stepsGen = this.stepsCollection.find('plateId', this.#plate.id);
-    const stepsMap = deGenerateMaps(stepsGen);
+  #getCurrentStep(plateId: string): SimStepIF {
+    const stepsGen = this.stepsCollection.find('plateId', plateId) as Iterable<
+      [string, SimStepIF]
+    >;
+    const stepsMap = new Map<string, SimStepIF>(stepsGen);
     if (!stepsMap.size) throw new Error('no steps found for plate');
 
     return [...stepsMap.values()].reduce((latest, step) => {
@@ -109,22 +96,34 @@ export default class PlateSimulationPlateManager {
   }
 
   /**
-   * Move the plate to its next position based on its current velocity and speed
+   * Move a specific plate to its next position
    * Uses ThreeOrbitalFrame to calculate the next position
    */
-  movePlate() {
-    if (!this.#plate) throw new Error('plate required');
+  movePlate(plateId: string) {
     if (!this.#sim.simulation) throw new Error('simulation required');
 
     // Get the current step
-    const currentStep = this.#getCurrentStep();
+    const currentStep = this.#getCurrentStep(plateId);
 
     // Get the planet for radius
-    const planet = this.#sim.getPlanet(this.#plate.planetId);
-    if (!planet) throw new Error(`Planet ${this.#plate.planetId} not found`);
+    const plate = this.#sim.getPlate(plateId);
+    if (!plate) throw new Error(`Plate ${plateId} not found in simulation`);
+
+    const planet = this.#sim.getPlanet(plate.planetId);
+    if (!planet) throw new Error(`Planet ${plate.planetId} not found`);
 
     // Create and configure the orbital frame at origin
-    const orbitalFrame = createOrbitalFrame(currentStep, planet);
+    const orbitalFrame = createOrbitalFrame(
+      {
+        speed: currentStep.speed,
+        velocity: new Vector3(
+          currentStep.velocity.x,
+          currentStep.velocity.y,
+          currentStep.velocity.z,
+        ),
+      },
+      planet,
+    );
 
     // Create a proxy object in the frame at (0, 0, radius) in local space
     const plateProxy = new Object3D();
@@ -142,11 +141,15 @@ export default class PlateSimulationPlateManager {
     const newStep = {
       ...currentStep,
       step: currentStep.step + 1,
-      position: newPosition,
-      velocity: orbitalFrame.axis.clone().multiplyScalar(currentStep.speed),
+      position: new Vector3(newPosition.x, newPosition.y, newPosition.z),
+      velocity: new Vector3(
+        orbitalFrame.axis.x,
+        orbitalFrame.axis.y,
+        orbitalFrame.axis.z,
+      ).multiplyScalar(currentStep.speed),
     };
 
-    this.stepsCollection.set(currentStep.id, newStep);
+    this.stepsCollection.set(currentStep.id, newStep as SimStepIF);
 
     return newStep;
   }

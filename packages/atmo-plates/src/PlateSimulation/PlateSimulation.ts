@@ -22,6 +22,14 @@ import type {
   SimProps,
   AddPlateProps,
 } from './types.PlateSimulation';
+import PlateSimulationPlateManager from './managers/PlateSimulationPlateManager';
+import { PlateletManager } from './managers/PlateletManager';
+
+// Define manager keys
+export const MANAGERS = {
+  PLATE: 'plateManager',
+  PLATELET: 'plateletManager',
+};
 
 // @deprecated Use SimPlateIF instead
 export interface Plate extends PlateIF {
@@ -34,6 +42,7 @@ export class PlateSimulation implements PlateSimulationIF {
   public planetRadius: number;
   public simulationId?: string;
   #defaultSimId: string | undefined;
+  readonly managers: Map<string, any>; // Map to store manager instances
 
   /**
    * Create a new plate simulation
@@ -67,6 +76,11 @@ export class PlateSimulation implements PlateSimulationIF {
     if (!this.multiverse.has(this.universeName)) {
       simUniverse(this.multiverse);
     }
+
+    // Initialize managers
+    this.managers = new Map<string, any>();
+    this.managers.set(MANAGERS.PLATE, new PlateSimulationPlateManager(this));
+    this.managers.set(MANAGERS.PLATELET, new PlateletManager(this));
   }
 
   /**

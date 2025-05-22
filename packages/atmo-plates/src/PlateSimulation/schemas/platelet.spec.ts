@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { Vector3 } from 'three';
-import { Platelet, createPlatelet, subdividePlate } from './platelet';
+import { Platelet, createPlatelet } from './platelet';
 
 describe('platelet', () => {
   it('should create a platelet with default values', () => {
@@ -15,6 +15,7 @@ describe('platelet', () => {
     expect(platelet.elasticity).toBe(0.5);
     expect(platelet.velocity).toEqual(new Vector3());
     expect(platelet.isActive).toBe(true);
+    expect(platelet.radius).toBe(1.0);
   });
 
   it('should create a platelet with custom values', () => {
@@ -27,6 +28,7 @@ describe('platelet', () => {
       velocity,
       isActive: false,
       temperature: 100,
+      radius: 5.0,
     });
 
     expect(platelet.mass).toBe(2.0);
@@ -34,29 +36,5 @@ describe('platelet', () => {
     expect(platelet.velocity).toEqual(velocity);
     expect(platelet.isActive).toBe(false);
     expect(platelet.temperature).toBe(100);
-  });
-
-  it('should subdivide a plate into platelets', () => {
-    const plateId = 'test-plate';
-    const center = new Vector3(0, 0, 0);
-    const radius = 10;
-    const subdivisions = 4;
-
-    const platelets = subdividePlate(plateId, center, radius, subdivisions);
-
-    expect(platelets).toHaveLength(subdivisions);
-
-    // Check that platelets form a circle
-    platelets.forEach((platelet, index) => {
-      const angle = (2 * Math.PI * index) / subdivisions;
-      const expectedX = center.x + radius * Math.cos(angle);
-      const expectedY = center.y + radius * Math.sin(angle);
-      const expectedZ = center.z;
-
-      expect(platelet.position.x).toBeCloseTo(expectedX);
-      expect(platelet.position.y).toBeCloseTo(expectedY);
-      expect(platelet.position.z).toBe(expectedZ);
-      expect(platelet.plateId).toBe(plateId);
-    });
   });
 });

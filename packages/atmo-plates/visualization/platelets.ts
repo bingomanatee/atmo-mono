@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import { PlateletManager } from '../src/PlateSimulation/PlateletManager';
+import { PlateletManager } from '../src/PlateSimulation/managers/PlateletManager';
 import { PlateSimulation } from '../src/PlateSimulation/PlateSimulation';
 import { Vector3 } from 'three';
 import type { SimPlateIF } from '../src/PlateSimulation/types.PlateSimulation';
@@ -54,6 +54,13 @@ const lightHelper = new THREE.DirectionalLightHelper(
 ); // Adjusted helper size
 scene.add(lightHelper);
 
+// Initialize simulation and add test plate
+const sim = new PlateSimulation({});
+sim.init();
+
+// Create Earth planet first
+const earthPlanet = sim.makePlanet(EARTH_RADIUS, 'Earth');
+
 // Create a test plate
 const testPlate: SimPlateIF = {
   id: 'test_plate',
@@ -62,10 +69,12 @@ const testPlate: SimPlateIF = {
   density: 2800,
   thickness: 100000, // 100 km
   position: new Vector3(0, EARTH_RADIUS, 0), // North pole
-  planetId: 'earth',
+  planetId: earthPlanet.id,
   velocity: new Vector3(0, 0, 0),
   isActive: true,
 };
+
+const plateId = sim.addPlate(testPlate);
 
 // Add planet sphere
 const planetGeometry = new THREE.SphereGeometry(EARTH_RADIUS, 32, 32); // Use full Earth radius
@@ -80,8 +89,8 @@ planet.position.set(0, 0, 0); // Set position to origin
 scene.add(planet);
 
 // Create platelet manager and generate platelets
-const manager = new PlateletManager();
-const platelets = manager.generatePlatelets(testPlate);
+const manager = new PlateletManager(sim);
+const platelets = manager.generatePlatelets(plateId);
 
 console.log('Generated platelets count:', platelets.length);
 

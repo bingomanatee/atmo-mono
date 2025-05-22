@@ -115,6 +115,10 @@ export const UNIVERSAL_PLATELETS_SCHEMA = {
   radius: FIELD_TYPES.number,
   thickness: FIELD_TYPES.number,
   density: FIELD_TYPES.number,
+  neighborCellIds: {
+    type: FIELD_TYPES.array,
+    meta: { itemType: FIELD_TYPES.string },
+  },
 };
 
 export const UNIVERSAL_SIMULATIONS_SCHEMA = {

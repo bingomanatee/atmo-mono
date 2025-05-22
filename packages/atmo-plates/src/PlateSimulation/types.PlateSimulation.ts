@@ -66,3 +66,21 @@ export interface PlateSimulationIF {
   makePlanet(radius?: number, name?: string): SimPlanetIF;
   getPlanet(id: string): SimPlanetIF | undefined;
 }
+
+// Simulation step interface
+export interface SimStepIF {
+  id: string;
+  plateId: string;
+  step: number;
+  speed: number; // Speed in meters per step
+  position: Vector3Like;
+  velocity: Vector3Like;
+  start: Vector3Like; // Starting position of the step
+}
+
+// Interface for the stateless PlateSimulationPlateManager
+export interface PlateSimulationPlateManagerIF {
+  new (sim: PlateSimulationIF): PlateSimulationPlateManagerIF;
+  initPlateSteps(plate: SimPlateIF): void;
+  movePlate(plateId: string): SimStepIF;
+}
