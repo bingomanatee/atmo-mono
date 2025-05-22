@@ -37,6 +37,68 @@ describe('plateMovement', () => {
     const expectedPosition = new Vector3(RADIUS * 0.7071, RADIUS * 0.7071, 0);
     expect(newPosition.distanceTo(expectedPosition)).toBeCloseTo(0, 0); // Acceptable error < 1 unit
   });
+
+  it('should stack multiple small movements correctly', () => {
+    const planet = { radius: RADIUS };
+    const initialPosition = new Vector3(RADIUS, 0, 0);
+    const velocity = new Vector3(0, 0, 1).normalize(); // Rotate around z-axis
+    const smallAngle = (5 * Math.PI) / 180; // 5 degrees in radians
+
+    // Perform 5 consecutive moves
+    let currentPosition = initialPosition.clone();
+    const positions = [currentPosition.clone()];
+
+    for (let i = 0; i < 5; i++) {
+      const currentStep = {
+        speed: smallAngle,
+        velocity: velocity,
+        position: currentPosition,
+      };
+      currentPosition = movePlate(currentStep, planet);
+      positions.push(currentPosition.clone());
+    }
+
+    // Log all positions for inspection
+    console.log('Multiple moves positions:');
+    positions.forEach((pos, idx) => {
+      console.log(`Move ${idx}: ${pos.toArray()}`);
+    });
+
+    // After 5 moves of 5 degrees each (25 degrees total), we expect:
+    // x = RADIUS * cos(25°)
+    // y = RADIUS * sin(25°)
+    const totalAngle = (25 * Math.PI) / 180; // 25 degrees in radians
+    const expectedFinalPosition = new Vector3(
+      RADIUS * Math.cos(totalAngle),
+      RADIUS * Math.sin(totalAngle),
+      0,
+    );
+
+    // Check if the final position is close to what we expect
+    expect(currentPosition.distanceTo(expectedFinalPosition)).toBeCloseTo(0, 0);
+  });
+
+  it('should rotate around a non-orthogonal axis', () => {
+    const planet = { radius: RADIUS };
+    const initialPosition = new Vector3(RADIUS, 0, 0);
+    // Create a non-orthogonal axis at 45° between x and y
+    const nonOrthogonalAxis = new Vector3(1, 1, 0).normalize();
+
+    const currentStep = {
+      speed: Math.PI / 4, // 45 degrees
+      velocity: nonOrthogonalAxis,
+      position: initialPosition,
+    };
+
+    const newPosition = movePlate(currentStep, planet);
+    console.log('Non-orthogonal rotation:');
+    console.log(`Initial: ${initialPosition.toArray()}`);
+    console.log(`Axis: ${nonOrthogonalAxis.toArray()}`);
+    console.log(`Final: ${newPosition.toArray()}`);
+
+    // The plate should maintain its distance from the origin
+    expect(newPosition.length()).toBeCloseTo(RADIUS, 0);
+  });
 });
 
 // Movement axis tests for all cardinal positions and axes
