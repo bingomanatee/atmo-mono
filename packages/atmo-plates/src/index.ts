@@ -4,7 +4,7 @@
  */
 
 // Export main classes
-export { PlateSimulation } from './PlateSimulation';
+export { PlateSimulation } from './PlateSimulation/PlateSimulation';
 
 // Export types
-export type { Plate } from './PlateSimulation';
+export type { Plate } from './PlateSimulation/PlateSimulation';

@@ -9,7 +9,6 @@
 
 import { varyP } from '@wonderlandlabs/atmo-utils';
 import {
-  PLATE_TYPES,
   PlateGeneratorConfig,
   PlateManifest,
   PlateExtendedIF,
@@ -21,8 +20,6 @@ import {
   calculateMass,
   determineBehavioralType,
 } from '../utils/plateUtils';
-
-// Using PlateExtendedIF from types.atmo-plates.ts
 
 export class PlateSpectrumGenerator {
   private config: Required<PlateGeneratorConfig>;

@@ -1,19 +1,31 @@
+import { EARTH_RADIUS } from '@wonderlandlabs/atmo-utils';
 import { FIELD_TYPES, CollSync } from '@wonderlandlabs/multiverse';
 import { SchemaLocal, Universe } from '@wonderlandlabs/multiverse';
-import { Multiverse } from '@wonderlandlabs/multiverse/dist';
+import { Multiverse } from '@wonderlandlabs/multiverse';
+import { Vector3 } from 'three';
+import type { Vector3Like } from 'three';
 import {
   COLLECTIONS,
   SIM_PLANETS_SCHEMA,
+  SIM_PLATE_STEPS_SCHEMA,
   SIM_PLATES_SCHEMA,
   SIM_SIMULATIONS_SCHEMA,
   UNIVERSES,
-} from './constants';
+} from './schema';
 
 export function coord(prefix = '') {
   return {
     [`${prefix}x`]: FIELD_TYPES.number,
     [`${prefix}y`]: FIELD_TYPES.number,
     [`${prefix}z`]: FIELD_TYPES.number,
+  };
+}
+
+export function asCoord(prefix: string, p: Vector3Like = new Vector3()) {
+  return {
+    [`${prefix}x`]: p.x,
+    [`${prefix}y`]: p.y,
+    [`${prefix}z`]: p.z,
   };
 }
 
@@ -38,5 +50,19 @@ export function simUniverse(mv: Multiverse) {
     schema: new SchemaLocal(COLLECTIONS.SIMULATIONS, SIM_SIMULATIONS_SCHEMA),
   });
 
+  const plateCollection = new CollSync({
+    name: COLLECTIONS.STEPS,
+    universe: simUniv,
+    schema: new SchemaLocal(COLLECTIONS.STEPS, SIM_PLATE_STEPS_SCHEMA),
+  });
   return simUniv;
+}
+
+export function varySpeedByRadius(
+  earthSpeed: number,
+  radiusKm: number,
+): number {
+  const scaleFactor = radiusKm / EARTH_RADIUS;
+  const speed = earthSpeed * Math.pow(scaleFactor, 0.5);
+  return Math.max(1, Math.min(speed, 20));
 }

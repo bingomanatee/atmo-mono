@@ -10,7 +10,8 @@
     "resolveJsonModule": true,
     "verbatimModuleSyntax": false,
     "skipLibCheck": true,
-    "noEmitOnError": false
+    "noEmitOnError": false,
+    "noEmit": false
   },
   "include": ["src/**/*"],
   "exclude": ["**/*.spec.ts", "**/*.test.ts"]

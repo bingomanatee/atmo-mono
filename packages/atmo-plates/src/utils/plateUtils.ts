@@ -1,8 +1,8 @@
 import { v4 as uuidV4 } from 'uuid';
+import { PLATE_TYPES } from '../constants';
 import {
   PlateIF,
   PlateExtendedIF,
-  PLATE_TYPES,
   PlateBehavioralType,
 } from '../types.atmo-plates';
 

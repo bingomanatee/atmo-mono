@@ -18,9 +18,12 @@ if (!fs.existsSync(typesDir)) {
 // Run TypeScript compiler to generate declaration files
 try {
   console.log("Generating declaration files...");
-  execSync("tsc --project tsconfig.build.json --noEmitOnError false", {
-    stdio: "inherit",
-  });
+  execSync(
+    "tsc --project tsconfig.build.json --noEmitOnError false --skipLibCheck true",
+    {
+      stdio: "inherit",
+    }
+  );
   console.log("Declaration files generated successfully!");
 } catch (error) {
   console.warn(

@@ -1,15 +1,17 @@
 import type { Vector3Like } from 'three';
+import { PLATE_TYPES } from './constants';
 import {
   PlateIF,
   PlateExtendedIF,
   PlateSimExtendedIF,
   PlateTypeValue,
-  PLATE_TYPES,
   Identifiable,
   PlateDistributionSummary,
   PlateManifest,
   PlateGeneratorConfig,
   SimSimulation,
+  PlanetIF,
+  SimPlanetIF,
 } from './types.atmo-plates';
 
 /**
@@ -197,5 +199,29 @@ export function isSimSimulation(obj: unknown): obj is SimSimulation {
     typeof (obj as SimSimulation).name === 'string' &&
     'planetId' in obj &&
     typeof (obj as SimSimulation).planetId === 'string'
+  );
+}
+
+/**
+ * Type guard for PlanetIF objects
+ */
+export function isPlanetIF(obj: unknown): obj is PlanetIF {
+  return (
+    typeof obj === 'object' &&
+    obj !== null &&
+    'radius' in obj &&
+    typeof (obj as PlanetIF).radius === 'number' &&
+    (!('name' in obj) || typeof (obj as PlanetIF).name === 'string')
+  );
+}
+
+/**
+ * Type guard for SimPlanetIF objects
+ */
+export function isSimPlanetIF(obj: unknown): obj is SimPlanetIF {
+  return (
+    isPlanetIF(obj) &&
+    isIdentifiable(obj) &&
+    (!('name' in obj) || typeof (obj as SimPlanetIF).name === 'string')
   );
 }

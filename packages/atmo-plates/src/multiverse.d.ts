@@ -42,7 +42,9 @@ declare module '@wonderlandlabs/multiverse' {
     constructor(name: string, multiverse?: Multiverse);
     name: string;
     collections: Map<string, any>;
-    add<RecordType = Record<string, any>, KeyType = string>(collection: any): any;
+    add<RecordType = Record<string, any>, KeyType = string>(
+      collection: any,
+    ): any;
     get(name: string): any;
     has(name: string): boolean;
     delete(name: string): boolean;
@@ -54,6 +56,7 @@ declare module '@wonderlandlabs/multiverse' {
     addUniverse(name: string): Universe;
     getUniverse(name: string): Universe;
     get(name: string): Universe;
+    has(name: string): boolean;
     hasUniverse(name: string): boolean;
     deleteUniverse(name: string): boolean;
     get size(): number;

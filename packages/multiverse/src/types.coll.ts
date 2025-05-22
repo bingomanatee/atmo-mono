@@ -60,15 +60,11 @@ export interface CollSyncIF<RecordType = DataRecord, KeyType = DataKey>
    * @param options - Optional parameters for the query
    * @returns A map of records matching the query or an Observable stream of records
    */
-  find(
-    ...query: any
-  ):
-    | Generator<KeyType, RecordType>
-    | Observable<{ key: KeyType; value: RecordType }>;
+  find(...query: any[]): Generator<{ key: KeyType; value: RecordType }>;
 
   get(key: KeyType): RecordType | undefined;
 
-  getAll(): Generator<Map<KeyType, RecordType>>;
+  getAll(): Generator<{ key: KeyType; value: RecordType }>;
 
   getMany(keys: KeyType[]): Generator<{ key: KeyType; value: RecordType }>;
 
@@ -101,7 +97,10 @@ export interface CollSyncIF<RecordType = DataRecord, KeyType = DataKey>
 
   sendAll(props: SendProps<RecordType, KeyType>): TransportResult;
 
-  sendMany(keys: KeyType[], props: SendProps<RecordType, K>): TransportResult;
+  sendMany(
+    keys: KeyType[],
+    props: SendProps<RecordType, KeyType>,
+  ): TransportResult;
 
   set(key: KeyType, value: RecordType): void;
 

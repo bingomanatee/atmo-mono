@@ -1,11 +1,5 @@
 import type { Vector3Like } from 'three';
-
-// Concrete string map for plate behavioral types
-export const PLATE_TYPES = {
-  CONTINENTAL: 'continental-like',
-  OCEANIC: 'oceanic-like',
-  TRANSITIONAL: 'transitional',
-} as const;
+import { PLATE_TYPES } from './constants';
 
 // Type for the PLATE_TYPES object itself
 export type PlateTypesMap = typeof PLATE_TYPES;
@@ -26,6 +20,11 @@ export interface PlateIF {
   radius: number; // kilometers
   density: number; // g/cm³
   thickness: number; // kilometers
+}
+
+export interface PlanetLocal {
+  name: string;
+  radius: number;
 }
 
 // Derived plate properties calculated from core properties
@@ -85,4 +84,16 @@ export type SimSimulation = {
   id: string; // unique identifier
   name: string; // display name
   planetId: string; // planet reference
+  plateCount: number; // number of plates to generate
 };
+
+// Basic planet interface with core physical properties
+export interface PlanetIF {
+  radius: number; // kilometers
+  name?: string; // optional display name
+}
+
+// Extended planet interface with simulation-specific properties
+export interface SimPlanetIF extends PlanetIF, Identifiable {
+  name?: string; // display name
+}
