@@ -10,6 +10,7 @@ export const COLLECTIONS = {
   PLANETS: 'planets',
   SIMULATIONS: 'simulations',
   STEPS: 'plate_steps',
+  PLATELETS: 'platelets',
 };
 
 export const UNIVERSES = {
@@ -38,6 +39,15 @@ export const SIM_PLATES_SCHEMA = {
   thickness: FIELD_TYPES.number,
   position: { type: FIELD_TYPES.object, isLocal: true },
   planetId: FIELD_TYPES.string,
+};
+
+export const SIM_PLATELETS_SCHEMA = {
+  id: FIELD_TYPES.string,
+  plateId: FIELD_TYPES.string,
+  position: { type: FIELD_TYPES.object, isLocal: true },
+  radius: FIELD_TYPES.number,
+  thickness: FIELD_TYPES.number,
+  density: FIELD_TYPES.number,
 };
 
 export const SIM_SIMULATIONS_SCHEMA = {
@@ -96,6 +106,17 @@ export const UNIVERSAL_PLATES_SCHEMA = {
   planetId: FIELD_TYPES.string,
 };
 
+export const UNIVERSAL_PLATELETS_SCHEMA = {
+  id: FIELD_TYPES.string,
+  plateId: FIELD_TYPES.string,
+  x: FIELD_TYPES.number,
+  y: FIELD_TYPES.number,
+  z: FIELD_TYPES.number,
+  radius: FIELD_TYPES.number,
+  thickness: FIELD_TYPES.number,
+  density: FIELD_TYPES.number,
+};
+
 export const UNIVERSAL_SIMULATIONS_SCHEMA = {
   id: FIELD_TYPES.string,
   name: FIELD_TYPES.string,
@@ -123,6 +144,13 @@ export const UNIVERSAL_SCHEMA = new Map([
   [
     COLLECTIONS.PLATES,
     new SchemaUniversal<Plate>(COLLECTIONS.PLATES, UNIVERSAL_PLATES_SCHEMA),
+  ],
+  [
+    COLLECTIONS.PLATELETS,
+    new SchemaUniversal<Plate>(
+      COLLECTIONS.PLATELETS,
+      UNIVERSAL_PLATELETS_SCHEMA,
+    ),
   ],
   [
     COLLECTIONS.SIMULATIONS,
