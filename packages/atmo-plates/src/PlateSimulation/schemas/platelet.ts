@@ -4,6 +4,9 @@ export interface Platelet {
   // Unique identifier for the platelet
   id: string;
 
+  // H3 cell ID for this platelet's location
+  h3Cell?: string;
+
   // Position in 3D space
   position: Vector3;
 
