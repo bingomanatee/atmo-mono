@@ -38,3 +38,55 @@ describe('plateMovement', () => {
     expect(newPosition.distanceTo(expectedPosition)).toBeCloseTo(0, 0); // Acceptable error < 1 unit
   });
 });
+
+// Movement axis tests for all cardinal positions and axes
+describe('movement axis tests', () => {
+  const RADIUS = 10000;
+  const planet = { radius: RADIUS };
+  const positions = [
+    new Vector3(RADIUS, 0, 0),
+    new Vector3(0, RADIUS, 0),
+    new Vector3(0, 0, RADIUS),
+    new Vector3(-RADIUS, 0, 0),
+    new Vector3(0, -RADIUS, 0),
+    new Vector3(0, 0, -RADIUS),
+  ];
+  const axes = [
+    new Vector3(1, 0, 0).normalize(),
+    new Vector3(0, 1, 0).normalize(),
+    new Vector3(0, 0, 1).normalize(),
+    new Vector3(1, 1, 1).normalize(),
+  ];
+  const angles = {
+    thirty: Math.PI / 6, // 30 degrees
+    ninety: Math.PI / 2, // 90 degrees
+  };
+
+  positions.forEach((position, posIdx) => {
+    axes.forEach((axis, axisIdx) => {
+      it(`should rotate position ${position.toArray()} by 30° and 90° around axis ${axis.toArray()}`, () => {
+        // Test 30-degree rotation
+        const step30 = {
+          speed: angles.thirty,
+          velocity: axis,
+          position: position.clone(),
+        };
+        const newPosition30 = movePlate(step30, planet);
+        console.log(
+          `30° Rotation - Initial: ${position.toArray()} | Axis: ${axis.toArray()} | New: ${newPosition30.toArray()}`,
+        );
+
+        // Test 90-degree rotation
+        const step90 = {
+          speed: angles.ninety,
+          velocity: axis,
+          position: position.clone(),
+        };
+        const newPosition90 = movePlate(step90, planet);
+        console.log(
+          `90° Rotation - Initial: ${position.toArray()} | Axis: ${axis.toArray()} | New: ${newPosition90.toArray()}`,
+        );
+      });
+    });
+  });
+});
