@@ -4,13 +4,15 @@ import { SchemaLocal, Universe } from '@wonderlandlabs/multiverse';
 import { Multiverse } from '@wonderlandlabs/multiverse';
 import { Vector3 } from 'three';
 import type { Vector3Like } from 'three';
+import { COLLECTIONS } from './PlateSimulation/constants';
 import {
-  COLLECTIONS,
   SIM_PLANETS_SCHEMA,
   SIM_PLATE_STEPS_SCHEMA,
   SIM_PLATES_SCHEMA,
   SIM_SIMULATIONS_SCHEMA,
   UNIVERSES,
+  SIM_PLATELETS_SCHEMA,
+  SIM_PLATELET_STEPS_SCHEMA,
 } from './schema';
 
 export function coord(prefix = '') {
@@ -55,6 +57,22 @@ export function simUniverse(mv: Multiverse) {
     universe: simUniv,
     schema: new SchemaLocal(COLLECTIONS.STEPS, SIM_PLATE_STEPS_SCHEMA),
   });
+
+  const plateletStepsCollection = new CollSync({
+    name: COLLECTIONS.PLATELET_STEPS,
+    universe: simUniv,
+    schema: new SchemaLocal(
+      COLLECTIONS.PLATELET_STEPS,
+      SIM_PLATELET_STEPS_SCHEMA,
+    ),
+  });
+
+  const plateletsCollection = new CollSync({
+    name: COLLECTIONS.PLATELETS,
+    universe: simUniv,
+    schema: new SchemaLocal(COLLECTIONS.PLATELETS, SIM_PLATELETS_SCHEMA),
+  });
+
   return simUniv;
 }
 

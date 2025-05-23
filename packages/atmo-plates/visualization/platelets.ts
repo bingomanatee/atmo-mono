@@ -92,8 +92,6 @@ scene.add(planet);
 const manager = new PlateletManager(sim);
 const platelets = manager.generatePlatelets(plateId);
 
-console.log('Generated platelets count:', platelets.length);
-
 // Create a color map for plates
 const plateColors = new Map<string, THREE.Color>();
 function getPlateColor(plateId: string): THREE.Color {
@@ -114,9 +112,10 @@ function getPlateColor(plateId: string): THREE.Color {
 const plateletGeometries: THREE.CircleGeometry[] = [];
 
 platelets.forEach((platelet, index) => {
-  console.log(`Platelet ${index} original position:`, platelet.position);
-  // Create a disc geometry
+  // console.log(`Platelet ${index} original position:`, platelet.position);
+  // Create a disc geometry with more segments to ensure proper indexing
   const geometry = new THREE.CircleGeometry(platelet.radius, 32);
+  geometry.computeVertexNormals(); // Ensure normals are computed for proper lighting
 
   // Create a temporary mesh to handle positioning and orientation
   const tempMaterial = new THREE.MeshBasicMaterial();
@@ -156,22 +155,49 @@ platelets.forEach((platelet, index) => {
 });
 
 // Merge all geometries into one
-const mergedGeometry = BufferGeometryUtils.mergeGeometries(plateletGeometries);
+const geometriesToMerge = plateletGeometries.map((geometry) => {
+  // Ensure each geometry has proper attributes
+  if (!geometry.index) {
+    // Create a new index buffer
+    const indices = [];
+    const vertexCount = geometry.attributes.position.count;
 
-// Create a single material (using the color of the first platelet for simplicity, or a more complex approach for multiple colors)
-const mergedMaterial = new THREE.MeshPhongMaterial({
-  color: getPlateColor(platelets[0]?.plateId || 'default'), // Use color of the first platelet or a default
-  side: THREE.DoubleSide,
-  transparent: true,
-  opacity: 0.8,
-  shininess: 30,
+    // Create triangles (each triangle needs 3 indices)
+    for (let i = 0; i < vertexCount - 2; i += 3) {
+      indices.push(i, i + 1, i + 2);
+    }
+
+    geometry.setIndex(indices);
+  }
+
+  // Ensure the geometry has normals
+  if (!geometry.attributes.normal) {
+    geometry.computeVertexNormals();
+  }
+
+  return geometry;
 });
 
-// Create a single mesh
-const mergedMesh = new THREE.Mesh(mergedGeometry, mergedMaterial);
+// Only merge if we have geometries to merge
+let mergedMesh;
+if (geometriesToMerge.length > 0) {
+  const mergedGeometry = BufferGeometryUtils.mergeGeometries(geometriesToMerge);
 
-// Add the single merged mesh to the scene
-scene.add(mergedMesh);
+  // Create a single material
+  const mergedMaterial = new THREE.MeshPhongMaterial({
+    color: getPlateColor(platelets[0]?.plateId || 'default'),
+    side: THREE.DoubleSide,
+    transparent: true,
+    opacity: 0.8,
+    shininess: 30,
+  });
+
+  // Create a single mesh
+  mergedMesh = new THREE.Mesh(mergedGeometry, mergedMaterial);
+  scene.add(mergedMesh);
+} else {
+  console.warn('No platelet geometries to merge');
+}
 
 // Add axes helper
 const axesHelper = new THREE.AxesHelper(5);

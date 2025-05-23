@@ -1,29 +1,28 @@
 import { EARTH_RADIUS, randomNormal } from '@wonderlandlabs/atmo-utils';
 import { Multiverse } from '@wonderlandlabs/multiverse';
-import { v4 as uuidV4 } from 'uuid';
 import type { Vector3Like } from 'three';
+import { v4 as uuidV4 } from 'uuid';
 import { PlateSpectrumGenerator } from '../generator/PlateSpectrumGenerator';
-import { COLLECTIONS, UNIVERSAL_SCHEMA, UNIVERSES } from '../schema';
+import { UNIVERSAL_SCHEMA, UNIVERSES } from '../schema';
+import { isPlateExtendedIF } from '../typeGuards';
 import type {
-  Identifiable,
-  PlateIF,
   PlateExtendedIF,
-  SimSimulation,
-  PlanetIF,
+  PlateIF,
   SimPlanetIF,
+  SimSimulation,
 } from '../types.atmo-plates';
 import { simUniverse } from '../utils';
 import { extendPlate } from '../utils/plateUtils';
-import { isPlateExtendedIF } from '../typeGuards';
+import { COLLECTIONS } from './constants';
+import { PlateletManager } from './managers/PlateletManager';
+import PlateSimulationPlateManager from './managers/PlateSimulationPlateManager';
 import type {
+  AddPlateProps,
   PlateSimulationIF,
   PlateSimulationProps,
   SimPlateIF,
   SimProps,
-  AddPlateProps,
 } from './types.PlateSimulation';
-import PlateSimulationPlateManager from './managers/PlateSimulationPlateManager';
-import { PlateletManager } from './managers/PlateletManager';
 
 // Define manager keys
 export const MANAGERS = {
@@ -88,6 +87,12 @@ export class PlateSimulation implements PlateSimulationIF {
    * This is separate from the constructor to allow for future async initialization
    */
   init(): void {
+    const plateManager = new PlateSimulationPlateManager(this);
+    this.managers.set(MANAGERS.PLATE, plateManager);
+
+    const plateletManager = new PlateletManager(this);
+    this.managers.set(MANAGERS.PLATELET, plateletManager);
+
     // The basic properties are already initialized in the constructor
 
     // If simulationId is provided, load that specific simulation
@@ -431,12 +436,16 @@ export class PlateSimulation implements PlateSimulationIF {
     return id;
   }
 
-  getPlate(id: string): SimPlateIF | undefined {
-    return this.simUniv.get(COLLECTIONS.PLATES).get(id);
+  getPlate(id: string): SimPlateIF {
+    const plate = this.simUniv.get(COLLECTIONS.PLATES).get(id);
+    if (!plate) throw new Error('cannot find plate ' + id);
+    return plate;
   }
 
-  getPlanet(id: string): SimPlanetIF | undefined {
-    return this.simUniv.get(COLLECTIONS.PLANETS).get(id);
+  getPlanet(id: string): SimPlanetIF {
+    const planet = this.simUniv.get(COLLECTIONS.PLANETS).get(id);
+    if (!planet) throw new Error('cannot find planet ' + id);
+    return planet;
   }
 
   planet: SimPlanetIF | undefined;

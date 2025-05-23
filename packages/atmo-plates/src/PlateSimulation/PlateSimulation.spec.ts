@@ -9,7 +9,8 @@ import {
 import type { CollSyncIF } from '@wonderlandlabs/multiverse';
 import { v4 as uuidV4 } from 'uuid';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { COLLECTIONS, UNIVERSES } from '../schema';
+import { UNIVERSES } from '../schema';
+import { COLLECTIONS } from './constants';
 import type { PlateIF } from '../types.atmo-plates';
 import { simUniverse } from '../utils';
 import { PlateSimulation } from './PlateSimulation';
@@ -112,11 +113,12 @@ describe('PlateSimulation:class', () => {
     expect(retrievedPlate?.name).toEqual(customName);
     expect(retrievedPlate?.radius).toEqual(customRadius);
     expect(retrievedPlate?.density).toEqual(customDensity);
+  });
 
+  it('throws when the plate is nonexistant', () => {
     // Verify that getPlate returns undefined for non-existent plates
     const nonExistentId = 'non-existent-id';
-    const nonExistentPlate = sim.getPlate(nonExistentId);
-    expect(nonExistentPlate).toBeUndefined();
+    expect(() => sim.getPlate(nonExistentId)).toThrow();
   });
 
   it('should automatically generate plates in the constructor', () => {
@@ -260,10 +262,11 @@ describe('PlateSimulation:class', () => {
     expect(retrievedPlanet?.id).toEqual(currentPlanet.id);
     expect(retrievedPlanet?.radius).toEqual(currentPlanet.radius);
 
-    // Verify that getPlanet returns undefined for non-existent planets
+    // Verify that getPlanet throws for non-existent planets
     const nonExistentId = 'non-existent-id';
-    const nonExistentPlanet = sim.getPlanet(nonExistentId);
-    expect(nonExistentPlanet).toBeUndefined();
+    expect(() => sim.getPlanet(nonExistentId)).toThrow(
+      'cannot find planet non-existent-id',
+    );
   });
 
   it('should use a custom universe name when provided', () => {

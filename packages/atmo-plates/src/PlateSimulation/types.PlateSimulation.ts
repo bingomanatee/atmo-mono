@@ -14,6 +14,7 @@ export interface SimPlateIF extends PlateExtendedIF, Identifiable {
   name?: string;
   planetId: string;
   position: Vector3Like;
+  plateletIds?: string[];
 }
 
 export interface SimProps {
@@ -43,6 +44,7 @@ export interface PlateSimulationIF {
   planetRadius: number;
   universeName: string;
   simulationId?: string;
+  readonly managers: Map<string, any>;
 
   // Multiverse and Universe access
   readonly multiverse: Multiverse;
@@ -54,7 +56,7 @@ export interface PlateSimulationIF {
   // Plate management
   plateGenerator(plateCount: number): PlateSpectrumGenerator;
   addPlate(props: AddPlateProps, simId?: string): string;
-  getPlate(id: string): SimPlateIF | undefined;
+  getPlate(id: string): SimPlateIF;
 
   // Simulation management
   addSimulation(props: SimProps): string;
@@ -64,7 +66,7 @@ export interface PlateSimulationIF {
   // Planet management
   planet?: SimPlanetIF;
   makePlanet(radius?: number, name?: string): SimPlanetIF;
-  getPlanet(id: string): SimPlanetIF | undefined;
+  getPlanet(id: string): SimPlanetIF;
 }
 
 // Simulation step interface
@@ -83,4 +85,15 @@ export interface PlateSimulationPlateManagerIF {
   new (sim: PlateSimulationIF): PlateSimulationPlateManagerIF;
   initPlateSteps(plate: SimPlateIF): void;
   movePlate(plateId: string): SimStepIF;
+}
+
+// Interface for Platelet Steps
+export interface PlateletStepIF extends Identifiable {
+  plateId: string; // ID of the plate this platelet belongs to
+  plateletId: string; // ID of the platelet itself
+  step: number; // Step number in the simulation
+  position: Vector3Like;
+  thickness: number;
+  float: number; // Floating elevation
+  h3Index: string; // H3 index of current location
 }

@@ -3,16 +3,9 @@ import { FIELD_TYPES, SchemaUniversal } from '@wonderlandlabs/multiverse';
 import type { Plate } from './PlateSimulation/PlateSimulation';
 import type { PlateIF } from './types.atmo-plates';
 import { coord } from './utils';
+import { COLLECTIONS } from './PlateSimulation/constants';
 
 // ─── Constants: Collections & Universes ───────────────────────────
-export const COLLECTIONS = {
-  PLATES: 'plates',
-  PLANETS: 'planets',
-  SIMULATIONS: 'simulations',
-  STEPS: 'plate_steps',
-  PLATELETS: 'platelets',
-};
-
 export const UNIVERSES = {
   SIM: 'simUniv',
   API: 'apiUniv',
@@ -39,6 +32,13 @@ export const SIM_PLATES_SCHEMA = {
   thickness: FIELD_TYPES.number,
   position: { type: FIELD_TYPES.object, isLocal: true },
   planetId: FIELD_TYPES.string,
+  plateletIds: {
+    type: FIELD_TYPES.array,
+    meta: {
+      itemType: FIELD_TYPES.string,
+      optional: true,
+    },
+  },
 };
 
 export const SIM_PLATELETS_SCHEMA = {
@@ -48,6 +48,14 @@ export const SIM_PLATELETS_SCHEMA = {
   radius: FIELD_TYPES.number,
   thickness: FIELD_TYPES.number,
   density: FIELD_TYPES.number,
+  planetId: FIELD_TYPES.string,
+  plateletIds: {
+    type: FIELD_TYPES.array,
+    meta: {
+      itemType: FIELD_TYPES.string,
+      optional: true,
+    },
+  },
 };
 
 export const SIM_SIMULATIONS_SCHEMA = {
@@ -60,6 +68,7 @@ export const SIM_SIMULATIONS_SCHEMA = {
 export const SIM_PLATE_STEPS_SCHEMA = {
   id: FIELD_TYPES.string,
   plateId: FIELD_TYPES.string,
+  plateletId: FIELD_TYPES.string,
   step: FIELD_TYPES.number,
   velocity: {
     type: FIELD_TYPES.object,
@@ -90,6 +99,25 @@ export const SIM_PLATE_STEPS_SCHEMA = {
   },
 };
 
+export const SIM_PLATELET_STEPS_SCHEMA = {
+  id: FIELD_TYPES.string,
+  plateId: FIELD_TYPES.string,
+  plateletId: FIELD_TYPES.string,
+  step: FIELD_TYPES.number,
+  position: {
+    type: FIELD_TYPES.object,
+    isLocal: true,
+    univFields: {
+      x: 'x',
+      y: 'y',
+      z: 'z',
+    },
+  },
+  thickness: FIELD_TYPES.number,
+  float: FIELD_TYPES.number,
+  h3Index: FIELD_TYPES.string,
+};
+
 // ─── 🌐 Universal Schemas (Flat, Translation Format) ─────────────
 export const UNIVERSAL_PLANETS_SCHEMA = {
   id: FIELD_TYPES.string,
@@ -104,6 +132,13 @@ export const UNIVERSAL_PLATES_SCHEMA = {
   density: FIELD_TYPES.number,
   thickness: FIELD_TYPES.number,
   planetId: FIELD_TYPES.string,
+  plateletIds: {
+    type: FIELD_TYPES.array,
+    meta: {
+      itemType: FIELD_TYPES.string,
+      optional: true,
+    },
+  },
 };
 
 export const UNIVERSAL_PLATELETS_SCHEMA = {
@@ -119,6 +154,23 @@ export const UNIVERSAL_PLATELETS_SCHEMA = {
     type: FIELD_TYPES.array,
     meta: { itemType: FIELD_TYPES.string },
   },
+  plateletIds: {
+    type: FIELD_TYPES.array,
+    meta: {
+      itemType: FIELD_TYPES.string,
+      optional: true,
+    },
+  },
+};
+
+export const UNIVERSAL_PLATELET_STEPS_SCHEMA = {
+  id: FIELD_TYPES.string,
+  plateId: FIELD_TYPES.string,
+  plateletId: FIELD_TYPES.string,
+  thickness: FIELD_TYPES.number,
+  float: FIELD_TYPES.number,
+  h3Index: FIELD_TYPES.string,
+  ...coord('position'),
 };
 
 export const UNIVERSAL_SIMULATIONS_SCHEMA = {
@@ -166,5 +218,12 @@ export const UNIVERSAL_SCHEMA = new Map([
   [
     COLLECTIONS.STEPS,
     new SchemaUniversal<Plate>('plate_step', UNIVERSAL_PLATE_STEPS_SCHEMA),
+  ],
+  [
+    COLLECTIONS.PLATELET_STEPS,
+    new SchemaUniversal<Plate>(
+      COLLECTIONS.PLATELET_STEPS,
+      UNIVERSAL_PLATELET_STEPS_SCHEMA,
+    ),
   ],
 ]);

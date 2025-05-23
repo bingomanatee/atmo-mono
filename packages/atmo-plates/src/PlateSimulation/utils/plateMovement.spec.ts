@@ -59,10 +59,10 @@ describe('plateMovement', () => {
     }
 
     // Log all positions for inspection
-    console.log('Multiple moves positions:');
+    /*    console.log('Multiple moves positions:');
     positions.forEach((pos, idx) => {
       console.log(`Move ${idx}: ${pos.toArray()}`);
-    });
+    });*/
 
     // After 5 moves of 5 degrees each (25 degrees total), we expect:
     // x = RADIUS * cos(25°)
@@ -91,10 +91,10 @@ describe('plateMovement', () => {
     };
 
     const newPosition = movePlate(currentStep, planet);
-    console.log('Non-orthogonal rotation:');
+    /*    console.log('Non-orthogonal rotation:');
     console.log(`Initial: ${initialPosition.toArray()}`);
     console.log(`Axis: ${nonOrthogonalAxis.toArray()}`);
-    console.log(`Final: ${newPosition.toArray()}`);
+    console.log(`Final: ${newPosition.toArray()}`);*/
 
     // The plate should maintain its distance from the origin
     expect(newPosition.length()).toBeCloseTo(RADIUS, 0);
@@ -134,9 +134,9 @@ describe('movement axis tests', () => {
           position: position.clone(),
         };
         const newPosition30 = movePlate(step30, planet);
-        console.log(
+        /*      console.log(
           `30° Rotation - Initial: ${position.toArray()} | Axis: ${axis.toArray()} | New: ${newPosition30.toArray()}`,
-        );
+        );*/
 
         // Test 90-degree rotation
         const step90 = {
@@ -145,9 +145,9 @@ describe('movement axis tests', () => {
           position: position.clone(),
         };
         const newPosition90 = movePlate(step90, planet);
-        console.log(
+        /*    console.log(
           `90° Rotation - Initial: ${position.toArray()} | Axis: ${axis.toArray()} | New: ${newPosition90.toArray()}`,
-        );
+        );*/
       });
     });
   });

@@ -18,10 +18,10 @@ export { SunMemoryAsync } from './suns/SunMemoryAsync';
 export { SunMemoryImmer } from './suns/SunMemoryImmer';
 export { SunMemoryImmerAsync } from './suns/SunMemoryImmerAsync';
 
-export { default as memorySunF } from './suns/SunMemory';
-export { default as memoryAsyncSunF } from './suns/SunMemoryAsync';
-export { default as memoryImmerSunF } from './suns/SunMemoryImmer';
-export { default as memoryImmerAsyncSunF } from './suns/SunMemoryImmerAsync';
+export * from './suns/SunMemory';
+export * from './suns/SunMemoryAsync';
+export * from './suns/SunMemoryImmer';
+export * from './suns/SunMemoryImmerAsync';
 
 // Constants
 export { FIELD_TYPES, MUTATION_ACTIONS } from './constants';
@@ -34,3 +34,4 @@ export * from './type.schema';
 // Utility functions
 export * from './typeguards.multiverse';
 export * from './utils/validateField';
+export * from './utils/deGenerateMaps';

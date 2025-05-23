@@ -14,3 +14,5 @@ export * from './vectcorString.ts';
 export * from './delay.ts';
 export * from './collections/extended-map.js';
 export * from './collections/indexed-map.js';
+export * from './vector/getH3CellForPosition';
+export * from './vector/pointToLatLon';

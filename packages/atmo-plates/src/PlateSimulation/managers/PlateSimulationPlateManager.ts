@@ -1,15 +1,19 @@
 import { randomNormal, varyP } from '@wonderlandlabs/atmo-utils';
 import { Object3D, Vector3 } from 'three';
 import { v4 as uuidV4 } from 'uuid';
-import { COLLECTIONS } from '../../schema';
+import { COLLECTIONS } from '../../PlateSimulation/constants';
 import { varySpeedByRadius } from '../../utils';
+import { MANAGERS } from '../PlateSimulation';
 import type {
   PlateSimulationIF,
   SimPlateIF,
   SimStepIF,
+  PlateletStepIF,
 } from '../types.PlateSimulation';
 import { createOrbitalFrame } from '../utils/plateMovement';
 import { ThreeOrbitalFrame } from '@wonderlandlabs/atmo-three-orbit';
+import { PlateletManager } from './PlateletManager';
+import { latLngToCell } from 'h3-js';
 
 export type PSPMProps = {
   sim: PlateSimulationIF;
@@ -35,28 +39,49 @@ export default class PlateSimulationPlateManager {
   initPlateSteps(plateId: string) {
     const steps = this.stepsCollection.find('plateId', plateId);
     if (!steps?.length) {
-      this.#addFirstStep(plateId);
+      const plateStepId = this.#addFirstStep(plateId);
+
+      // Get the PlateletManager instance
+      const plateletManager = this.#sim.managers.get(
+        MANAGERS.PLATELET,
+      ) as PlateletManager;
+      if (!plateletManager)
+        throw new Error('PlateletManager not found in sim.managers');
+
+      // Generate initial platelet steps
+      const platelets = plateletManager.generatePlatelets(plateId);
+      const plateletStepsCollection = this.#sim.simUniv.get(
+        COLLECTIONS.PLATELET_STEPS,
+      );
+
+      if (!plateletStepsCollection)
+        throw new Error('platelet_steps collection not found');
+
+      platelets.forEach((platelet) => {
+        if (!platelet.id) {
+          console.warn('Platelet missing id:', platelet);
+          return;
+        }
+        const plateletStep: PlateletStepIF = {
+          id: uuidV4(),
+          plateletId: platelet.id,
+          plateId: platelet.plateId,
+          step: 0,
+          position: platelet.position,
+          thickness: platelet.thickness,
+          float: platelet.elevation || 0,
+          h3Index: latLngToCell(platelet.position.y, platelet.position.x, 4),
+        };
+        plateletStepsCollection.set(plateletStep.id, plateletStep);
+      });
     } else {
       console.log(`initPlateSteps: steps already exist for plate ${plateId}`);
     }
   }
 
-  // Method to add the first step for a specific plate
-  #addFirstStep(plateId: string) {
-    // @ts-ignore
-    const plate: SimPlateIF = this.#sim.getPlate(plateId);
-    if (!plate) throw new Error('plate now found');
-    const planet = this.#sim.getPlanet(plate.planetId);
-    if (!planet) throw new Error(`Planet ${plate.planetId} not found`);
-
-    const stepId = uuidV4();
-
-    const position = plate.position
-      ? new Vector3(plate.position.x, plate.position.y, plate.position.z)
-      : randomNormal().multiplyScalar(planet.radius);
-
+  #initVelocity(radius: number) {
     const speed = varyP({ min: 5, max: 250 });
-    const scaledSpeed = varySpeedByRadius(speed, planet.radius);
+    const scaledSpeed = varySpeedByRadius(speed, radius);
     let startingVelocity;
 
     do {
@@ -65,13 +90,31 @@ export default class PlateSimulationPlateManager {
     } while (!startingVelocity.length());
     startingVelocity.setLength(scaledSpeed);
 
+    return { speed, velocity: startingVelocity };
+  }
+
+  // Method to add the first step for a specific plate
+  #addFirstStep(plateId: string) {
+    // @ts-ignore
+    const plate: SimPlateIF = this.#sim.getPlate(plateId);
+    const planet = this.#sim.getPlanet(plate.planetId);
+
+    const stepId = uuidV4();
+
+    const position = plate.position
+      ? new Vector3(plate.position.x, plate.position.y, plate.position.z)
+      : randomNormal().multiplyScalar(planet.radius);
+
+    const { speed, velocity } = this.#initVelocity(planet.radius);
+
     const stepData = {
       id: stepId,
       plateId: plate.id,
+      plateletId: plate.id,
       step: 0,
       speed, // Use provided speed or random between 5-250
       position,
-      velocity: startingVelocity,
+      velocity,
       start: position,
     };
 
