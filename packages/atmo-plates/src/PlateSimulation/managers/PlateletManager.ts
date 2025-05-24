@@ -88,4 +88,16 @@ export class PlateletManager {
       PlateletManager.plateletCache.clear();
     }
   }
+
+  /**
+   * Add a platelet to the simulation's platelet collection, with validation.
+   */
+  setPlatelet(platelet: Platelet | null | undefined): void {
+    if (!platelet || typeof platelet !== 'object') {
+      throw new Error('Attempted to add an empty or invalid platelet');
+    }
+    const plateletsCollection = this.sim.simUniv.get(COLLECTIONS.PLATELETS);
+    if (!plateletsCollection) throw new Error('platelets collection not found');
+    plateletsCollection.set(platelet.id, platelet);
+  }
 }

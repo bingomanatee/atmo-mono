@@ -1,9 +1,16 @@
 // ─── Imports ─────────────────────────────────────────────────────
-import { FIELD_TYPES, SchemaUniversal } from '@wonderlandlabs/multiverse';
+import {
+  FIELD_TYPES,
+  SchemaUniversal,
+  SchemaLocal,
+} from '@wonderlandlabs/multiverse';
+import type { PostParams } from '@wonderlandlabs/multiverse/src/type.schema';
 import type { Plate } from './PlateSimulation/PlateSimulation';
 import type { PlateIF } from './types.atmo-plates';
 import { coord } from './utils';
 import { COLLECTIONS } from './PlateSimulation/constants';
+import { Platelet } from './PlateSimulation/Platelet';
+import { Vector3 } from 'three';
 
 // ─── Constants: Collections & Universes ───────────────────────────
 export const UNIVERSES = {
@@ -41,22 +48,23 @@ export const SIM_PLATES_SCHEMA = {
   },
 };
 
-export const SIM_PLATELETS_SCHEMA = {
+export const SIM_PLATELETS_SCHEMA = new SchemaLocal<Platelet>('platelets', {
   id: FIELD_TYPES.string,
   plateId: FIELD_TYPES.string,
-  position: { type: FIELD_TYPES.object, isLocal: true },
-  radius: FIELD_TYPES.number,
-  thickness: FIELD_TYPES.number,
-  density: FIELD_TYPES.number,
   planetId: FIELD_TYPES.string,
-  plateletIds: {
-    type: FIELD_TYPES.array,
+  position: {
+    type: FIELD_TYPES.object,
     meta: {
-      itemType: FIELD_TYPES.string,
-      optional: true,
+      fields: {
+        x: FIELD_TYPES.number,
+        y: FIELD_TYPES.number,
+        z: FIELD_TYPES.number,
+      },
     },
   },
-};
+  density: FIELD_TYPES.number,
+  thickness: FIELD_TYPES.number,
+});
 
 export const SIM_SIMULATIONS_SCHEMA = {
   id: FIELD_TYPES.string,
@@ -101,21 +109,21 @@ export const SIM_PLATE_STEPS_SCHEMA = {
 
 export const SIM_PLATELET_STEPS_SCHEMA = {
   id: FIELD_TYPES.string,
-  plateId: FIELD_TYPES.string,
   plateletId: FIELD_TYPES.string,
   step: FIELD_TYPES.number,
   position: {
     type: FIELD_TYPES.object,
-    isLocal: true,
-    univFields: {
-      x: 'x',
-      y: 'y',
-      z: 'z',
+    meta: {
+      fields: {
+        x: FIELD_TYPES.number,
+        y: FIELD_TYPES.number,
+        z: FIELD_TYPES.number,
+      },
     },
   },
   thickness: FIELD_TYPES.number,
   float: FIELD_TYPES.number,
-  h3Index: FIELD_TYPES.string,
+  sector: FIELD_TYPES.string,
 };
 
 // ─── 🌐 Universal Schemas (Flat, Translation Format) ─────────────
@@ -170,6 +178,7 @@ export const UNIVERSAL_PLATELET_STEPS_SCHEMA = {
   thickness: FIELD_TYPES.number,
   float: FIELD_TYPES.number,
   h3Index: FIELD_TYPES.string,
+  sector: FIELD_TYPES.string,
   ...coord('position'),
 };
 
@@ -227,3 +236,19 @@ export const UNIVERSAL_SCHEMA = new Map([
     ),
   ],
 ]);
+
+export const plateletsFilterRecord = (params: { inputRecord: any }) => {
+  const { inputRecord } = params;
+  if (inputRecord instanceof Platelet) {
+    return inputRecord;
+  }
+  // Ensure position is a Vector3 instance
+  if (inputRecord.position && !(inputRecord.position instanceof Vector3)) {
+    inputRecord.position = new Vector3(
+      inputRecord.position.x,
+      inputRecord.position.y,
+      inputRecord.position.z,
+    );
+  }
+  return new Platelet(inputRecord);
+};

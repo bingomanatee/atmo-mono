@@ -10,10 +10,11 @@ import type {
   SimStepIF,
   PlateletStepIF,
 } from '../types.PlateSimulation';
-import { createOrbitalFrame } from '../utils/plateMovement';
+import { createOrbitalFrame, movePlate } from '../utils/plateMovement';
 import { ThreeOrbitalFrame } from '@wonderlandlabs/atmo-three-orbit';
 import { PlateletManager } from './PlateletManager';
 import { latLngToCell } from 'h3-js';
+import type { Platelet } from '../schemas/platelet';
 
 export type PSPMProps = {
   sim: PlateSimulationIF;
@@ -71,6 +72,7 @@ export default class PlateSimulationPlateManager {
           thickness: platelet.thickness,
           float: platelet.elevation || 0,
           h3Index: latLngToCell(platelet.position.y, platelet.position.x, 4),
+          sector: latLngToCell(platelet.position.y, platelet.position.x, 0), // L0 cell for sector tracking
         };
         plateletStepsCollection.set(plateletStep.id, plateletStep);
       });
@@ -193,6 +195,52 @@ export default class PlateSimulationPlateManager {
     };
 
     this.stepsCollection.set(currentStep.id, newStep as SimStepIF);
+
+    // Update platelet steps
+    const plateletStepsCollection = this.#sim.simUniv.get(
+      COLLECTIONS.PLATELET_STEPS,
+    );
+    if (!plateletStepsCollection)
+      throw new Error('platelet_steps collection not found');
+
+    const platelets = this.#sim.simUniv.get(COLLECTIONS.PLATELETS);
+    if (!platelets) throw new Error('platelets collection not found');
+
+    const platePlatelets = platelets.find({ plateId });
+    platePlatelets.forEach((platelet: Platelet) => {
+      // Calculate new position based on plate movement
+      const plateletPosition = platelet.position.clone();
+      const newPlateletPosition = movePlate(
+        {
+          speed: currentStep.speed,
+          velocity: new Vector3(
+            orbitalFrame.axis.x,
+            orbitalFrame.axis.y,
+            orbitalFrame.axis.z,
+          ),
+          position: plateletPosition,
+        },
+        planet,
+      );
+
+      // Create new platelet step
+      const plateletStep: PlateletStepIF = {
+        id: uuidV4(),
+        plateletId: platelet.id,
+        plateId,
+        step: currentStep.step + 1,
+        position: newPlateletPosition,
+        thickness: platelet.thickness,
+        float: platelet.elevation || 0,
+        h3Index: latLngToCell(newPlateletPosition.y, newPlateletPosition.x, 4),
+        sector: latLngToCell(newPlateletPosition.y, newPlateletPosition.x, 0), // L0 cell for sector tracking
+      };
+
+      plateletStepsCollection.set(plateletStep.id, plateletStep);
+
+      // Update platelet position
+      platelet.position.copy(newPlateletPosition);
+    });
 
     return newStep;
   }

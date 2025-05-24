@@ -1,4 +1,9 @@
-import { EARTH_RADIUS, randomNormal } from '@wonderlandlabs/atmo-utils';
+import {
+  EARTH_RADIUS,
+  randomNormal,
+  latLonToPoint,
+  getH3CellForPosition,
+} from '@wonderlandlabs/atmo-utils';
 import { Multiverse } from '@wonderlandlabs/multiverse';
 import type { Vector3Like } from 'three';
 import { v4 as uuidV4 } from 'uuid';
@@ -23,6 +28,9 @@ import type {
   SimPlateIF,
   SimProps,
 } from './types.PlateSimulation';
+import { gridDisk } from 'h3-js';
+import { Vector3 } from 'three';
+import { Planet } from './Planet';
 
 // Define manager keys
 export const MANAGERS = {
@@ -42,6 +50,7 @@ export class PlateSimulation implements PlateSimulationIF {
   public simulationId?: string;
   #defaultSimId: string | undefined;
   readonly managers: Map<string, any>; // Map to store manager instances
+  #l0NeighborCache: Map<string, string[]> = new Map(); // Cache for L0 cell neighbors
 
   /**
    * Create a new plate simulation
@@ -442,10 +451,10 @@ export class PlateSimulation implements PlateSimulationIF {
     return plate;
   }
 
-  getPlanet(id: string): SimPlanetIF {
-    const planet = this.simUniv.get(COLLECTIONS.PLANETS).get(id);
-    if (!planet) throw new Error('cannot find planet ' + id);
-    return planet;
+  getPlanet(id: string): Planet {
+    const planetData = this.simUniv.get(COLLECTIONS.PLANETS).get(id);
+    if (!planetData) throw new Error('cannot find planet ' + id);
+    return Planet.fromJSON(planetData);
   }
 
   planet: SimPlanetIF | undefined;
@@ -454,22 +463,10 @@ export class PlateSimulation implements PlateSimulationIF {
     if (radius < 1000) {
       throw new Error('planet radii must be >= 1000km');
     }
-    const id = uuidV4();
-    const planetData: SimPlanetIF = {
-      id,
-      radius,
-      name,
-    };
+    const planet = new Planet({ radius, name });
 
     // Set the planet data in the collection
-    this.simUniv.get(COLLECTIONS.PLANETS).set(id, planetData);
-
-    // Get the planet data back to verify it was set
-    const planet = this.simUniv.get(COLLECTIONS.PLANETS).get(id);
-
-    if (!planet) {
-      throw new Error(`Planet ${id} not found`);
-    }
+    this.simUniv.get(COLLECTIONS.PLANETS).set(planet.id, planet.toJSON());
 
     return planet;
   }

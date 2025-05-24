@@ -13,7 +13,9 @@ import {
   UNIVERSES,
   SIM_PLATELETS_SCHEMA,
   SIM_PLATELET_STEPS_SCHEMA,
+  plateletsFilterRecord,
 } from './schema';
+import { IndexedSun } from './PlateSimulation/managers/sun/IndexedSun';
 
 export function coord(prefix = '') {
   return {
@@ -58,7 +60,7 @@ export function simUniverse(mv: Multiverse) {
     schema: new SchemaLocal(COLLECTIONS.STEPS, SIM_PLATE_STEPS_SCHEMA),
   });
 
-  const plateletStepsCollection = new CollSync({
+  const plateletStepsCollection = new IndexedSun({
     name: COLLECTIONS.PLATELET_STEPS,
     universe: simUniv,
     schema: new SchemaLocal(
@@ -70,7 +72,11 @@ export function simUniverse(mv: Multiverse) {
   const plateletsCollection = new CollSync({
     name: COLLECTIONS.PLATELETS,
     universe: simUniv,
-    schema: new SchemaLocal(COLLECTIONS.PLATELETS, SIM_PLATELETS_SCHEMA),
+    schema: new SchemaLocal(
+      COLLECTIONS.PLATELETS,
+      SIM_PLATELETS_SCHEMA,
+      plateletsFilterRecord,
+    ),
   });
 
   return simUniv;

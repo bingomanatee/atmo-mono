@@ -8,6 +8,7 @@ import type {
   SimPlanetIF,
 } from '../types.atmo-plates';
 import type { PlateSpectrumGenerator } from '../generator/PlateSpectrumGenerator';
+import { Planet } from './Planet';
 
 // Simulation plate interface with identity and relational links
 export interface SimPlateIF extends PlateExtendedIF, Identifiable {
@@ -64,9 +65,9 @@ export interface PlateSimulationIF {
   readonly simulation: SimSimulation;
 
   // Planet management
-  planet?: SimPlanetIF;
-  makePlanet(radius?: number, name?: string): SimPlanetIF;
-  getPlanet(id: string): SimPlanetIF;
+  planet?: Planet;
+  makePlanet(radius?: number, name?: string): Planet;
+  getPlanet(id: string): Planet;
 }
 
 // Simulation step interface
@@ -96,4 +97,5 @@ export interface PlateletStepIF extends Identifiable {
   thickness: number;
   float: number; // Floating elevation
   h3Index: string; // H3 index of current location
+  sector: string; // L0 H3 cell for tracking large-scale movement
 }

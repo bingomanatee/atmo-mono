@@ -136,7 +136,6 @@ describe('PlateletManager', () => {
 
   beforeAll(() => {
     try {
-      console.log('---- starting plateelet manager test');
       // Increase timeout for all tests in this suite
 
       // Save sample simulation to file
@@ -161,7 +160,6 @@ describe('PlateletManager', () => {
     } catch (err) {
       console.log('----error in setup:', err);
     }
-    console.log('---- end beforeEach plateelet manager test');
   });
 
   it('should cache generated platelets', () => {
