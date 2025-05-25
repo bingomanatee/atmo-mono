@@ -8,7 +8,6 @@ export type UniverseName = string;
 export interface SunIF<RecordType = DataRecord, KeyType = DataKey> {
   get(key: KeyType): any;
   set(key: KeyType, value: RecordType): any;
-  getAll(): any;
   delete(key: KeyType): any;
   clear(): any;
   has(key: KeyType): any;
@@ -82,6 +81,13 @@ export interface SunIF<RecordType = DataRecord, KeyType = DataKey> {
    * @returns Number of records set
    */
   setMany?(recordMap: Map<KeyType, RecordType>): number | Promise<number>;
+
+  /**
+   * Make the Sun engine itself iterable over [key, value] pairs
+   */
+  [Symbol.iterator](): Iterator<[KeyType, RecordType]>;
+
+  values(): Generator<RecordType>;
 }
 export interface SunIFSync<RecordType = DataRecord, KeyType = DataKey>
   extends SunIF<RecordType, KeyType> {
@@ -124,8 +130,8 @@ export interface SunIFSync<RecordType = DataRecord, KeyType = DataKey>
       key: KeyType,
       collection: CollBaseIF,
     ) => void,
-  ): void | Promise<void>;
-  count(): number | Promise<number>;
+  ): void;
+  count(): number;
   map?(
     mapper: (
       record: RecordType,
@@ -133,7 +139,10 @@ export interface SunIFSync<RecordType = DataRecord, KeyType = DataKey>
       collection: CollBaseIF,
     ) => RecordType | void | any,
     noTransaction?: boolean,
-  ): Map<KeyType, RecordType> | Promise<Map<KeyType, RecordType>>;
+  ): Map<KeyType, RecordType>;
+
+  [Symbol.iterator](): Iterator<[KeyType, RecordType]>;
+  values(): Generator<RecordType>;
 }
 
 export interface SunIfAsync<RecordType = DataRecord, KeyType = DataKey>
@@ -160,7 +169,7 @@ export interface SunIfAsync<RecordType = DataRecord, KeyType = DataKey>
       key: KeyType,
       collection: CollBaseIF,
     ) => void,
-  ): void | Promise<void>;
+  ): Promise<void>;
 
   /**
    * Optional method to find records matching a query
@@ -189,7 +198,7 @@ export interface SunIfAsync<RecordType = DataRecord, KeyType = DataKey>
       collection: CollBaseIF,
     ) => RecordType | void | any,
     noTransaction?: boolean,
-  ): Map<KeyType, RecordType> | Promise<Map<KeyType, RecordType>>;
+  ): Promise<Map<KeyType, RecordType>>;
 
   mutate?(
     key: KeyType,
@@ -197,6 +206,9 @@ export interface SunIfAsync<RecordType = DataRecord, KeyType = DataKey>
   ): Promise<RecordType>;
 
   set(key: KeyType, value: RecordType): Promise<void>;
+
+  [Symbol.iterator](): Iterator<[KeyType, RecordType]>;
+  values(): AsyncGenerator<RecordType>;
 }
 
 export interface UniverseIF {

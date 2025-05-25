@@ -82,14 +82,11 @@ export class CollAsync<RecordType, KeyType = string>
     );
   }
 
-  getAll(): AsyncGenerator<Map<KeyType, RecordType>, void, any> {
-    if (!this._sun.getAll) {
-      throw new Error('getAll method not implemented by sun');
-    }
-    return this._sun.getAll();
+  values() {
+    return this._sun.values();
   }
 
-  find(...query: any[]): Generator<Map<KeyType, RecordType>> {
+  find(...query: any[]): Generator<[KeyType, RecordType]> {
     if (typeof this._sun.find === 'function') {
       return this._sun.find(...query);
     }

@@ -115,10 +115,11 @@ export function matchesQuery<RecordType = DataRecord, KeyType = DataKey>(
   }
   const [a, b] = query;
 
+  // Handle function predicate first
   if (typeof a === 'function') {
-    // If query is a function, use it as a predicate
-    return matchesFunctionQuery(record, key, query[0]);
+    return a(record);
   }
+
   // Handle different query formats
   if (query.length === 2) {
     // Handle property/value pair format (e.g., find('status', 'active'))
@@ -183,20 +184,17 @@ export function* findInMap<RecordType = DataRecord, KeyType = DataKey>(
  * @returns A Map containing the generator's values
  */
 export function generatorToMap<KeyType, ValueType>(
-  generator: Generator<Map<KeyType, ValueType>, void, any>,
+  generator: Generator<[KeyType, ValueType], void, any>,
 ): Map<KeyType, ValueType> {
   const map = new Map<KeyType, ValueType>();
 
   let result = generator.next();
   while (!result.done) {
-    // Merge the batch into the result map
-    const batch = result.value;
-    for (const [key, value] of batch.entries()) {
-      map.set(key, value);
-    }
+    // Add the key-value pair directly to the map
+    const [key, value] = result.value;
+    map.set(key, value);
 
     // Pass undefined to the generator to continue normally
-    // (not terminating the stream)
     result = generator.next(undefined);
   }
 

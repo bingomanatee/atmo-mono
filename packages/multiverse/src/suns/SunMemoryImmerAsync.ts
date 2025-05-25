@@ -24,10 +24,6 @@ export class SunMemoryImmerAsync<R, K>
     this.coll = coll;
   }
 
-  async getAll() {
-    return new Map(this.#data);
-  }
-
   async find(...query: any[]): Promise<Map<K, R>> | R[] {
     return this.#data.find(...query);
   }
@@ -192,6 +188,14 @@ export class SunMemoryImmerAsync<R, K>
 
     return this.get(key);
     // NOOP action does nothing
+  }
+
+  [Symbol.iterator]() {
+    return this.#data.entries();
+  }
+
+  findAll() {
+    return this;
   }
 }
 

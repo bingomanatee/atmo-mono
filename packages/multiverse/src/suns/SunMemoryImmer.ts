@@ -95,9 +95,12 @@ export class SunMemoryImmer<RecordType, KeyType>
     }
   }
 
-  getAll() {
-    return new Map(this.#data);
+  *values(): Generator<[KeyType, RecordType]> {
+    for (const [key, value] of this.#data) {
+      yield [key, value];
+    }
   }
+
   map?(
     mapper: (
       record: RecordType,
@@ -247,11 +250,9 @@ export class SunMemoryImmer<RecordType, KeyType>
   /**
    * Find records matching a query
    * @param query - The query to match against
-   * @returns An array of records matching the query
+   * @returns Generator yielding [key, value] pairs
    */
-  find(query: any): RecordType[] {
-    const results: RecordType[] = [];
-
+  *find(query: any): Generator<[KeyType, RecordType]> {
     // Iterate through all records
     for (const [key, record] of this.#data.entries()) {
       // Simple matching logic - if query is an object, check if all properties match
@@ -266,18 +267,16 @@ export class SunMemoryImmer<RecordType, KeyType>
           }
         }
         if (matches) {
-          results.push(record);
+          yield [key, record];
         }
       }
       // If query is a function, use it as a predicate
       else if (typeof query === 'function') {
         if (query(record)) {
-          results.push(record);
+          yield [key, record];
         }
       }
     }
-
-    return results;
   }
 
   /**

@@ -282,9 +282,9 @@ describe('CollAsync', () => {
       const generator = coll.find('status', 'active');
       let results = new Map();
       let data = generator.next();
-      let limit = 0;
       while (!data.done) {
-        results = new Map([...results.entries(), ...data.value.entries()]);
+        const [key, value] = data.value;
+        results.set(key, value);
         data = generator.next();
       }
 
@@ -300,19 +300,12 @@ describe('CollAsync', () => {
     it('should find records by function predicate', async () => {
       // Find users over 30
       const generator = coll.find((user) => user.age > 30);
-
-      const pop = await coll.getAll();
       let results = new Map();
-
       let data = generator.next();
-
       while (!data.done) {
-        if (!data.done) {
-          results = new Map([...results.entries(), ...data.value.entries()]);
-          data = generator.next();
-        } else {
-          break;
-        }
+        const [key, value] = data.value;
+        results.set(key, value);
+        data = generator.next();
       }
 
       // Should return 2 users
@@ -327,9 +320,15 @@ describe('CollAsync', () => {
     it('should return empty map if no records match', async () => {
       // Find users with non-existent status
       const generator = await coll.find('status', 'inactive');
-      const { value } = generator.next();
-      // Should return empty array
-      expect(value.size).toBe(0);
+      let results = new Map();
+      let data = generator.next();
+      while (!data.done) {
+        const [key, value] = data.value;
+        results.set(key, value);
+        data = generator.next();
+      }
+      // Should return empty map
+      expect(results.size).toBe(0);
     });
   });
 

@@ -103,23 +103,11 @@ export class SunMemory<RecordType, KeyType>
    * @param query The query to match against
    * @returns A generator that yields batches of matching records
    */
-  *find(...query: any[]): Generator<Map<KeyType, RecordType>, void, any> {
-    // For tests, return all matching records in a single batch
-    let results = new Map<KeyType, RecordType>();
-
-    // Find all matching records
+  *find(...query: any[]): Generator<[KeyType, RecordType]> {
     for (const [key, value] of this.#data.entries()) {
       if (matchesQuery(value, key, query)) {
-        results.set(key, value);
+        yield [key, value];
       }
-      if (results.size > this.#batchSize) {
-        yield reults;
-        results = new Map();
-      }
-    }
-
-    if (results.size) {
-      yield results;
     }
   }
 
@@ -146,40 +134,6 @@ export class SunMemory<RecordType, KeyType>
    */
   count(): number {
     return this.#data.size;
-  }
-
-  /**
-   * Get all records as a generator of batches
-   * @returns Generator that yields batches of records and can receive control signals
-   */
-  *getAll(): Generator<Map<KeyType, RecordType>, void, any> {
-    // Create batches of records
-    let currentBatch = new Map<KeyType, RecordType>();
-    let count = 0;
-
-    // Yield each record from the data map
-    for (const [key, value] of this.#data.entries()) {
-      currentBatch.set(key, value);
-      count++;
-
-      // If we've reached the batch size, yield the batch
-      if (count >= this.#batchSize) {
-        const feedback = yield currentBatch;
-
-        // Reset for next batch
-        currentBatch = new Map<KeyType, RecordType>();
-
-        // Check for termination signal
-        if (feedback === STREAM_ACTIONS.TERMINATE) {
-          return;
-        }
-      }
-    }
-
-    // Yield any remaining records in the final batch
-    if (currentBatch.size > 0) {
-      yield currentBatch;
-    }
   }
 
   /**
@@ -323,6 +277,10 @@ export class SunMemory<RecordType, KeyType>
     }
     this.set(key, result);
     return this.get(key); // should equal result but ...
+  }
+
+  *values(): Generator<Map<KeyType, RecordType>> {
+    yield new Map(this.#data.entries());
   }
 }
 

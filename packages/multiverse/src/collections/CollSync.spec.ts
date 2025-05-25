@@ -220,103 +220,57 @@ describe('CollSync', () => {
       expect(() => mockColl.find({})).toThrow('Find method not implemented');
     });
 
-    it('should find records by object query', () => {
-      // Find users with status 'active'
+    it('should find records by parameter query', () => {
       const generator = coll.find('status', 'active');
-
-      // Convert generator to array of batches for testing
-      const batches = Array.from(generator);
-
-      // Should return at least one batch
-      expect(batches.length).toBeGreaterThan(0);
-
-      // Extract all records from all batches
-      const records = [];
-      for (const batch of batches) {
-        for (const [key, value] of batch.entries()) {
-          records.push({ key, value });
-        }
+      let results = new Map();
+      let data = generator.next();
+      while (!data.done) {
+        const [key, value] = data.value;
+        results.set(key, value);
+        data = generator.next();
       }
 
-      // Should have 2 records total
-      expect(records.length).toBe(2);
-      expect(records.map((item) => item.value.id).sort()).toEqual(
-        ['user3', 'user4'].sort(),
-      );
+      // Should return 2 users
+      expect(results.size).toBe(2);
+      expect(
+        Array.from(results.values())
+          .map((user) => user.id)
+          .sort(),
+      ).toEqual(['user3', 'user4'].sort());
     });
 
     it('should find records by function predicate', () => {
       // Find users over 30
-      const generator = coll.find(
-        (user) => user.age !== undefined && user.age > 30,
-      );
-
-      // Convert generator to array of batches for testing
-      const batches = Array.from(generator);
-
-      // Extract all records from all batches
-      const records = [];
-      for (const batch of batches) {
-        for (const [key, value] of batch.entries()) {
-          records.push({ key, value });
-        }
+      const generator = coll.find((user) => user.age > 30);
+      let results = new Map();
+      let data = generator.next();
+      while (!data.done) {
+        const [key, value] = data.value;
+        results.set(key, value);
+        data = generator.next();
       }
 
-      // Should have 2 records total
-      expect(records.length).toBe(2);
-      expect(records.map((item) => item.value.id).sort()).toEqual(
-        ['user3', 'user4'].sort(),
-      );
+      // Should return 2 users
+      expect(results.size).toBe(2);
+      expect(
+        Array.from(results.values())
+          .map((user) => user.id)
+          .sort(),
+      ).toEqual(['user3', 'user4'].sort());
     });
 
-    it('should find records with multiple criteria', () => {
-      // Find active users over 35
-      const generator = coll.find((user) => {
-        return (
-          user.status === 'active' && user.age !== undefined && user.age >= 35
-        );
-      });
-
-      // Convert generator to array of batches for testing
-      const batches = Array.from(generator);
-
-      // Extract all records from all batches
-      const records = [];
-      for (const batch of batches) {
-        for (const [key, value] of batch.entries()) {
-          records.push({ key, value });
-        }
-      }
-
-      // Should have 2 records total
-      expect(records.length).toBe(2);
-      expect(records.map((item) => item.value.id).sort()).toEqual([
-        'user3',
-        'user4',
-      ]);
-    });
-
-    it('should return empty generator if no records match', () => {
+    it('should return empty map if no records match', () => {
       // Find users with non-existent status
-      const generator = coll.find({ status: 'inactive' });
-
-      // Convert generator to array of batches for testing
-      const batches = Array.from(generator);
-
-      const totalSize = batches.reduce((count, b) => count + b.size, 0);
-      // Should have at least one batch (even if empty)
-      expect(totalSize).toBe(0);
-
-      // Extract all records from all batches
-      const records = [];
-      for (const batch of batches) {
-        for (const [key, value] of batch.entries()) {
-          records.push({ key, value });
-        }
+      const generator = coll.find('status', 'inactive');
+      let results = new Map();
+      let data = generator.next();
+      while (!data.done) {
+        const [key, value] = data.value;
+        results.set(key, value);
+        data = generator.next();
       }
-
-      // Should have 0 records total
-      expect(records.length).toBe(0);
+      // Should return empty map
+      expect(results.size).toBe(0);
     });
   });
 

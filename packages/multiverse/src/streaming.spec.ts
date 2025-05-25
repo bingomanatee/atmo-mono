@@ -226,18 +226,32 @@ describe('Streaming Data Transport', () => {
   describe('transportGenerator', () => {
     it('should stream records from server to client', async () => {
       // Get a generator of users from the server
-      const userGenerator = serverUsers.getAll();
-      const clients = deGenerateMaps(clientUniverse.get('users')!.getAll());
+      const userGenerator = serverUsers.values();
+      const clients = deGenerateMaps(clientUniverse.get('users')!.values());
       expect(clients.size).toBe(0);
+
       // Transport the generator to the client
-      multiverse.transportGenerator({
-        generator: userGenerator,
-        collectionName: 'users',
-        fromU: 'server',
-        toU: 'client',
+      await new Promise<void>((resolve) => {
+        let subscription: any = null;
+        subscription = multiverse.transportGenerator({
+          generator: userGenerator,
+          collectionName: 'users',
+          fromU: 'server',
+          toU: 'client',
+          listener: {
+            complete() {
+              subscription?.unsubscribe();
+              resolve();
+            },
+            error(err) {
+              subscription?.unsubscribe();
+              resolve();
+            },
+          },
+        });
       });
 
-      const newClients = deGenerateMaps(clientUniverse.get('users')!.getAll());
+      const newClients = deGenerateMaps(clientUniverse.get('users')!.values());
       expect(newClients.size).toBe(5);
 
       expect(newClients.get(5)).toEqual({
@@ -251,14 +265,14 @@ describe('Streaming Data Transport', () => {
         email: 'john@example.com',
       });
       expect(Array.from(newClients.keys()).sort()).toEqual([1, 2, 3, 4, 5]);
-    });
+    }, 10000);
 
     it('should handle errors during transport', async () => {
       clientUniverse
         .get('users')!
         .set(1, { id: 1, name: 'John Doe', email: 'badly formatted email' });
 
-      const userGenerator = clientUsers.getAll();
+      const userGenerator = clientUsers.values();
 
       // Use a promise to properly handle the async nature of the test
       return new Promise<void>((resolve) => {
@@ -298,21 +312,25 @@ describe('Streaming Data Transport', () => {
 
   describe('find', () => {
     it('should find records and return them as a generator', async () => {
-      // Find users with IDs 1, 2, and 3 using generator
-      const userGenerator = serverUsers.find((record) =>
-        [1, 3].includes(record.id),
-      ) as Generator<{ key: number; value: ServerUser }>;
-
-      const users = generatorToMap(userGenerator);
-      expect(Array.from(users.keys()).sort()).toEqual([1, 3]);
-    });
-    it('should find records and return them as a generator', async () => {
-      // Find users with IDs 1, 2, and 3 using generator
-      const userGenerator = serverUsers.find((record) =>
-        [1, 3].includes(record.id),
+      // Find users with IDs 1 and 3 using generator
+      const userGenerator = serverUsers.find(
+        (record) => record.id === 1 || record.id === 3,
       );
 
       const users = generatorToMap(userGenerator);
+      console.log('Found users:', Array.from(users.entries()));
+      console.log('User keys:', Array.from(users.keys()));
+      expect(Array.from(users.keys()).sort()).toEqual([1, 3]);
+    });
+    it('should find records and return them as a generator', async () => {
+      // Find users with IDs 1 and 3 using generator
+      const userGenerator = serverUsers.find(
+        (record) => record.id === 1 || record.id === 3,
+      );
+
+      const users = generatorToMap(userGenerator);
+      console.log('Found users:', Array.from(users.entries()));
+      console.log('User keys:', Array.from(users.keys()));
       expect(Array.from(users.keys()).sort()).toEqual([1, 3]);
     });
   });

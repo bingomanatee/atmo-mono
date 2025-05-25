@@ -69,12 +69,14 @@ export class CollSync<RecordType, KeyType = string>
    * Get all records as a generator of batches
    * @returns Generator that yields batches of records
    */
-  getAll(): Generator<Map<KeyType, RecordType>, void, any> {
-    if (!this._sun.getAll) {
-      throw new Error('getAll method not implemented by sun');
-    }
-    return this._sun.getAll();
+  getAll() {
+    return this._sun.values();
   }
+
+  values() {
+    return this._sun.values();
+  }
+
   delete(key: KeyType) {
     if (this._sun.delete) {
       return this._sun.delete(key);
@@ -84,10 +86,10 @@ export class CollSync<RecordType, KeyType = string>
   /**
    * Find records matching a query
    * @param query - The query to match against
-   * @returns Generator that yields batches of matching records
+   * @returns Generator that yields [key, value] pairs
    * @throws Error if the sun does not implement find
    */
-  find(...args: any[]): Generator<Map<KeyType, RecordType>, void, any> {
+  find(...args: any[]): Generator<[KeyType, RecordType]> {
     // Process arguments
     let query: any;
 

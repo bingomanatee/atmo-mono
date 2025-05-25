@@ -94,29 +94,12 @@ export class SunMemoryAsync<RecordType, KeyType>
    * @param query - The query to match against
    * @returns A promise that resolves to an array of records matching the query
    */
-  *find(...query: any[]): Generator<Map<KeyType, RecordType>> {
-    // For tests, return all matching records in a single batch
-    let results;
-
-    // Find all matching records
+  *find(...query: any[]): Generator<[KeyType, RecordType]> {
     for (const [key, value] of this.#data.entries()) {
       if (matchesQuery(value, key, query)) {
-        if (!results) results = new Map();
-        results.set(key, value);
-      } else {
-        continue;
-      }
-      if (results.size > this.#batchSize) {
-        const interrupt = yield results;
-        if (interrupt === STREAM_ACTIONS.TERMINATE) {
-          return;
-        }
-        results = new Map();
+        yield [key, value];
       }
     }
-
-    if (!results) yield new Map();
-    else if (results.size) yield results;
   }
 
   /**
@@ -223,10 +206,6 @@ export class SunMemoryAsync<RecordType, KeyType>
     return this.#afterMutate(key, result);
   }
 
-  async getAll() {
-    return new Map(this.#data);
-  }
-
   /**
    * Process the result of a mutation
    * @param key - The key of the record
@@ -256,6 +235,16 @@ export class SunMemoryAsync<RecordType, KeyType>
         return this.get(key);
       }
     }
+  }
+
+  async *values(): AsyncGenerator<[KeyType, RecordType]> {
+    for (const [key, value] of this.#data) {
+      yield [key, value];
+    }
+  }
+
+  findAll() {
+    return this;
   }
 }
 
