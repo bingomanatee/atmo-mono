@@ -1,16 +1,14 @@
-import { asError, ExtendedMap } from '@wonderlandlabs/atmo-utils';
+import { ExtendedMap } from '@wonderlandlabs/atmo-utils';
+import { v4 as uuidv4 } from 'uuid';
 import { MUTATION_ACTIONS, STREAM_ACTIONS } from '../constants';
+import type { Pair, SchemaLocalIF } from '../type.schema';
 import { isMutatorAction, isObj } from '../typeguards.multiverse';
 import type { CollSyncIF } from '../types.coll';
+import { CollName } from '../types.coll';
 import type { MutationAction, SunIFSync } from '../types.multiverse';
 import { matchesQuery } from '../utils.sun';
 import { applyFieldFilters } from './applyFieldFilters';
 import { SunBase } from './SunFBase';
-import type { Pair } from '../type.schema';
-import { CollName } from '../types.coll';
-import type { SchemaLocalIF } from '../type.schema';
-import { isColl } from '../typeguards.multiverse';
-import { v4 as uuidv4 } from 'uuid';
 
 export class SunMemory<RecordType, KeyType>
   extends SunBase<RecordType, KeyType, CollSyncIF<RecordType, KeyType>>
@@ -281,9 +279,8 @@ export class SunMemory<RecordType, KeyType>
 export default function memorySunF<R, K>(
   coll?: CollSyncIF<R, K>,
 ): SunIFSync<R, K> {
-  const sun = new SunMemory({
+  return new SunMemory({
     schema: coll?.schema,
     coll,
   });
-  return sun;
 }

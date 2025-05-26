@@ -1,34 +1,10 @@
-import { SunMemory } from './SunMemory';
 import { produce } from 'immer';
 import { MUTATION_ACTIONS } from '../constants';
-import { isMutatorAction, isObj, isColl } from '../typeguards.multiverse';
-import type { CollSyncIF, CollIF } from '../types.coll';
+import { isMutatorAction, isObj } from '../typeguards.multiverse';
+import type { CollIF, CollSyncIF } from '../types.coll';
 import type { MutationAction, SunIF } from '../types.multiverse';
 import { applyFieldFilters } from './applyFieldFilters';
-
-// Helper function for tests
-const delay = (fn: () => void) => setTimeout(fn, 0);
-
-// Simple event emitter for tests
-class SimpleEventEmitter {
-  private listeners: Array<(data: any) => void> = [];
-
-  subscribe(listener: (data: any) => void): { unsubscribe: () => void } {
-    this.listeners.push(listener);
-    return {
-      unsubscribe: () => {
-        const index = this.listeners.indexOf(listener);
-        if (index !== -1) {
-          this.listeners.splice(index, 1);
-        }
-      },
-    };
-  }
-
-  next(data: any): void {
-    this.listeners.forEach((listener) => listener(data));
-  }
-}
+import { SunMemory } from './SunMemory';
 
 /**
  * A Sun implementation that uses Immer for immutable state management
@@ -38,22 +14,12 @@ export class SunMemoryImmer<RecordType, KeyType = string> extends SunMemory<
   KeyType
 > {
   #locked: boolean = false;
-  #event$: SimpleEventEmitter = new SimpleEventEmitter();
-  _isMutating: boolean = false;
-
-  constructor(coll?: CollIF<RecordType, KeyType>) {
-    super({ schema: coll?.schema, coll });
-    this.#event$ = new SimpleEventEmitter();
-    if (coll) {
-      this.coll = coll;
-    }
-  }
 
   set(key: KeyType, record: RecordType) {
     if (!this.coll) {
       throw new Error('SunMemoryImmer: collection not set');
     }
-    if (this.#locked && !this._isMutating) {
+    if (this.#locked) {
       throw new Error(
         'SunMemoryImmer: cannot set while record is locked - usually during mutation',
       );
@@ -78,7 +44,12 @@ export class SunMemoryImmer<RecordType, KeyType = string> extends SunMemory<
       }
     }
 
-    this.validate(processedRecord);
+    try {
+      this.validate(processedRecord);
+    } catch (err) {
+      console.error('failed SMI validation:', record, processedRecord, err);
+      throw err;
+    }
     super.set(key, processedRecord);
   }
 
@@ -89,70 +60,31 @@ export class SunMemoryImmer<RecordType, KeyType = string> extends SunMemory<
       collection: CollIF<RecordType, KeyType>,
     ) => RecordType | undefined | MutationAction,
   ): RecordType | undefined {
-    this._isMutating = true;
-    try {
-      const current = this.get(key);
-      const result = produce(current, (draft) => {
-        return mutator(draft, this.coll);
-      });
+    this.#locked = true;
 
-      if (result === undefined) {
-        this.delete(key);
-        return undefined;
-      }
+    const current = this.get(key);
 
-      if (typeof result === 'object' && result !== null) {
-        if ('action' in result) {
-          switch (result.action) {
-            case 'DELETE':
-              this.delete(result.key ?? key);
-              return undefined;
-            case 'NOOP':
-              return current;
-          }
-        }
-      }
-
-      this.set(key, result);
-      return result;
-    } finally {
-      this._isMutating = false;
+    const result = produce(current, (draft) => {
+      return mutator(draft, this.coll);
+    });
+    this.#locked = false;
+    if (result === undefined) {
+      this.delete(key);
+      return undefined;
     }
-  }
 
-  mutateAsync(
-    key: KeyType,
-    mutator: (
-      draft: RecordType | undefined,
-      collection: CollIF<RecordType, KeyType>,
-    ) => Promise<RecordType | undefined | MutationAction>,
-  ): Promise<RecordType | undefined> {
-    this._isMutating = true;
-    return mutator(this.get(key), this.coll)
-      .then((result) => {
-        if (result === undefined) {
+    if (isMutatorAction(result)) {
+      switch (result.action) {
+        case MUTATION_ACTIONS.DELETE:
           this.delete(key);
           return undefined;
-        }
+        case MUTATION_ACTIONS.NOOP:
+          return current;
+      }
+    }
 
-        if (typeof result === 'object' && result !== null) {
-          if ('action' in result) {
-            switch (result.action) {
-              case 'DELETE':
-                this.delete(result.key ?? key);
-                return undefined;
-              case 'NOOP':
-                return this.get(key);
-            }
-          }
-        }
-
-        this.set(key, result);
-        return result;
-      })
-      .finally(() => {
-        this._isMutating = false;
-      });
+    this.set(key, result);
+    return result;
   }
 
   delete(key: KeyType): void {
@@ -170,7 +102,9 @@ export class SunMemoryImmer<RecordType, KeyType = string> extends SunMemory<
   }
 }
 
-export function memoryImmerSunF<R, K>(coll?: CollSyncIF<R, K>): SunIF<R, K> {
+export default function memoryImmerSunF<R, K>(
+  coll?: CollSyncIF<R, K>,
+): SunIF<R, K> {
   return new SunMemoryImmer<R, K>({
     schema: coll?.schema,
     coll,

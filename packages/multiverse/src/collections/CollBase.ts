@@ -37,13 +37,11 @@ export abstract class CollBase<RecordType, KeyType = string>
       }
       // Create sun and set up references via factory
       this._sun = this._sunF(this);
-      console.log('called sunf; _sun is ', !!this._sun);
       if (!this._sun) {
         throw new Error('Sun factory function returned undefined');
       }
       // Set the collection reference and initialize sun
       this._sun.init(this);
-      console.log('sun initialized');
     }
     return this._sun;
   }

@@ -5,7 +5,7 @@ import { CollSync } from '../collections/CollSync';
 import { FIELD_TYPES, MUTATION_ACTIONS } from '../constants';
 import { SchemaLocal } from '../SchemaLocal';
 import { Universe } from '../Universe';
-import { SunMemoryImmer } from './SunMemoryImmer';
+import sunF, { SunMemoryImmer } from './SunMemoryImmer';
 
 interface User {
   id: number;
@@ -56,8 +56,9 @@ describe('SunMemoryImmer', () => {
       name: 'users',
       schema,
       universe: univ,
+      sunF: sunF,
     });
-    sun = new SunMemoryImmer<User, number>(coll);
+    sun = coll.sun;
   });
 
   describe('constructor', () => {
@@ -70,6 +71,7 @@ describe('SunMemoryImmer', () => {
   describe('set and get', () => {
     it('should store and retrieve a value', () => {
       const user = { id: 1, name: 'John Doe' };
+      console.log('set and get sun is ', sun);
       sun.set(1, user);
 
       const result = sun.get(1);
@@ -196,12 +198,10 @@ describe('SunMemoryImmer', () => {
         name: 'users',
         schema,
         universe: univ,
-        sunF(coll) {
-          sun = new SunMemoryImmer<any, string>(coll);
-          return sun;
-        },
+        sunF: sunF,
       });
 
+      sun = coll.sun;
       // Set up initial data
       sun.set('user1', { id: 'user1', name: 'John Doe', age: 30 });
       sun.set('user2', { id: 'user2', name: 'Jane Smith', age: 25 });
@@ -288,10 +288,8 @@ describe('SunMemoryImmer', () => {
         expect(sun.get('user3')).toEqual(original);
       });
 
-      it('should handle mutations that return a value', async () => {
-        // Mutate with async function
-
-        await sun.mutate('user1', (draft) => {
+      it('should handle mutations that return a value', () => {
+        sun.mutate('user1', (draft) => {
           if (draft) {
             // Update the draft
             draft.name = 'Updated Async';
@@ -427,13 +425,7 @@ describe('SunMemoryImmer', () => {
        * Create a PositionEntity from a plain object
        */
       static fromJSON(data: any): PositionEntity {
-        return new PositionEntity({
-          id: data.id,
-          name: data.name,
-          x: data.x,
-          y: data.y,
-          z: data.z,
-        });
+        return new PositionEntity(data);
       }
     }
 
@@ -477,11 +469,9 @@ describe('SunMemoryImmer', () => {
         name: 'entities',
         schema,
         universe: univ,
-        sunF(coll) {
-          sun = new SunMemoryImmer<any, string>(coll);
-          return sun;
-        },
+        sunF: sunF,
       });
+      sun = coll.sun;
     });
 
     describe('PositionEntity class', () => {

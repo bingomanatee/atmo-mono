@@ -5,7 +5,7 @@ import { SchemaLocal } from '../SchemaLocal';
 import type { PostParams } from '../type.schema';
 import type { CollAsyncIF } from '../types.coll';
 import { Universe } from '../Universe';
-import { SunMemoryAsync } from './SunMemoryAsync';
+import sunF, { SunMemoryAsync } from './SunMemoryAsync';
 
 type User = { id: number; name: string; age?: number; email?: string };
 const TEST_ERROR = 'Test Error';
@@ -26,102 +26,112 @@ describe('SunMemoryAsync', () => {
       name: 'users',
       schema,
       universe: univ,
-      sunF(coll) {
-        return new SunMemoryAsync<User, number>(coll);
-      },
+      sunF: sunF,
     });
   });
 
   describe('constructor', () => {
     it('should create a new instance with an empty data map', async () => {
-      expect(coll.sun).toBeInstanceOf(SunMemoryAsync);
-      expect(await coll.sun.has(1)).toBe(false);
+      const sun = coll.sun;
+      expect(sun).toBeInstanceOf(SunMemoryAsync);
+      expect(await sun.has(1)).toBe(false);
     });
   });
 
   describe('basic operations', () => {
     describe('get', () => {
       it('should return undefined for missing records', async () => {
-        const result = await coll.sun.get(1);
+        const sun = coll.sun;
+        const result = await sun.get(1);
         expect(result).toBeUndefined();
       });
 
       it('should return the record if it exists', async () => {
+        const sun = coll.sun;
         const user = { id: 1, name: 'John Doe' };
-        await coll.sun.set(1, user);
-        expect(await coll.sun.get(1)).toEqual(user);
+        await sun.set(1, user);
+        expect(await sun.get(1)).toEqual(user);
       });
     });
 
     describe('has', () => {
       it('should return false for missing records', async () => {
-        expect(await coll.sun.has(1)).toBe(false);
+        const sun = coll.sun;
+        expect(await sun.has(1)).toBe(false);
       });
 
       it('should return true if the record exists', async () => {
-        await coll.sun.set(1, { id: 1, name: 'John Doe' });
-        expect(await coll.sun.has(1)).toBe(true);
+        const sun = coll.sun;
+        await sun.set(1, { id: 1, name: 'John Doe' });
+        expect(await sun.has(1)).toBe(true);
       });
     });
 
     describe('delete', () => {
       it('should remove a record', async () => {
-        await coll.sun.set(1, { id: 1, name: 'John Doe' });
-        expect(await coll.sun.has(1)).toBe(true);
+        const sun = coll.sun;
+        await sun.set(1, { id: 1, name: 'John Doe' });
+        expect(await sun.has(1)).toBe(true);
 
-        await coll.sun.delete(1);
-        expect(await coll.sun.has(1)).toBe(false);
+        await sun.delete(1);
+        expect(await sun.has(1)).toBe(false);
       });
 
       it('should do nothing if the record does not exist', async () => {
-        expect(await coll.sun.has(1)).toBe(false);
-        await coll.sun.delete(1);
-        expect(await coll.sun.has(1)).toBe(false);
+        const sun = coll.sun;
+        expect(await sun.has(1)).toBe(false);
+        await sun.delete(1);
+        expect(await sun.has(1)).toBe(false);
       });
     });
 
     describe('clear', () => {
       it('should remove all records', async () => {
-        await coll.sun.set(1, { id: 1, name: 'John Doe' });
-        await coll.sun.set(2, { id: 2, name: 'Jane Smith' });
+        const sun = coll.sun;
+        await sun.set(1, { id: 1, name: 'John Doe' });
+        await sun.set(2, { id: 2, name: 'Jane Smith' });
 
-        expect(await coll.sun.has(1)).toBe(true);
-        expect(await coll.sun.has(2)).toBe(true);
+        expect(await sun.has(1)).toBe(true);
+        expect(await sun.has(2)).toBe(true);
 
-        coll.sun.clear();
+        sun.clear();
 
-        expect(await coll.sun.has(1)).toBe(false);
-        expect(await coll.sun.has(2)).toBe(false);
+        expect(await sun.has(1)).toBe(false);
+        expect(await sun.has(2)).toBe(false);
       });
     });
   });
 
   describe('set', () => {
     it('should add a new record', async () => {
+      const sun = coll.sun;
       const user = { id: 1, name: 'John Doe' };
-      await coll.sun.set(1, user);
+      await sun.set(1, user);
 
-      expect(await coll.sun.has(1)).toBe(true);
-      expect(await coll.sun.get(1)).toEqual(user);
+      expect(await sun.has(1)).toBe(true);
+      expect(await sun.get(1)).toEqual(user);
     });
 
     it('should update an existing record', async () => {
-      await coll.sun.set(1, { id: 1, name: 'John Doe' });
-      await coll.sun.set(1, { id: 1, name: 'John Updated' });
+      const sun = coll.sun;
+      await sun.set(1, { id: 1, name: 'John Doe' });
+      await sun.set(1, { id: 1, name: 'John Updated' });
 
-      expect(await coll.sun.get(1)).toEqual({ id: 1, name: 'John Updated' });
+      expect(await sun.get(1)).toEqual({ id: 1, name: 'John Updated' });
     });
 
     it('should validate field types for id', async () => {
+      const sun = coll.sun;
       await expect(async () => {
-        await coll.sun.set(1, { id: 'not a number', name: 'John Doe' });
+        await sun.set(1, { id: 'not a number', name: 'John Doe' });
       }).rejects.toThrow(/validation.*id/);
     });
 
     it('should validate field types for name', async () => {
+      const sun = coll.sun;
       try {
         // @ts-ignore - Testing runtime behavior
-        await coll.sun.set(1, { id: 1, name: 123 });
+        await sun.set(1, { id: 1, name: 123 });
         // If we get here, the test should fail
         expect('should have thrown').toBe('but did not throw');
       } catch (error) {
@@ -131,16 +141,18 @@ describe('SunMemoryAsync', () => {
     });
 
     it('should allow optional fields to be undefined', async () => {
+      const sun = coll.sun;
       // Just verify that this doesn't throw an error
-      await coll.sun.set(1, { id: 1, name: 'John Doe' });
+      await sun.set(1, { id: 1, name: 'John Doe' });
       // If we get here, the test passes
       expect(true).toBe(true);
     });
 
     it('should validate optional fields when provided', async () => {
+      const sun = coll.sun;
       try {
         // @ts-ignore - Testing runtime behavior
-        await coll.sun.set(1, { id: 1, name: 'John Doe', age: 'not a number' });
+        await sun.set(1, { id: 1, name: 'John Doe', age: 'not a number' });
         // If we get here, the test should fail
         expect('should have thrown').toBe('but did not throw');
       } catch (error) {
@@ -181,9 +193,14 @@ describe('SunMemoryAsync', () => {
     });
 
     it('should apply field filters when setting a record', async () => {
-      await coll.sun.set(1, { id: 1, name: 'John Doe', email: 'JOHN@EXAMPLE.COM' });
+      const sun = coll.sun;
+      await sun.set(1, {
+        id: 1,
+        name: 'John Doe',
+        email: 'JOHN@EXAMPLE.COM',
+      });
 
-      const result = await coll.sun.get(1);
+      const result = await sun.get(1);
       expect(result).toEqual({
         id: 1,
         name: 'JOHN DOE',
@@ -192,21 +209,21 @@ describe('SunMemoryAsync', () => {
     });
 
     it('should handle existing records in field filters', async () => {
-      await coll.sun.set(1, { id: 1, name: 'John Doe' });
+      const sun = coll.sun;
+      await sun.set(1, { id: 1, name: 'John Doe' });
 
       // Update with a new record
-      await coll.sun.set(1, {
+      await sun.set(1, {
         id: 1,
-        name: 'Jane Smith',
-        email: 'jane@example.com',
+        name: 'John Updated',
+        email: 'JOHN@EXAMPLE.COM',
       });
 
-      const result = await coll.sun.get(1);
-
+      const result = await sun.get(1);
       expect(result).toEqual({
         id: 1,
-        name: 'JANE SMITH',
-        email: 'jane@example.com',
+        name: 'JOHN UPDATED',
+        email: 'john@example.com',
       });
     });
   });
@@ -235,15 +252,18 @@ describe('SunMemoryAsync', () => {
         schema,
         universe: univ,
         sunF(coll) {
-          return new SunMemoryAsync<User & { lastUpdated?: string }, number>(coll);
+          return new SunMemoryAsync<User & { lastUpdated?: string }, number>(
+            coll,
+          );
         },
       });
     });
 
     it('should apply record filter when setting a record', async () => {
-      await coll.sun.set(1, { id: 1, name: 'John Doe' });
+      const sun = coll.sun;
+      await sun.set(1, { id: 1, name: 'John Doe' });
 
-      const result = await coll.sun.get(1);
+      const result = await sun.get(1);
       expect(result).toEqual({
         id: 1,
         name: 'John Doe',
@@ -257,13 +277,14 @@ describe('SunMemoryAsync', () => {
         return params.newValue ? String(params.newValue).toUpperCase() : '';
       };
 
-      await coll.sun.set(1, {
+      const sun = coll.sun;
+      await sun.set(1, {
         id: 1,
         name: 'John Doe',
         email: 'foo@bar.com',
       });
 
-      const result = await coll.sun.get(1);
+      const result = await sun.get(1);
       expect(result).toEqual({
         id: 1,
         name: 'JOHN DOE',
@@ -276,9 +297,10 @@ describe('SunMemoryAsync', () => {
   describe('Special Actions', () => {
     beforeEach(async () => {
       // Set up initial data
-      await coll.sun.set(1, { id: 1, name: 'John Doe', age: 30 });
-      await coll.sun.set(2, { id: 2, name: 'Jane Smith', age: 25 });
-      await coll.sun.set(3, {
+      const sun = coll.sun;
+      await sun.set(1, { id: 1, name: 'John Doe', age: 30 });
+      await sun.set(2, { id: 2, name: 'Jane Smith', age: 25 });
+      await sun.set(3, {
         id: 3,
         name: 'Bob Johnson',
         age: 40,
@@ -289,7 +311,8 @@ describe('SunMemoryAsync', () => {
     describe('DELETE action', () => {
       it('should delete a record when returning DELETE action with key', async () => {
         // Mutate with DELETE action
-        const result = await coll.sun.mutate(1, (draft) => {
+        const sun = coll.sun;
+        const result = await sun.mutate(1, (draft) => {
           return { action: MUTATION_ACTIONS.DELETE, key: 1 };
         });
 
@@ -297,12 +320,12 @@ describe('SunMemoryAsync', () => {
         expect(result).toBeUndefined();
 
         // Record should be deleted
-        expect(await coll.sun.has(1)).toBe(false);
+        expect(await sun.has(1)).toBe(false);
       });
 
       it('should delete a record using the ID from the draft', async () => {
         // Mutate with DELETE action using ID from draft
-        const result = await coll.sun.mutate(2, (draft) => {
+        const result = await sun.mutate(2, (draft) => {
           if (draft) {
             return { action: MUTATION_ACTIONS.DELETE, key: draft.id };
           }
@@ -312,19 +335,19 @@ describe('SunMemoryAsync', () => {
         expect(result).toBeUndefined();
 
         // Record should be deleted
-        expect(await coll.sun.has(2)).toBe(false);
+        expect(await sun.has(2)).toBe(false);
       });
 
       it("should  delete a record even if action doesn't have key", async () => {
         // Mutate with DELETE action but missing key
-        const result = await coll.sun.mutate(1, () => {
+        const result = await sun.mutate(1, () => {
           return { action: MUTATION_ACTIONS.DELETE };
         });
 
         // Result should be undefined (as per DELETE action)
         expect(result).toBeUndefined();
 
-        const has1 = await coll.sun.has(1);
+        const has1 = await sun.has(1);
         expect(has1).toBe(false);
       });
     });
@@ -332,10 +355,11 @@ describe('SunMemoryAsync', () => {
     describe('NOOP action', () => {
       it('should do nothing when returning NOOP action', async () => {
         // Get the original record
-        const original = await coll.sun.get(3);
+        const sun = coll.sun;
+        const original = await sun.get(3);
 
         // Mutate with NOOP action
-        const result = await coll.sun.mutate(3, (draft) => {
+        const result = await sun.mutate(3, (draft) => {
           if (draft && draft.status === 'locked') {
             return { action: MUTATION_ACTIONS.NOOP };
           }
@@ -349,14 +373,15 @@ describe('SunMemoryAsync', () => {
         expect(result).toEqual(original);
 
         // Record should not be changed
-        expect(await coll.sun.get(3)).toEqual(original);
+        expect(await sun.get(3)).toEqual(original);
       });
     });
 
     describe('Nested async mutations', () => {
       it('should handle nested async operations', async () => {
         // Mutate with nested async functions
-        const result = await coll.sun.mutate(1, async (draft) => {
+        const sun = coll.sun;
+        const result = await sun.mutate(1, async (draft) => {
           if (draft) {
             // First async operation
             await new Promise((resolve) => setTimeout(resolve, 10));
@@ -378,7 +403,7 @@ describe('SunMemoryAsync', () => {
         expect(result?.name).toBe('Second Update');
 
         // Check that the stored record was updated
-        const stored = await coll.sun.get(1);
+        const stored = await sun.get(1);
         expect(stored?.name).toBe('Second Update');
       });
     });
@@ -392,23 +417,25 @@ describe('SunMemoryAsync', () => {
           await new Promise((resolve) => setTimeout(resolve, 10));
           throw new Error(TEST_ERROR);
         };
-        await coll.sun.set(1, { name: 'foo', email: 'foo@bar.com', id: 1 });
+        const sun = coll.sun;
+        await sun.set(1, { name: 'foo', email: 'foo@bar.com', id: 1 });
 
         // Expect the mutate call to throw
-        await expect(coll.sun.mutate(1, errorMutator)).rejects.toThrow(
+        await expect(sun.mutate(1, errorMutator)).rejects.toThrow(
           new RegExp(TEST_ERROR),
         );
 
         // Verify that the original record is unchanged
-        const record = await coll.sun.get(1);
+        const record = await sun.get(1);
         expect(record).toEqual({ name: 'foo', email: 'foo@bar.com', id: 1 });
       });
 
       it('should continue processing mutations after an error', async () => {
-        await coll.sun.set(1, { name: 'foo', email: 'foo@bar.com', id: 1 });
+        const sun = coll.sun;
+        await sun.set(1, { name: 'foo', email: 'foo@bar.com', id: 1 });
         // First try a mutation that throws
         try {
-          await coll.sun.mutate(1, async () => {
+          await sun.mutate(1, async () => {
             await new Promise((resolve) => setTimeout(resolve, 10));
             throw new Error(TEST_ERROR);
           });
@@ -417,7 +444,7 @@ describe('SunMemoryAsync', () => {
         }
 
         // Then try a valid mutation
-        await coll.sun.mutate(1, async (draft) => {
+        await sun.mutate(1, async (draft) => {
           if (draft) {
             await new Promise((resolve) => setTimeout(resolve, 10));
             draft.name = 'Updated Name';
@@ -426,7 +453,7 @@ describe('SunMemoryAsync', () => {
         });
 
         // Verify that the second mutation worked
-        const record = await coll.sun.get(1);
+        const record = await sun.get(1);
         expect(record?.name).toBe('Updated Name');
       });
 
@@ -452,14 +479,19 @@ describe('SunMemoryAsync', () => {
           return draft;
         };
 
-        await coll.sun.set(1, { name: 'John Doe', email: 'foo@bar.com', id: 1 });
+        const sun = coll.sun;
+        await sun.set(1, {
+          name: 'John Doe',
+          email: 'foo@bar.com',
+          id: 1,
+        });
         // Expect the mutate call to throw
-        await expect(coll.sun.mutate(1, errorMutator)).rejects.toThrow(
+        await expect(sun.mutate(1, errorMutator)).rejects.toThrow(
           new RegExp(NESTED_ERROR),
         );
 
         // Verify that the original record is unchanged
-        const record = await coll.sun.get(1);
+        const record = await sun.get(1);
         expect(record?.name).toBe('John Doe');
       });
     });
@@ -468,14 +500,16 @@ describe('SunMemoryAsync', () => {
   describe('values', () => {
     beforeEach(async () => {
       // Set up initial data
-      await coll.sun.set(1, { id: 1, name: 'John Doe', age: 30 });
-      await coll.sun.set(2, { id: 2, name: 'Jane Smith', age: 25 });
-      await coll.sun.set(3, { id: 3, name: 'Bob Johnson', age: 40 });
+      const sun = coll.sun;
+      await sun.set(1, { id: 1, name: 'John Doe', age: 30 });
+      await sun.set(2, { id: 2, name: 'Jane Smith', age: 25 });
+      await sun.set(3, { id: 3, name: 'Bob Johnson', age: 40 });
     });
 
     it('should yield [key, value] pairs for all records', async () => {
       const values = [];
-      for await (const [key, value] of coll.sun.values()) {
+      const sun = coll.sun;
+      for await (const [key, value] of sun.values()) {
         values.push([key, value]);
       }
       expect(values).toHaveLength(3);
@@ -487,9 +521,10 @@ describe('SunMemoryAsync', () => {
     });
 
     it('should yield empty array when no records exist', async () => {
-      await coll.sun.clear();
+      const sun = coll.sun;
+      await sun.clear();
       const values = [];
-      for await (const [key, value] of coll.sun.values()) {
+      for await (const [key, value] of sun.values()) {
         values.push([key, value]);
       }
       expect(values).toHaveLength(0);
@@ -499,14 +534,16 @@ describe('SunMemoryAsync', () => {
   describe('find', () => {
     beforeEach(async () => {
       // Set up initial data
-      await coll.sun.set(1, { id: 1, name: 'John Doe', age: 30 });
-      await coll.sun.set(2, { id: 2, name: 'Jane Smith', age: 25 });
-      await coll.sun.set(3, { id: 3, name: 'Bob Johnson', age: 40 });
+      const sun = coll.sun;
+      await sun.set(1, { id: 1, name: 'John Doe', age: 30 });
+      await sun.set(2, { id: 2, name: 'Jane Smith', age: 25 });
+      await sun.set(3, { id: 3, name: 'Bob Johnson', age: 40 });
     });
 
     it('should find records by field value', async () => {
       const results = [];
-      for await (const [key, value] of coll.sun.find('age', 30)) {
+      const sun = coll.sun;
+      for await (const [key, value] of sun.find('age', 30)) {
         results.push([key, value]);
       }
       expect(results).toHaveLength(1);
@@ -515,7 +552,8 @@ describe('SunMemoryAsync', () => {
 
     it('should find records by predicate function', async () => {
       const results = [];
-      for await (const [key, value] of coll.sun.find((record) => record.age > 30)) {
+      const sun = coll.sun;
+      for await (const [key, value] of sun.find((record) => record.age > 30)) {
         results.push([key, value]);
       }
       expect(results).toHaveLength(1);
@@ -524,7 +562,8 @@ describe('SunMemoryAsync', () => {
 
     it('should return empty array when no records match', async () => {
       const results = [];
-      for await (const [key, value] of coll.sun.find('age', 50)) {
+      const sun = coll.sun;
+      for await (const [key, value] of sun.find('age', 50)) {
         results.push([key, value]);
       }
       expect(results).toHaveLength(0);

@@ -21,7 +21,6 @@ export { SunMemoryImmerAsync } from './suns/SunMemoryImmerAsync';
 export * from './suns/SunMemory';
 export * from './suns/SunMemoryAsync';
 export * from './suns/SunMemoryImmer';
-export * from './suns/SunMemoryImmerAsync';
 
 // Constants
 export { FIELD_TYPES, MUTATION_ACTIONS } from './constants';

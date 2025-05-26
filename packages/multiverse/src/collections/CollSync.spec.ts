@@ -3,7 +3,6 @@ import { FIELD_TYPES, MUTATION_ACTIONS } from '../constants';
 import { Multiverse } from '../Multiverse';
 import { SchemaLocal } from '../SchemaLocal';
 import { SchemaUniversal } from '../SchemaUniversal';
-import { memoryImmerSunF } from '../suns/SunMemoryImmer';
 import type { CollSyncIF } from '../types.coll';
 import type { UniverseIF } from '../types.multiverse';
 import { Universe } from '../Universe';
@@ -202,9 +201,11 @@ describe('CollSync', () => {
         get: vi.fn(),
         set: vi.fn(),
         has: vi.fn(),
+        getMany: vi.fn(),
         delete: vi.fn(),
         clear: vi.fn(),
         // No find method
+        init: vi.fn(),
       };
 
       // Create a collection with the mock sun

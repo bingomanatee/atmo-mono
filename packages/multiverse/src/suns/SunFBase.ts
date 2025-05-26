@@ -41,7 +41,6 @@ export abstract class SunBase<
   }
 
   init(coll?: CollType): void {
-    console.log('sun base called with ', !!coll);
     if (coll) {
       this.#coll = coll;
     }
