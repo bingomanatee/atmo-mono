@@ -1,5 +1,5 @@
 import { get } from 'lodash-es';
-import { isObj } from '../typeguards.multiverse';
+import { isObj, isColl } from '../typeguards.multiverse';
 import type { CollBaseIF, FieldLocalIF, SunIF } from '../types.multiverse';
 import { validateField } from '../utils/validateField';
 
@@ -22,7 +22,55 @@ export abstract class SunBase<
   CollType extends CollBaseIF = CollBaseIF,
 > implements SunIF<RecordType, KeyType>
 {
-  protected coll!: CollType;
+  #coll?: CollType;
+  protected _isMutating: boolean = false;
+  #initialized: boolean = false;
+
+  get coll(): CollType {
+    if (!this.#coll) {
+      throw new Error('Collection is not set');
+    }
+    if (!this.#initialized) {
+      throw new Error('Sun must be initialized before accessing collection');
+    }
+    return this.#coll;
+  }
+
+  set coll(value: CollType) {
+    this.#coll = value;
+  }
+
+  init(coll?: CollType): void {
+    console.log('sun base called with ', !!coll);
+    if (coll) {
+      this.#coll = coll;
+    }
+    if (this.#initialized) {
+      return;
+    }
+
+    if (!this.#coll) {
+      throw new Error('Collection must be set before initialization');
+    }
+    if (!isColl(this.#coll)) {
+      console.error('Invalid collection passed to SunBase:', this.#coll);
+      throw new Error('Collection must be a valid collection');
+    }
+    if (!this.#coll.schema) {
+      throw new Error('Collection schema must be set before initialization');
+    }
+    // Call subclass-specific initialization
+    this._init();
+    this.#initialized = true;
+  }
+
+  /**
+   * Subclass-specific initialization. Called after base validation but before setting initialized flag.
+   * Override this method to add initialization logic specific to your Sun implementation.
+   */
+  protected _init(): void {
+    // Default implementation does nothing
+  }
 
   /**
    * Event queue for handling asynchronous events

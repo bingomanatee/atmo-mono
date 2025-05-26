@@ -25,6 +25,9 @@ export function validateField(
     console.warn(`Field ${key} not found in schema of ${schema.name}`);
     return;
   }
+  if (fieldSchema.meta?.required && (value === undefined || value === null)) {
+    return `${key} is required`;
+  }
   const { type: fieldType, validator: fieldValidator } = fieldSchema;
   if (fieldValidator) {
     const msg = fieldValidator(value, {

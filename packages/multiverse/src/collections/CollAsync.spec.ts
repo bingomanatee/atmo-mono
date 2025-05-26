@@ -489,4 +489,76 @@ describe('CollAsync', () => {
       });
     });
   });
+
+  describe('values', () => {
+    let univ: Universe;
+    let schema: SchemaLocal;
+    let coll: CollAsync<any, string>;
+
+    beforeEach(async () => {
+      univ = new Universe('test-universe');
+      schema = new SchemaLocal('users', {
+        id: { type: FIELD_TYPES.string },
+        name: { type: FIELD_TYPES.string },
+        age: { type: FIELD_TYPES.number, meta: { optional: true } },
+      });
+      coll = new CollAsync({
+        name: 'users',
+        schema,
+        universe: univ,
+      });
+
+      // Set up initial data
+      await coll.set('user1', { id: 'user1', name: 'John Doe', age: 30 });
+      await coll.set('user2', { id: 'user2', name: 'Jane Smith', age: 25 });
+    });
+
+    it('should yield [key, value] pairs for all records', async () => {
+      const values = [];
+      for await (const [key, value] of coll.values()) {
+        values.push([key, value]);
+      }
+      expect(values).toHaveLength(2);
+      expect(values).toEqual([
+        ['user1', { id: 'user1', name: 'John Doe', age: 30 }],
+        ['user2', { id: 'user2', name: 'Jane Smith', age: 25 }],
+      ]);
+    });
+
+    it('should yield empty array when no records exist', async () => {
+      await coll.clear();
+      const values = [];
+      for await (const [key, value] of coll.values()) {
+        values.push([key, value]);
+      }
+      expect(values).toHaveLength(0);
+    });
+
+    it('should throw if sun engine does not implement values', async () => {
+      // Create a mock sun without values method
+      const mockSun = {
+        get: vi.fn(),
+        set: vi.fn(),
+        has: vi.fn(),
+        delete: vi.fn(),
+        clear: vi.fn(),
+        // No values method
+      };
+
+      // Create a collection with the mock sun
+      const mockColl = new CollAsync({
+        name: 'mock-users',
+        schema,
+        universe: univ,
+        sunF: () => mockSun,
+      });
+
+      // Expect values to throw an error
+      await expect(async () => {
+        for await (const _ of mockColl.values()) {
+          // This should not execute
+        }
+      }).rejects.toThrow();
+    });
+  });
 });

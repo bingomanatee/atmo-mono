@@ -56,11 +56,8 @@ describe('SunMemoryImmer', () => {
       name: 'users',
       schema,
       universe: univ,
-      sunF(coll) {
-        sun = new SunMemoryImmer<User, number>(coll);
-        return sun;
-      },
     });
+    sun = new SunMemoryImmer<User, number>(coll);
   });
 
   describe('constructor', () => {
@@ -625,6 +622,57 @@ describe('SunMemoryImmer', () => {
         expect(stored.y).toBe(8);
         expect(stored.z).toBe(9);
       });
+    });
+  });
+
+  describe('values', () => {
+    beforeEach(() => {
+      // Set up initial data
+      sun.set(1, { id: 1, name: 'John Doe', age: 30 });
+      sun.set(2, { id: 2, name: 'Jane Smith', age: 25 });
+      sun.set(3, { id: 3, name: 'Bob Johnson', age: 40 });
+    });
+
+    it('should yield [key, value] pairs for all records', () => {
+      const values = Array.from(sun.values());
+      expect(values).toHaveLength(3);
+      expect(values).toEqual([
+        [1, { id: 1, name: 'John Doe', age: 30 }],
+        [2, { id: 2, name: 'Jane Smith', age: 25 }],
+        [3, { id: 3, name: 'Bob Johnson', age: 40 }],
+      ]);
+    });
+
+    it('should yield empty array when no records exist', () => {
+      sun.clear();
+      const values = Array.from(sun.values());
+      expect(values).toHaveLength(0);
+    });
+  });
+
+  describe('find', () => {
+    beforeEach(() => {
+      // Set up initial data
+      sun.set(1, { id: 1, name: 'John Doe', age: 30 });
+      sun.set(2, { id: 2, name: 'Jane Smith', age: 25 });
+      sun.set(3, { id: 3, name: 'Bob Johnson', age: 40 });
+    });
+
+    it('should find records by field value', () => {
+      const results = Array.from(sun.find('age', 30));
+      expect(results).toHaveLength(1);
+      expect(results[0]).toEqual([1, { id: 1, name: 'John Doe', age: 30 }]);
+    });
+
+    it('should find records by predicate function', () => {
+      const results = Array.from(sun.find((record) => record.age > 30));
+      expect(results).toHaveLength(1);
+      expect(results[0]).toEqual([3, { id: 3, name: 'Bob Johnson', age: 40 }]);
+    });
+
+    it('should return empty array when no records match', () => {
+      const results = Array.from(sun.find('age', 50));
+      expect(results).toHaveLength(0);
     });
   });
 });

@@ -1,4 +1,4 @@
-import sunMemoryAsyncF from '../suns/SunMemoryAsync';
+import { memoryAsyncSunF } from '../suns/SunMemoryAsync';
 import type { CollIF } from '../types.coll';
 import type {
   CollAsyncIF,
@@ -6,6 +6,7 @@ import type {
   SunIfAsync,
   UniverseIF,
 } from '../types.multiverse';
+import { CollBase } from './CollBase';
 
 type CollParms<RecordType, KeyType = string> = {
   name: string;
@@ -15,86 +16,71 @@ type CollParms<RecordType, KeyType = string> = {
 };
 
 export class CollAsync<RecordType, KeyType = string>
+  extends CollBase<RecordType, KeyType>
   implements CollAsyncIF<RecordType, KeyType>
 {
-  name: string;
-  protected _universe: UniverseIF;
-  schema: SchemaLocalIF;
   isAsync: true = true;
+  protected _sunF: (
+    coll: CollIF<RecordType, KeyType>,
+  ) => SunIfAsync<RecordType, KeyType>;
 
   constructor(params: CollParms<RecordType, KeyType>) {
     const { name, sunF, schema, universe } = params;
-    this.name = name;
-    this.schema = schema;
-    this._universe = universe;
-    this._sun = (sunF ?? sunMemoryAsyncF)(this);
+    super(name, schema, universe);
+    this._sunF = sunF ?? memoryAsyncSunF;
     if (universe) {
       universe.add(this);
     }
   }
 
-  protected _sun: SunIfAsync<RecordType, KeyType>;
-
-  async get(identity: KeyType) {
-    return this._sun.get(identity);
+  async get(key: KeyType): Promise<RecordType | undefined> {
+    return this.sun.get(key);
   }
 
-  async has(key: KeyType) {
-    return this._sun.has(key);
+  async set(key: KeyType, value: RecordType): Promise<void> {
+    await this.sun.set(key, value);
   }
 
-  async set(key: KeyType, value: RecordType) {
-    this._sun.set(key, value);
+  async has(key: KeyType): Promise<boolean> {
+    return this.sun.has(key);
+  }
+
+  async delete(key: KeyType): Promise<void> {
+    await this.sun.delete(key);
+  }
+
+  async clear(): Promise<void> {
+    await this.sun.clear();
+  }
+
+  values(): AsyncGenerator<[KeyType, RecordType]> {
+    return this.sun.values();
+  }
+
+  find(
+    query: string | ((record: RecordType) => boolean),
+    value?: any,
+  ): AsyncGenerator<[KeyType, RecordType]> {
+    if (typeof this.sun.find !== 'function') {
+      throw new Error('Find method not implemented');
+    }
+    return this.sun.find(query, value);
   }
 
   async mutate(
     key: KeyType,
     mutator: (
       draft: RecordType | undefined,
-      collection: CollAsyncIF<RecordType, KeyType>,
-    ) => RecordType | void | any | Promise<RecordType | void | any>,
+    ) => Promise<RecordType | undefined | MutationAction>,
   ): Promise<RecordType | undefined> {
-    if (this._sun.mutate) {
-      return this._sun.mutate(key, (draft) => mutator(draft, this));
-    } else {
-      // Fallback for suns that don't support mutate
-      const existing = await this.get(key);
-      if (!existing) return undefined;
-      const result = await mutator(existing, this);
-      await this.set(key, result);
-      return this.get(key);
-    }
+    return this.sun.mutate(key, mutator);
   }
 
   getMany(keys: KeyType[]) {
-    if (!this._sun.getMany) {
+    if (!this.sun.getMany) {
       throw new Error('getAll method not implemented by sun');
     }
-    return this._sun.getMany(keys);
-  }
-
-  delete(key: KeyType): Promise<void> {
-    if (this._sun.delete) {
-      return this._sun.delete(key);
-    }
-    throw new Error(
-      `delete method not implemented for collection ${this.name}`,
-    );
-  }
-
-  values() {
-    return this._sun.values();
-  }
-
-  find(...query: any[]): Generator<[KeyType, RecordType]> {
-    if (typeof this._sun.find === 'function') {
-      return this._sun.find(...query);
-    }
-
-    // Throw an error if find is not implemented
-    throw new Error(
-      `Find method not implemented for sun in collection ${this.name}`,
-    );
+    return this.sun.getMany(keys);
   }
 
   /**
@@ -110,14 +96,14 @@ export class CollAsync<RecordType, KeyType = string>
     ) => void | Promise<void>,
   ): Promise<void> {
     // If the sun has an each method, use it
-    if (typeof this._sun.each === 'function') {
-      await this._sun.each((record, key) => callback(record, key, this));
+    if (typeof this.sun.each === 'function') {
+      await this.sun.each((record, key) => callback(record, key, this));
       return;
     }
 
     // Fallback implementation using keys
-    if (typeof this._sun.keys === 'function') {
-      const keys = await this._sun.keys();
+    if (typeof this.sun.keys === 'function') {
+      const keys = await this.sun.keys();
 
       // Process all keys in parallel
       await Promise.all(
@@ -142,13 +128,13 @@ export class CollAsync<RecordType, KeyType = string>
    */
   async count(): Promise<number> {
     // If the sun has a count method, use it
-    if (typeof this._sun.count === 'function') {
-      return this._sun.count();
+    if (typeof this.sun.count === 'function') {
+      return this.sun.count();
     }
 
     // Fallback implementation using keys
-    if (typeof this._sun.keys === 'function') {
-      const keys = await this._sun.keys();
+    if (typeof this.sun.keys === 'function') {
+      const keys = await this.sun.keys();
       return keys.length;
     }
 
@@ -173,16 +159,16 @@ export class CollAsync<RecordType, KeyType = string>
     ) => Promise<RecordType>,
   ): Promise<Map<KeyType, RecordType>> {
     // If the sun has a map method, use it
-    if (typeof this._sun.map === 'function') {
-      return this._sun.map(mapper);
+    if (typeof this.sun.map === 'function') {
+      return this.sun.map(mapper);
     }
-    if (!(typeof this._sun.keys === 'function')) {
+    if (!(typeof this.sun.keys === 'function')) {
       throw new Error(
         `each not implemented in ${this.name}; sun has no keys or map function`,
       );
     }
 
-    const keys = await this._sun.keys();
+    const keys = await this.sun.keys();
     const values: RecordType[] = Promise.all(
       Array.from(keys).map(async () => {
         const record = await this.get(record);

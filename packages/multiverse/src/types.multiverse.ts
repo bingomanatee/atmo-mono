@@ -6,11 +6,23 @@ import type { CollBaseIF, CollIF, CollName } from './types.coll';
 export type UniverseName = string;
 
 export interface SunIF<RecordType = DataRecord, KeyType = DataKey> {
-  get(key: KeyType): any;
-  set(key: KeyType, value: RecordType): any;
-  delete(key: KeyType): any;
-  clear(): any;
-  has(key: KeyType): any;
+  /**
+   * Initialize the sun. Must be called before any other operations.
+   * This is where validation of the collection should occur.
+   * @throws Error if initialization fails or if already initialized
+   */
+  init(): void | Promise<void>;
+
+  get(key: KeyType): RecordType | undefined;
+  set(key: KeyType, value: RecordType): void;
+  has(key: KeyType): boolean;
+  delete(key: KeyType): void;
+  clear(): void;
+  values(): Generator<[KeyType, RecordType]>;
+  find(
+    query: string | ((record: RecordType) => boolean),
+    value?: any,
+  ): Generator<[KeyType, RecordType]>;
   /**
    * Validate a record against the schema
    * @param record - The record to validate
@@ -30,12 +42,6 @@ export interface SunIF<RecordType = DataRecord, KeyType = DataKey> {
       draft: RecordType | undefined,
     ) => Promise<RecordType | MutationAction>,
   ): any;
-  /**
-   * Find records matching a query
-   * @param query - The query to match against
-   * @returns A generator of {key, value} pairs for matching records
-   */
-  find?(query: any): Generator<{ key: KeyType; value: RecordType }>;
 
   keys?(): any;
 
@@ -61,19 +67,19 @@ export interface SunIF<RecordType = DataRecord, KeyType = DataKey> {
   ): any;
 
   /**
-   * Get multiple records as a generator of {key, value} pairs
+   * Get multiple records as a generator of [key, value] pairs
    * @param keys Array of record keys to get
-   * @returns A generator of {key, value} pairs for matching records
+   * @returns A generator of [key, value] pairs for matching records
    */
-  getMany?(keys: KeyType[]): Generator<{ key: KeyType; value: RecordType }>;
+  getMany?(keys: KeyType[]): Generator<[KeyType, RecordType]>;
 
   /**
-   * Get all records as a generator of {key, value} pairs
-   * @returns A generator of {key, value} pairs for all records
+   * Get all records as a generator of [key, value] pairs
+   * @returns A generator of [key, value] pairs for all records
    */
   getAll():
-    | Generator<{ key: KeyType; value: RecordType }>
-    | Promise<Generator<{ key: KeyType; value: RecordType }>>;
+    | Generator<[KeyType, RecordType]>
+    | Promise<Generator<[KeyType, RecordType]>>;
 
   /**
    * Set multiple records from a Map
@@ -86,77 +92,49 @@ export interface SunIF<RecordType = DataRecord, KeyType = DataKey> {
    * Make the Sun engine itself iterable over [key, value] pairs
    */
   [Symbol.iterator](): Iterator<[KeyType, RecordType]>;
-
-  values(): Generator<RecordType>;
 }
+
 export interface SunIFSync<RecordType = DataRecord, KeyType = DataKey>
   extends SunIF<RecordType, KeyType> {
-  get(key: KeyType): RecordType | undefined;
-  getAll(): Generator<{ key: KeyType; value: RecordType }>;
-  set(key: KeyType, value: RecordType): void;
-  delete(key: KeyType): void;
-  clear(): void;
-  has(key: KeyType): boolean;
-  validate(record: RecordType): void;
-  /**
-   * Optional method to mutate a record
-   * @param key - The key of the record to mutate
-   * @param mutator - A function that accepts the previous record (or undefined) and returns a new record
-   * @returns The mutated record or undefined if deleted
-   */
-  mutate?(
+  mutate(
     key: KeyType,
-    mutator: (draft: RecordType | undefined) => RecordType | void | any,
-  ): RecordType;
-  /**
-   * Find records matching a query
-   * @param query - The query to match against
-   * @returns A generator of {key, value} pairs for matching records
-   */
-  find?(query: any): Generator<{ key: KeyType; value: RecordType }>;
-  /**
-   * Optional method to get all keys in the collection
-   * @returns An array of keys
-   */
-  keys?(): KeyType[];
-  /**
-   * Iterate over each record in the collection
-   * @param callback - Function to call for each record
-   * @returns void for sync collections, Promise<void> for async collections
-   */
-  each(
-    callback: (
-      record: RecordType,
-      key: KeyType,
-      collection: CollBaseIF,
-    ) => void,
-  ): void;
-  count(): number;
-  map?(
-    mapper: (
-      record: RecordType,
-      key: KeyType,
-      collection: CollBaseIF,
-    ) => RecordType | void | any,
-    noTransaction?: boolean,
-  ): Map<KeyType, RecordType>;
-
-  [Symbol.iterator](): Iterator<[KeyType, RecordType]>;
-  values(): Generator<RecordType>;
+    mutator: (
+      draft: RecordType | undefined,
+    ) => RecordType | undefined | MutationAction,
+  ): RecordType | undefined;
 }
 
 export interface SunIfAsync<RecordType = DataRecord, KeyType = DataKey>
-  extends SunIF {
+  extends Omit<SunIF<RecordType, KeyType>, 'init'> {
+  /**
+   * Initialize the sun. Must be called before any other operations.
+   * This is where validation of the collection should occur.
+   * @throws Error if initialization fails or if already initialized
+   */
+  init(): Promise<void>;
+
+  get(key: KeyType): Promise<RecordType | undefined>;
+  set(key: KeyType, value: RecordType): Promise<void>;
+  has(key: KeyType): Promise<boolean>;
+  delete(key: KeyType): Promise<void>;
   clear(): Promise<void>;
-  validate(record: RecordType): void;
+  values(): AsyncGenerator<[KeyType, RecordType]>;
+  find(
+    query: string | ((record: RecordType) => boolean),
+    value?: any,
+  ): AsyncGenerator<[KeyType, RecordType]>;
+  mutate(
+    key: KeyType,
+    mutator: (
+      draft: RecordType | undefined,
+    ) => Promise<RecordType | undefined | MutationAction>,
+  ): Promise<RecordType | undefined>;
 
   /**
    * Get the number of records in the collection
    * @returns The number of records for sync collections, Promise<number> for async collections
    */
   count(): number | Promise<number>;
-
-  delete(key: KeyType): Promise<void>;
 
   /**
    * Iterate over each record in the collection
@@ -174,16 +152,12 @@ export interface SunIfAsync<RecordType = DataRecord, KeyType = DataKey>
   /**
    * Optional method to find records matching a query
    * @param query - The query to match against
-   * @returns An array of records matching the query
+   * @returns A generator of [key, value] pairs for matching records
    */
-  find?(...query: any[]): RecordType[] | Promise<Map<KeyType, RecordType>>;
+  find?(...query: any[]): AsyncGenerator<[KeyType, RecordType]>;
 
-  get(key: KeyType): Promise<RecordType | undefined>;
-
-  getMany(keys: KeyType[]): AsyncGenerator<Map<KeyType, RecordType>>;
-  getAll(): AsyncGenerator<{ key: KeyType; value: RecordType }>;
-
-  has(key: KeyType): Promise<boolean>;
+  getMany(keys: KeyType[]): AsyncGenerator<[KeyType, RecordType]>;
+  getAll(): AsyncGenerator<[KeyType, RecordType]>;
 
   /**
    * Optional method to get all keys in the collection
@@ -200,15 +174,7 @@ export interface SunIfAsync<RecordType = DataRecord, KeyType = DataKey>
     noTransaction?: boolean,
   ): Promise<Map<KeyType, RecordType>>;
 
-  mutate?(
-    key: KeyType,
-    mutator: (draft: RecordType | undefined) => RecordType | void | any,
-  ): Promise<RecordType>;
-
-  set(key: KeyType, value: RecordType): Promise<void>;
-
   [Symbol.iterator](): Iterator<[KeyType, RecordType]>;
-  values(): AsyncGenerator<RecordType>;
 }
 
 export interface UniverseIF {

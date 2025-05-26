@@ -4,6 +4,7 @@ import type { CollIF, CollSyncIF } from '../types.coll';
 import type {
   SchemaLocalIF,
   SendProps,
+  SunIF,
   SunIFSync,
   TransportResult,
   UniverseIF,
@@ -22,34 +23,51 @@ export class CollSync<RecordType, KeyType = string>
   implements CollSyncIF<RecordType, KeyType>
 {
   isAsync: false = false;
-  _sun: SunIFSync<RecordType, KeyType>;
-
-  // Define the sun property required by CollBase
-  protected get sun(): SunIF<RecordType, KeyType> {
-    return this._sun;
-  }
+  protected _sunF: (
+    coll: CollIF<RecordType, KeyType>,
+  ) => SunIFSync<RecordType, KeyType>;
 
   constructor(params: CollParms<RecordType, KeyType>) {
     const { name, sunF, schema, universe } = params;
     super(name, schema, universe);
-    this._sun = (sunF ?? memorySunF)(this);
+    this._sunF = sunF ?? memorySunF;
     if (universe) {
       universe.add(this);
     }
   }
 
-  get(identity: KeyType): RecordType | undefined {
-    return this._sun.get(identity);
+  get(key: KeyType): RecordType | undefined {
+    return this.sun.get(key);
   }
 
   has(key: KeyType): boolean {
-    return this._sun.has(key);
+    return this.sun.has(key);
   }
 
   set(key: KeyType, value: RecordType): void {
-    // Validate the record before setting it
-    this.validate(value);
-    this._sun.set(key, value);
+    this.sun.set(key, value);
+  }
+
+  delete(key: KeyType): void {
+    this.sun.delete(key);
+  }
+
+  clear(): void {
+    this.sun.clear();
+  }
+
+  values(): Generator<[KeyType, RecordType]> {
+    return this.sun.values();
+  }
+
+  find(
+    query: string | ((record: RecordType) => boolean),
+    value?: any,
+  ): Generator<[KeyType, RecordType]> {
+    if (typeof this.sun.find !== 'function') {
+      throw new Error('Find method not implemented');
+    }
+    return this.sun.find(query, value);
   }
 
   mutate(
@@ -57,58 +75,9 @@ export class CollSync<RecordType, KeyType = string>
     mutator: (
       draft: RecordType | undefined,
       collection: CollSyncIF<RecordType, KeyType>,
-    ) => RecordType | void | any,
+    ) => RecordType | undefined | MutationAction,
   ): RecordType | undefined {
-    if (typeof this._sun.mutate !== 'function') {
-      throw new Error(`collection ${this.name} sun does not support mutation`);
-    }
-    return this._sun.mutate(key, mutator);
-  }
-
-  /**
-   * Get all records as a generator of batches
-   * @returns Generator that yields batches of records
-   */
-  getAll() {
-    return this._sun.values();
-  }
-
-  values() {
-    return this._sun.values();
-  }
-
-  delete(key: KeyType) {
-    if (this._sun.delete) {
-      return this._sun.delete(key);
-    }
-    throw new Error('delete method not implemented by sun');
-  }
-  /**
-   * Find records matching a query
-   * @param query - The query to match against
-   * @returns Generator that yields [key, value] pairs
-   * @throws Error if the sun does not implement find
-   */
-  find(...args: any[]): Generator<[KeyType, RecordType]> {
-    // Process arguments
-    let query: any;
-
-    if (args.length === 2 && typeof args[0] === 'string') {
-      // Format: find(prop, value)
-      const [prop, value] = args;
-      query = { [prop]: value };
-    } else {
-      // Format: find(query) or find(predicate)
-      query = args[0];
-    }
-
-    // If the sun has a find method, use it
-    if (typeof this._sun.find === 'function') {
-      return this._sun.find(query);
-    }
-
-    // Throw an error if find is not implemented
-    throw new Error(`Find method not implemented for collection ${this.name}`);
+    return this.sun.mutate(key, (draft) => mutator(draft, this));
   }
 
   /**
@@ -124,18 +93,18 @@ export class CollSync<RecordType, KeyType = string>
       collection: CollSyncIF<RecordType, KeyType>,
     ) => RecordType,
   ): Map<KeyType, RecordType> {
-    if (typeof this._sun.map === 'function') {
-      return this._sun.map((record, key) => mapper(record, key, this));
+    if (typeof this.sun.map === 'function') {
+      return this.sun.map((record, key) => mapper(record, key, this));
     }
 
-    if (typeof this._sun.keys !== 'function') {
+    if (typeof this.sun.keys !== 'function') {
       throw new Error(
         'This collection cannot implement map: sun has no keys or map functions',
       );
     }
 
     return new Map(
-      Array.from(this._sun.keys()).map((key) => {
+      Array.from(this.sun.keys()).map((key) => {
         const record = this.get(key)!;
         return [key, mapper(record, key, this)];
       }),
@@ -168,18 +137,18 @@ export class CollSync<RecordType, KeyType = string>
     ) => void,
   ): void {
     // If the sun has an each method, use it
-    if (typeof this._sun.each === 'function') {
-      this._sun.each((record, key) => callback(record, key, this));
+    if (typeof this.sun.each === 'function') {
+      this.sun.each((record, key) => callback(record, key, this));
       return;
     }
 
     // Fallback implementation using keys
-    if (typeof this._sun.keys !== 'function') {
+    if (typeof this.sun.keys !== 'function') {
       throw new Error(
         `Each method not implemented for collection ${this.name}`,
       );
     }
-    const keys = this._sun.keys();
+    const keys = this.sun.keys();
     for (const key of keys) {
       const record = this.get(key)!;
       callback(record, key, this);
@@ -189,8 +158,8 @@ export class CollSync<RecordType, KeyType = string>
 
   count(): number {
     // If the sun has a count method, use it
-    if (typeof this._sun.count === 'function') {
-      return this._sun.count();
+    if (typeof this.sun.count === 'function') {
+      return this.sun.count();
     }
 
     // Throw an error if neither count nor keys is implemented
@@ -198,22 +167,19 @@ export class CollSync<RecordType, KeyType = string>
   }
 
   /**
-   * Get multiple records as a generator of {key, value} pairs
+   * Get multiple records as a Map
    * @param keys Array of record keys to get
-   * @returns Generator that yields records one by one
+   * @returns Map of records
    */
-  getMany(keys: KeyType[]): Generator<Map<KeyType, RecordType>> {
-    // If the sun has a getMany method, use it
-    if (typeof this._sun.getMany !== 'function') {
-      console.log(
-        'cannot getMany from sun',
-        this._sun,
-        typeof this._sun.getMany,
-      );
-      throw new Error(`sun ${this.name} does not have getMany implementation`);
+  getMany(keys: KeyType[]): Map<KeyType, RecordType> {
+    const map = new Map<KeyType, RecordType>();
+    for (const key of keys) {
+      const value = this.get(key);
+      if (value !== undefined) {
+        map.set(key, value);
+      }
     }
-
-    return this._sun.getMany(keys);
+    return map;
   }
 
   /**
@@ -223,8 +189,8 @@ export class CollSync<RecordType, KeyType = string>
    */
   setMany(recordMap: Map<KeyType, RecordType>): void {
     // If the sun has a setMany method, use it
-    if (typeof this._sun.setMany === 'function') {
-      return this._sun.setMany(recordMap);
+    if (typeof this.sun.setMany === 'function') {
+      return this.sun.setMany(recordMap);
     }
 
     recordMap.forEach((record, key) => {

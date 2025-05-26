@@ -1,9 +1,10 @@
 // a system has a collection of uniform records
 import type { Observable } from 'rxjs';
-import type { DataKey, DataRecord, SchemaLocalIF } from './type.schema';
+import type { DataKey, DataRecord, SchemaLocalIF, Pair } from './type.schema';
 import type {
   MutationAction,
   SendProps,
+  SunIF,
   TransportResult,
   UniverseName,
 } from './types.multiverse';
@@ -14,21 +15,10 @@ export interface CollBaseIF<RecordType = DataRecord, KeyType = DataKey> {
   name: CollName;
   schema: SchemaLocalIF;
   isAsync: boolean;
-  find(
-    ...query: any[]
-  ):
-    | Generator<{ key: KeyType; value: RecordType }>
-    | Generator<Map<KeyType, RecordType>>;
+  find(...query: any[]): any;
+  values(): any;
+  getMany(keys: KeyType[]): any;
   get(key: KeyType): RecordType | undefined | Promise<RecordType | undefined>;
-  values():
-    | Generator<[KeyType, RecordType]>
-    | AsyncGenerator<[KeyType, RecordType]>;
-  getMany(
-    keys: KeyType[],
-    batchSize?: number,
-  ):
-    | Generator<{ key: KeyType; value: RecordType }>
-    | Generator<Map<KeyType, RecordType>>;
   has(key: KeyType): boolean | Promise<boolean>;
   send(key: KeyType, target: UniverseName): TransportResult;
   sendAll(props: SendProps<RecordType, KeyType>): TransportResult;
@@ -39,7 +29,8 @@ export interface CollBaseIF<RecordType = DataRecord, KeyType = DataKey> {
   set(key: KeyType, value: RecordType): void | Promise<void>;
   setMany(values: Map<KeyType, RecordType>): void | Promise<void>;
   delete(key: KeyType): void | Promise<void>;
-  [Symbol.iterator](): Iterator<[KeyType, RecordType]>;
+  [Symbol.iterator](): Iterator<Pair<KeyType, RecordType>>;
+  sun: SunIF;
 }
 
 export interface CollSyncIF<RecordType = DataRecord, KeyType = DataKey>
@@ -52,10 +43,9 @@ export interface CollSyncIF<RecordType = DataRecord, KeyType = DataKey>
       collection: CollSyncIF<RecordType, KeyType>,
     ) => void,
   ): void;
-  find(...query: any[]): Generator<{ key: KeyType; value: RecordType }>;
-  get(key: KeyType): RecordType | undefined;
-  values(): Generator<[KeyType, RecordType]>;
-  getMany(keys: KeyType[]): Generator<{ key: KeyType; value: RecordType }>;
+  find(...criteria: any[]): Generator<Pair<KeyType, RecordType>>;
+  values(): Generator<Pair<KeyType, RecordType>>;
+  getMany(keys: KeyType[]): Map<KeyType, RecordType>;
   has(key: KeyType): boolean;
   isAsync: false;
   map(
@@ -63,15 +53,15 @@ export interface CollSyncIF<RecordType = DataRecord, KeyType = DataKey>
       record: RecordType,
       key: KeyType,
       collection: CollSyncIF<RecordType, KeyType>,
-    ) => RecordType | void | any,
+    ) => RecordType | void | MutationAction,
     noTransaction?: boolean,
-  ): number;
+  ): Map<KeyType, RecordType>;
   mutate(
     key: KeyType,
     mutator: (
       draft: RecordType | undefined,
       collection: CollSyncIF<RecordType, KeyType>,
-    ) => RecordType | void | any,
+    ) => RecordType | MutationAction,
   ): RecordType | undefined;
   name: CollName;
   schema: SchemaLocalIF;
@@ -84,7 +74,7 @@ export interface CollSyncIF<RecordType = DataRecord, KeyType = DataKey>
   set(key: KeyType, value: RecordType): void;
   setMany(values: Map<KeyType, RecordType>): void;
   delete(key: KeyType): void;
-  [Symbol.iterator](): Iterator<[KeyType, RecordType]>;
+  [Symbol.iterator](): Iterator<Pair<KeyType, RecordType>>;
 }
 
 export interface CollAsyncIF<RecordType = DataRecord, KeyType = DataKey>
@@ -97,13 +87,9 @@ export interface CollAsyncIF<RecordType = DataRecord, KeyType = DataKey>
       collection: CollAsyncIF<RecordType, KeyType>,
     ) => void | Promise<void>,
   ): Promise<void>;
-  find(...query: any[]): Generator<Map<KeyType, RecordType>>;
-  get(key: KeyType): Promise<RecordType | undefined>;
-  values(): AsyncGenerator<[KeyType, RecordType]>;
-  getMany(
-    keys: KeyType[],
-    batchSize?: number,
-  ): Generator<Map<KeyType, RecordType>>;
+  find(...query: any[]): AsyncGenerator<Pair<KeyType, RecordType>>;
+  values(): AsyncGenerator<Pair<KeyType, RecordType>>;
+  getMany(keys: KeyType[]): Promise<Map<KeyType, RecordType>>;
   has(key: KeyType): Promise<boolean>;
   isAsync: true;
   map(
@@ -128,10 +114,15 @@ export interface CollAsyncIF<RecordType = DataRecord, KeyType = DataKey>
   ): TransportResult;
   set(key: KeyType, value: RecordType): Promise<void>;
   setMany(input: Map<KeyType, RecordType>): Promise<void>;
-  [Symbol.iterator](): Iterator<[KeyType, RecordType]>;
+  [Symbol.iterator](): Iterator<Pair<KeyType, RecordType>>;
 }
 
 export type CollName = string;
 export type CollIF<RecordType = DataRecord, KeyType = DataKey> =
   | CollAsyncIF<RecordType, KeyType>
   | CollSyncIF<RecordType, KeyType>;
+
+export type CollSyncMutator<RecordType = DataRecord, KeyType = DataKey> = (
+  draft: RecordType | undefined,
+  collection: CollSyncIF<RecordType, KeyType>,
+) => RecordType | MutationAction;

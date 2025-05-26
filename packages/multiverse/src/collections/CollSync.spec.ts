@@ -3,11 +3,10 @@ import { FIELD_TYPES, MUTATION_ACTIONS } from '../constants';
 import { Multiverse } from '../Multiverse';
 import { SchemaLocal } from '../SchemaLocal';
 import { SchemaUniversal } from '../SchemaUniversal';
-import memoryImmerSunF from '../suns/SunMemoryImmer';
+import { memoryImmerSunF } from '../suns/SunMemoryImmer';
 import type { CollSyncIF } from '../types.coll';
 import type { UniverseIF } from '../types.multiverse';
 import { Universe } from '../Universe';
-import { deGenerateMaps } from '../utils/deGenerateMaps';
 import { CollSync } from './CollSync';
 
 // Helper function for tests
@@ -364,6 +363,7 @@ describe('CollSync', () => {
         it('should provide access to the collection in the mutator function', () => {
           // Mutate with a function that uses the collection
           coll.mutate('user1', (draft, collection) => {
+            console.log('Collection passed to mutator:', collection);
             if (draft) {
               // Get another record from the collection
               const user2 = collection.get('user2');
@@ -606,15 +606,77 @@ describe('CollSync', () => {
     });
 
     it('retrieves selected record', () => {
-      const many = deGenerateMaps(coll.getMany(['user1', 'user3']));
+      const many = coll.getMany(['user1', 'user3']);
       const keysOfMany = Array.from(many.keys()).sort();
       expect(keysOfMany).toEqual(['user1', 'user3'].sort());
     });
 
     it('only retrieves present record', () => {
-      const many = deGenerateMaps(coll.getMany(['user1', 'user300']));
+      const many = coll.getMany(['user1', 'user300']);
       const keysOfMany = Array.from(many.keys()).sort();
       expect(keysOfMany).toEqual(['user1'].sort());
+    });
+  });
+
+  describe('values', () => {
+    let univ: Universe;
+    let schema: SchemaLocal;
+    let coll: CollSync<any, string>;
+
+    beforeEach(() => {
+      univ = new Universe('test-universe');
+      schema = new SchemaLocal('users', {
+        id: { type: FIELD_TYPES.string },
+        name: { type: FIELD_TYPES.string },
+        age: { type: FIELD_TYPES.number, meta: { optional: true } },
+      });
+      coll = new CollSync({
+        name: 'users',
+        schema,
+        universe: univ,
+      });
+
+      // Set up initial data
+      coll.set('user1', { id: 'user1', name: 'John Doe', age: 30 });
+      coll.set('user2', { id: 'user2', name: 'Jane Smith', age: 25 });
+    });
+
+    it('should yield [key, value] pairs for all records', () => {
+      const values = Array.from(coll.values());
+      expect(values).toHaveLength(2);
+      expect(values).toEqual([
+        ['user1', { id: 'user1', name: 'John Doe', age: 30 }],
+        ['user2', { id: 'user2', name: 'Jane Smith', age: 25 }],
+      ]);
+    });
+
+    it('should yield empty array when no records exist', () => {
+      coll.clear();
+      const values = Array.from(coll.values());
+      expect(values).toHaveLength(0);
+    });
+
+    it('should throw if sun engine does not implement values', () => {
+      // Create a mock sun without values method
+      const mockSun = {
+        get: vi.fn(),
+        set: vi.fn(),
+        has: vi.fn(),
+        delete: vi.fn(),
+        clear: vi.fn(),
+        // No values method
+      };
+
+      // Create a collection with the mock sun
+      const mockColl = new CollSync({
+        name: 'mock-users',
+        schema,
+        universe: univ,
+        sunF: () => mockSun,
+      });
+
+      // Expect values to throw an error
+      expect(() => Array.from(mockColl.values())).toThrow();
     });
   });
 });

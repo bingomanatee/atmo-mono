@@ -5,7 +5,7 @@ import { SchemaLocal } from '../SchemaLocal';
 import type { PostParams } from '../type.schema';
 import type { CollSyncIF } from '../types.coll';
 import { Universe } from '../Universe';
-import { SunMemory } from './SunMemory';
+import sunF, { SunMemory } from './SunMemory';
 
 type User = { id: number; name: string; age?: number; email?: string };
 
@@ -23,15 +23,16 @@ describe('SunMemory', () => {
       age: { type: FIELD_TYPES.number, meta: { optional: true } },
       email: { type: FIELD_TYPES.string, meta: { optional: true } },
     });
+    console.log('---- SunMemory.spec: creating the collection');
     coll = new CollSync({
       name: 'users',
       schema,
       universe: univ,
-      sunF(coll) {
-        sun = new SunMemory<User, number>(coll);
-        return sun;
-      },
+      sunF: sunF,
     });
+    console.log('---- SunMemory.spec: created the collection');
+    sun = coll.sun;
+    console.log('----- SunMemory.spec: sun is ', !!sun);
   });
 
   describe('constructor', () => {
@@ -167,7 +168,7 @@ describe('SunMemory', () => {
         universe: univ,
       });
 
-      sun = new SunMemory<User, number>(coll);
+      sun = new SunMemory<User, number>({ coll });
     });
 
     it('should apply field filters when setting a record', () => {
@@ -221,7 +222,7 @@ describe('SunMemory', () => {
         universe: univ,
       });
 
-      sun = new SunMemory<User & { lastUpdated?: string }, number>(coll);
+      sun = new SunMemory<User & { lastUpdated?: string }, number>({ coll });
     });
 
     it('should apply record filter when setting a record', () => {
@@ -263,7 +264,7 @@ describe('SunMemory', () => {
     describe('DELETE action', () => {
       it('should delete a record when returning DELETE action with key', () => {
         // Mutate with DELETE action
-        const result = sun.mutate(1, (draft) => {
+        const result = sun.mutate(1, () => {
           return { action: MUTATION_ACTIONS.DELETE, key: 1 };
         });
 
@@ -365,7 +366,7 @@ describe('SunMemory', () => {
     });
 
     afterEach(() => {
-      consoleSpy.mockRestore();
+      consoleSpy?.mockRestore();
     });
 
     describe('Synchronous error handling', () => {
@@ -412,6 +413,57 @@ describe('SunMemory', () => {
         // Verify that the second mutation worked
         expect(sun.get(1)?.name).toBe('Updated Name');
       });
+    });
+  });
+
+  describe('values', () => {
+    beforeEach(() => {
+      // Set up initial data
+      sun.set(1, { id: 1, name: 'John Doe', age: 30 });
+      sun.set(2, { id: 2, name: 'Jane Smith', age: 25 });
+      sun.set(3, { id: 3, name: 'Bob Johnson', age: 40 });
+    });
+
+    it('should yield [key, value] pairs for all records', () => {
+      const values = Array.from(sun.values());
+      expect(values).toHaveLength(3);
+      expect(values).toEqual([
+        [1, { id: 1, name: 'John Doe', age: 30 }],
+        [2, { id: 2, name: 'Jane Smith', age: 25 }],
+        [3, { id: 3, name: 'Bob Johnson', age: 40 }],
+      ]);
+    });
+
+    it('should yield empty array when no records exist', () => {
+      sun.clear();
+      const values = Array.from(sun.values());
+      expect(values).toHaveLength(0);
+    });
+  });
+
+  describe('find', () => {
+    beforeEach(() => {
+      // Set up initial data
+      sun.set(1, { id: 1, name: 'John Doe', age: 30 });
+      sun.set(2, { id: 2, name: 'Jane Smith', age: 25 });
+      sun.set(3, { id: 3, name: 'Bob Johnson', age: 40 });
+    });
+
+    it('should find records by field value', () => {
+      const results = Array.from(sun.find('age', 30));
+      expect(results).toHaveLength(1);
+      expect(results[0]).toEqual([1, { id: 1, name: 'John Doe', age: 30 }]);
+    });
+
+    it('should find records by predicate function', () => {
+      const results = Array.from(sun.find((record) => record.age > 30));
+      expect(results).toHaveLength(1);
+      expect(results[0]).toEqual([3, { id: 3, name: 'Bob Johnson', age: 40 }]);
+    });
+
+    it('should return empty array when no records match', () => {
+      const results = Array.from(sun.find('age', 50));
+      expect(results).toHaveLength(0);
     });
   });
 });

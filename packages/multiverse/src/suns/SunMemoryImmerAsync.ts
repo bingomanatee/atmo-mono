@@ -1,10 +1,11 @@
 import { ExtendedMap } from '@wonderlandlabs/atmo-utils';
 import { produce } from 'immer';
 import { MUTATION_ACTIONS } from '../constants';
-import { isMutatorAction, isObj } from '../typeguards.multiverse';
+import { isMutatorAction, isObj, isColl } from '../typeguards.multiverse';
 import type { CollAsyncIF, CollBaseIF } from '../types.coll';
 import type { MutationAction, SunIF, SunIfAsync } from '../types.multiverse';
 import { SunBase } from './SunFBase';
+import { SunMemoryImmer } from './SunMemoryImmer';
 
 // Helper function for tests
 const delay = (fn: () => void) => setTimeout(fn, 0);
@@ -13,19 +14,42 @@ const delay = (fn: () => void) => setTimeout(fn, 0);
  * An async Sun implementation that uses Immer for immutable state management
  */
 export class SunMemoryImmerAsync<R, K>
-  extends SunBase<R, K, CollAsyncIF<R, K>>
+  extends SunMemoryImmer<R, K>
   implements SunIF<R, K>
 {
   #data = new ExtendedMap();
   #locked: boolean = false;
 
-  constructor(coll: CollAsyncIF<R, K>) {
-    super();
-    this.coll = coll;
+  constructor(coll?: CollAsyncIF<R, K>) {
+    super(coll);
+    this.#data = new ExtendedMap();
+    this.#locked = false;
+    if (coll) {
+      this.coll = coll;
+    }
   }
 
-  async find(...query: any[]): Promise<Map<K, R>> | R[] {
-    return this.#data.find(...query);
+  async *values(): AsyncIterableIterator<[K, R]> {
+    for (const [key, value] of this.#data.entries()) {
+      yield [key, value];
+    }
+  }
+
+  async *find(...query: any[]): AsyncIterableIterator<[K, R]> {
+    const [field, value] = query;
+    if (typeof field === 'function') {
+      for (const [key, record] of this.#data.entries()) {
+        if (field(record)) {
+          yield [key, record];
+        }
+      }
+    } else {
+      for (const [key, record] of this.#data.entries()) {
+        if (record[field] === value) {
+          yield [key, record];
+        }
+      }
+    }
   }
 
   async keys(): Promise<K[]> {
@@ -114,43 +138,42 @@ export class SunMemoryImmerAsync<R, K>
    * @param mutator - A function that accepts the previous record (or undefined) and the collection, and returns a new record or a mutation action
    * @returns A promise that resolves to the mutated record or undefined if deleted
    */
-  async mutate(
+  async mutateAsync(
     key: K,
     mutator: (
       draft: R | undefined,
       collection: CollAsyncIF<R, K>,
-    ) => R | void | MutationAction | Promise<R | void | MutationAction>,
+    ) => Promise<R | undefined | MutationAction>,
   ): Promise<R | undefined> {
-    this.#locked = true;
+    this._isMutating = true;
     try {
-      const record = await this.get(key);
-      // note - the mutator has to be sync even thoul this is an async Sun.
-      const result = produce(record, (draft: R) => mutator(draft, this.coll));
-      this.#locked = false;
-      return this.#afterMutate(result, key);
-    } finally {
-      // Ensure the collection is unlocked
-      this.#locked = false;
-    }
-  }
+      const current = this.get(key);
+      const result = await produce(current, async (draft) => {
+        return mutator(draft, this.coll);
+      });
 
-  /**
-   * Process the result of a mutation
-   * @param key - The key of the record
-   * @param result - The result of the mutation
-   * @returns The final record value or undefined if deleted
-   * @private
-   */
-  async #afterMutate(
-    result: R | void | MutationAction,
-    key: K,
-  ): Promise<R | undefined> {
-    // Handle special actions
-    if (isMutatorAction(result)) {
-      return this.#processAction(result as MutationAction, key);
+      if (result === undefined) {
+        this.delete(key);
+        return undefined;
+      }
+
+      if (typeof result === 'object' && result !== null) {
+        if ('action' in result) {
+          switch (result.action) {
+            case 'DELETE':
+              this.delete(result.key ?? key);
+              return undefined;
+            case 'NOOP':
+              return current;
+          }
+        }
+      }
+
+      this.set(key, result);
+      return result;
+    } finally {
+      this._isMutating = false;
     }
-    await this.set(key, result);
-    return this.get(key);
   }
 
   async delete(key: K) {
@@ -175,27 +198,8 @@ export class SunMemoryImmerAsync<R, K>
     this.#data.clear();
   }
 
-  #processAction(action: MutationAction, key: K): void {
-    switch (action.key) {
-      case MUTATION_ACTIONS.DELETE:
-        this.delete(key);
-        return undefined;
-        break;
-
-      case MUTATION_ACTIONS.NOOP:
-        break;
-    }
-
-    return this.get(key);
-    // NOOP action does nothing
-  }
-
   [Symbol.iterator]() {
     return this.#data.entries();
-  }
-
-  findAll() {
-    return this;
   }
 }
 

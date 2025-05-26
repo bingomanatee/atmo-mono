@@ -19,6 +19,7 @@ export abstract class CollBase<RecordType, KeyType = string>
   name: string;
   protected universe: UniverseIF;
   schema: SchemaLocalIF;
+  protected _sun?: SunIF<RecordType, KeyType>;
 
   constructor(name: string, schema: SchemaLocalIF, universe: UniverseIF) {
     this.name = name;
@@ -29,7 +30,27 @@ export abstract class CollBase<RecordType, KeyType = string>
   /**
    * The sun that powers this collection
    */
-  protected abstract sun: SunIF<RecordType, KeyType>;
+  public get sun(): SunIF<RecordType, KeyType> {
+    if (!this._sun) {
+      if (!this._sunF) {
+        throw new Error('Sun factory function is not set');
+      }
+      // Create sun and set up references via factory
+      this._sun = this._sunF(this);
+      console.log('called sunf; _sun is ', !!this._sun);
+      if (!this._sun) {
+        throw new Error('Sun factory function returned undefined');
+      }
+      // Set the collection reference and initialize sun
+      this._sun.init(this);
+      console.log('sun initialized');
+    }
+    return this._sun;
+  }
+
+  protected abstract _sunF: (
+    coll: CollIF<RecordType, KeyType>,
+  ) => SunIF<RecordType, KeyType>;
 
   /**
    * Get a record by key

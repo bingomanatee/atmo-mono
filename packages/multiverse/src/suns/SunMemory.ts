@@ -6,20 +6,31 @@ import type { MutationAction, SunIFSync } from '../types.multiverse';
 import { matchesQuery } from '../utils.sun';
 import { applyFieldFilters } from './applyFieldFilters';
 import { SunBase } from './SunFBase';
+import type { Pair } from '../type.schema';
+import { CollName } from '../types.coll';
+import type { SchemaLocalIF } from '../type.schema';
+import { isColl } from '../typeguards.multiverse';
+import { v4 as uuidv4 } from 'uuid';
 
 export class SunMemory<RecordType, KeyType>
   extends SunBase<RecordType, KeyType, CollSyncIF<RecordType, KeyType>>
   implements SunIFSync<RecordType, KeyType>
 {
-  // Private data storage
+  readonly id: CollName;
+  readonly isAsync = false;
   #data: ExtendedMap<KeyType, RecordType>;
-  id: string;
+  coll?: CollSyncIF<RecordType, KeyType>;
 
-  constructor(coll: CollSyncIF<RecordType, KeyType>) {
+  constructor(props: {
+    schema: SchemaLocalIF<RecordType>;
+    coll?: CollSyncIF<RecordType, KeyType>;
+  }) {
     super();
-    this.coll = coll;
+    this.id = props.coll?.schema?.name ?? uuidv4();
     this.#data = new ExtendedMap();
-    this.id = 'sun' + Math.random();
+    if (props.coll) {
+      this.coll = props.coll;
+    }
   }
 
   #batchSize = 30;
@@ -29,8 +40,7 @@ export class SunMemory<RecordType, KeyType>
    * @param key - The key of the record to get
    * @returns The record or undefined if not found
    */
-
-  get(key: KeyType) {
+  get(key: KeyType): RecordType | undefined {
     return this.#data.get(key);
   }
 
@@ -39,7 +49,10 @@ export class SunMemory<RecordType, KeyType>
   }
 
   set(key: KeyType, record: RecordType) {
-    if (this._locked) {
+    if (!this.coll) {
+      throw new Error('SunMemory: collection not set');
+    }
+    if (this._locked && !this._isMutating) {
       throw new Error(
         'cannot set during locked operations - usually mutations',
       );
@@ -62,15 +75,13 @@ export class SunMemory<RecordType, KeyType>
       }
     }
 
-    // Skip validation here since it's now done at the collection level
-
     // Store the processed record
     this.#data.set(key, processedRecord);
   }
 
   delete(key: KeyType) {
-    // If the collection is locked, queue the delete operation
-    if (this._locked) {
+    // If the collection is locked and not in a mutation, queue the delete operation
+    if (this._locked && !this._isMutating) {
       throw new Error('cannot delete during lock -- usually during mutation');
     }
 
@@ -78,7 +89,7 @@ export class SunMemory<RecordType, KeyType>
   }
 
   clear() {
-    if (this._locked) {
+    if (this._locked && !this._isMutating) {
       throw new Error('cannot clear during lock -- usually during mutation');
     }
 
@@ -96,14 +107,9 @@ export class SunMemory<RecordType, KeyType>
   /**
    * Find records matching a query
    * @param query The query to match against
-   * @returns A generator of {key, value} pairs for matching records
+   * @returns A generator of Pair<KeyType, RecordType> for matching records
    */
-  /**
-   * Find records matching a query
-   * @param query The query to match against
-   * @returns A generator that yields batches of matching records
-   */
-  *find(...query: any[]): Generator<[KeyType, RecordType]> {
+  *find(...query: any[]): Generator<Pair<KeyType, RecordType>> {
     for (const [key, value] of this.#data.entries()) {
       if (matchesQuery(value, key, query)) {
         yield [key, value];
@@ -137,41 +143,19 @@ export class SunMemory<RecordType, KeyType>
   }
 
   /**
-   * Get multiple records as a generator of batches
+   * Get multiple records as a Map
    * @param keys Array of record keys to get
-   * @returns Generator that yields batches of records and can receive control signals
+   * @returns Map of records
    */
-  *getMany(keys: KeyType[]): Generator<Map<KeyType, RecordType>, void, any> {
-    // Create batches of records
-    let currentBatch: Map<KeyType, RecordType>;
-    //@TODO: find?
-    // Yield each record from the keys array
+  getMany(keys: KeyType[]): Map<KeyType, RecordType> {
+    const map = new Map<KeyType, RecordType>();
     for (const key of keys) {
       const value = this.#data.get(key);
-      if (!currentBatch) {
-        currentBatch = new Map();
-      }
-      currentBatch.set(key, value);
-
-      // If we've reached the batch size, yield the batch
-      if (currentBatch.size >= this.#batchSize) {
-        const feedback = yield currentBatch;
-
-        // Reset for next batch
-        currentBatch = new Map<KeyType, RecordType>();
-
-        // Check for termination signal
-        if (feedback === STREAM_ACTIONS.TERMINATE) {
-          return;
-        }
+      if (value !== undefined) {
+        map.set(key, value);
       }
     }
-
-    if (!currentBatch) {
-      yield new Map();
-    } else if (currentBatch.size) {
-      yield currentBatch;
-    }
+    return map;
   }
 
   /**
@@ -206,20 +190,15 @@ export class SunMemory<RecordType, KeyType>
       key: KeyType,
       collection: CollSyncIF<RecordType, KeyType>,
     ) => RecordType | void | MutationAction,
+    noTransaction?: boolean,
   ): Map<KeyType, RecordType> {
-    // If noTransaction is true, apply changes immediately
-    const map = new Map();
-
-    try {
-      this.#data.forEach((record, key) => {
-        map.set(key, mapper(record, key, this.coll));
-      });
-    } catch (err) {
-      const error = asError(err);
-      error.successCount = map.size;
-      throw error;
+    const map = new Map<KeyType, RecordType>();
+    for (const [key, record] of this.#data.entries()) {
+      const result = mapper(record, key, this.coll);
+      if (result !== undefined) {
+        map.set(key, result as RecordType);
+      }
     }
-
     return map;
   }
 
@@ -237,55 +216,74 @@ export class SunMemory<RecordType, KeyType>
       collection: CollSyncIF<RecordType, KeyType>,
     ) => RecordType | MutationAction,
   ): RecordType | undefined {
-    // Lock the collection during mutation
+    if (this._locked) {
+      throw new Error('Cannot mutate while locked');
+    }
+
     this._locked = true;
-
     try {
-      const existing = this.#data.get(key);
-      const result = mutator(existing, this.coll);
+      const current = this.get(key);
+      const result = mutator(current, this.coll);
       this._locked = false;
-      return this._afterMutate(key, result);
+      if (isMutatorAction(result)) {
+        if (result.action === MUTATION_ACTIONS.DELETE) {
+          const keyToDelete = result.key ?? key;
+          this.delete(keyToDelete);
+          return undefined;
+        } else if (result.action === MUTATION_ACTIONS.NOOP) {
+          return current;
+        }
+      }
+
+      this.set(key, result);
+      return result;
     } finally {
-      // Unlock the collection
       this._locked = false;
     }
   }
 
-  /**
-   * Process the result of a mutation
-   * @param key - The key of the record
-   * @param result - The result of the mutation
-   * @returns The final record value or undefined if deleted
-   * @private
-   */
-  protected _afterMutate(
-    key: KeyType,
-    result: RecordType | MutationAction,
-  ): RecordType | undefined {
-    // Handle special actions
-    if (isMutatorAction(result)) {
-      // For DELETE action, return undefined
-      if ((result as MutationAction).action === MUTATION_ACTIONS.DELETE) {
-        this.delete(key);
-        return undefined;
-      }
-
-      // For NOOP action, return the current value
-      if ((result as MutationAction).action === MUTATION_ACTIONS.NOOP) {
-        return this.get(key);
-      }
+  *values(): Generator<Pair<KeyType, RecordType>> {
+    for (const [key, value] of this.#data.entries()) {
+      yield [key, value];
     }
-    this.set(key, result);
-    return this.get(key); // should equal result but ...
   }
 
-  *values(): Generator<Map<KeyType, RecordType>> {
-    yield new Map(this.#data.entries());
+  get name(): CollName {
+    return this.id;
+  }
+
+  send(key: KeyType, target: string): any {
+    throw new Error('Method not implemented.');
+  }
+
+  sendAll(props: any): any {
+    throw new Error('Method not implemented.');
+  }
+
+  sendMany(keys: KeyType[], props: any): any {
+    throw new Error('Method not implemented.');
+  }
+
+  _afterMutate(action: MutationAction): any {
+    switch (action) {
+      case STREAM_ACTIONS.CREATE:
+        return this.values();
+      case STREAM_ACTIONS.UPDATE:
+        return this.values();
+      case STREAM_ACTIONS.DELETE:
+        return this.values();
+      default:
+        return undefined;
+    }
   }
 }
 
 export default function memorySunF<R, K>(
-  coll: CollSyncIF<R, K>,
+  coll?: CollSyncIF<R, K>,
 ): SunIFSync<R, K> {
-  return new SunMemory<R, K>(coll);
+  const sun = new SunMemory({
+    schema: coll?.schema,
+    coll,
+  });
+  return sun;
 }

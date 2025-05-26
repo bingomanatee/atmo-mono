@@ -1,6 +1,6 @@
 import { ExtendedMap } from '@wonderlandlabs/atmo-utils';
 import { MUTATION_ACTIONS, STREAM_ACTIONS } from '../constants';
-import { isMutatorAction, isObj } from '../typeguards.multiverse';
+import { isMutatorAction, isObj, isColl } from '../typeguards.multiverse';
 import type { CollAsyncIF } from '../types.coll';
 import type { MutationAction, SunIF, SunIfAsync } from '../types.multiverse';
 import { matchesQuery } from '../utils.sun';
@@ -14,10 +14,12 @@ export class SunMemoryAsync<RecordType, KeyType>
   #batchSize = 30;
   #data: ExtendedMap<KeyType, RecordType>;
 
-  constructor(coll: CollAsyncIF<RecordType, KeyType>) {
+  constructor(coll?: CollAsyncIF<RecordType, KeyType>) {
     super();
-    this.coll = coll;
     this.#data = new ExtendedMap<KeyType, RecordType>();
+    if (coll) {
+      this.coll = coll;
+    }
   }
 
   async get(key: KeyType) {
@@ -248,7 +250,7 @@ export class SunMemoryAsync<RecordType, KeyType>
   }
 }
 
-export default function memoryAsyncSunF<R, K>(
+export function memoryAsyncSunF<R, K>(
   coll: CollAsyncIF<R, K>,
 ): SunIfAsync<R, K> {
   return new SunMemoryAsync<R, K>(coll);

@@ -102,3 +102,5 @@ export type PostParams = {
 };
 
 export type UnivSchemaMap = Map<CollName, SchemaUnivIF>;
+
+export type Pair<K, V> = [K, V];

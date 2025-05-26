@@ -763,9 +763,7 @@ export class Multiverse implements MultiverseIF {
     const { listener, generator, fromU, toU } = props;
 
     let subscription = listener ? feedbackStream.subscribe(listener) : null;
-    let data: IteratorResult<Map<KeyType, RecordType>>;
     let outBatchSize = toColl.batchSize ?? 30;
-
     let outMap = new Map();
     let total = 0;
 
@@ -807,50 +805,44 @@ export class Multiverse implements MultiverseIF {
     };
 
     try {
-      do {
-        data = generator.next();
-        if (data.done) break;
-        const dataMap = data.value;
+      for (const [key, value] of generator) {
+        if (value) {
+          try {
+            // Convert to universal format
+            const universalRecord = this.toUniversal(
+              value,
+              fromColl as CollBaseIF,
+              fromU,
+            );
 
-        for (const [key, value] of dataMap) {
-          if (value) {
-            try {
-              // Convert to universal format
-              const universalRecord = this.toUniversal(
-                value,
-                fromColl as CollBaseIF,
-                fromU,
-              );
+            // Convert to target format
+            const targetRecord = this.toLocal(
+              universalRecord,
+              toColl as CollBaseIF,
+              toU,
+            );
 
-              // Convert to target format
-              const targetRecord = this.toLocal(
-                universalRecord,
-                toColl as CollBaseIF,
-                toU,
-              );
-
-              outMap.set(key, targetRecord);
-              if (flush()) {
-                completeAndCleanup();
-                return subscription;
-              }
-            } catch (error) {
-              // Convert the error to an Error object if it's not already
-              const errorObj =
-                error instanceof Error ? error : new Error(String(error));
-
-              feedbackStream.next({
-                total,
-                error: errorObj,
-              });
-
-              // Complete the stream when there's an error
+            outMap.set(key, targetRecord);
+            if (flush()) {
               completeAndCleanup();
               return subscription;
             }
-          } // if value
-        } // for
-      } while (!data?.done);
+          } catch (error) {
+            // Convert the error to an Error object if it's not already
+            const errorObj =
+              error instanceof Error ? error : new Error(String(error));
+
+            feedbackStream.next({
+              total,
+              error: errorObj,
+            });
+
+            // Complete the stream when there's an error
+            completeAndCleanup();
+            return subscription;
+          }
+        } // if value
+      } // for
 
       flush(true);
 

@@ -1,6 +1,8 @@
 import { MUTATION_ACTIONS_VALUES } from './constants';
 import type { FieldBaseIF } from './type.schema';
 import type { MutationAction } from './types.multiverse';
+import type { CollIF } from './types.coll';
+import { CollBase } from './collections/CollBase';
 
 export function isObj(value: unknown): value is object {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -37,4 +39,20 @@ export function isMutatorAction(value: unknown): value is MutationAction {
   }
 
   return MUTATION_ACTIONS_VALUES.includes(obj.action as symbol);
+}
+
+// Type guard for collection objects
+export function isColl(obj: any): obj is CollIF {
+  if (!obj || typeof obj !== 'object') return false;
+  if (typeof obj.name !== 'string') return false;
+  if (!obj.schema || typeof obj.schema !== 'object') return false;
+  if (typeof obj.isAsync !== 'boolean') return false;
+
+  // Core methods from CollBaseIF - only check essential ones
+  if (typeof obj.get !== 'function') return false;
+  if (typeof obj.set !== 'function') return false;
+  if (typeof obj.has !== 'function') return false;
+  if (typeof obj.delete !== 'function') return false;
+
+  return true;
 }

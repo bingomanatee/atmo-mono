@@ -12,7 +12,6 @@ import type {
 } from './streaming.types';
 import { Universe } from './Universe';
 import { generatorToMap } from './utils.sun';
-import { deGenerateMaps } from './utils/deGenerateMaps';
 
 describe('Streaming Data Transport', () => {
   let multiverse: Multiverse;
@@ -227,7 +226,7 @@ describe('Streaming Data Transport', () => {
     it('should stream records from server to client', async () => {
       // Get a generator of users from the server
       const userGenerator = serverUsers.values();
-      const clients = deGenerateMaps(clientUniverse.get('users')!.values());
+      const clients = new Map(clientUniverse.get('users')!.values());
       expect(clients.size).toBe(0);
 
       // Transport the generator to the client
@@ -251,7 +250,7 @@ describe('Streaming Data Transport', () => {
         });
       });
 
-      const newClients = deGenerateMaps(clientUniverse.get('users')!.values());
+      const newClients = new Map(clientUniverse.get('users')!.values());
       expect(newClients.size).toBe(5);
 
       expect(newClients.get(5)).toEqual({
@@ -286,7 +285,9 @@ describe('Streaming Data Transport', () => {
             next(msg) {
               if (msg.error) {
                 expect(msg.error).toBeInstanceOf(Error);
-                expect(msg.error.message).toMatch(/email/);
+                expect(msg.error.message).toMatch(
+                  /must be a valid email address/,
+                );
 
                 // Clean up subscription and resolve the promise
                 subscription?.unsubscribe();
