@@ -5,6 +5,7 @@ import type {
   SchemaLocalIF,
   SunIfAsync,
   UniverseIF,
+  UniverseName,
 } from '../types.multiverse';
 import { CollBase } from './CollBase';
 
@@ -30,6 +31,7 @@ export class CollAsync<RecordType, KeyType = string>
     this._sunF = sunF ?? memoryAsyncSunF;
     if (universe) {
       universe.add(this);
+      this.universe = universe;
     }
   }
 
@@ -182,13 +184,17 @@ export class CollAsync<RecordType, KeyType = string>
   }
 
   async send(key: KeyType, target: UniverseName) {
-    if (!this._universe.multiverse) {
+    if (!this.universe) {
+      throw new Error('Universe not set in CollAsync');
+    }
+
+    if (!this.universe.multiverse) {
       throw new Error(
-        'CollSync.send: multiverse not set on universe ' + this._universe.name,
+        'CollSync.send: multiverse not set on universe ' + this.universe.name,
       );
     }
 
-    const multiverse = this._universe.multiverse;
-    return multiverse.transport(key, this.name, this._universe.name, target);
+    const multiverse = this.universe.multiverse;
+    return multiverse.transport(key, this.name, this.universe.name, target);
   }
 }

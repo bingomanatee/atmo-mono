@@ -13,7 +13,7 @@ describe('SunMemoryAsync', () => {
   let univ: Universe;
   let schema: SchemaLocal;
   let coll: CollAsyncIF<User, number>;
-
+  let sun;
   beforeEach(() => {
     univ = new Universe('test-universe');
     schema = new SchemaLocal('users', {
@@ -28,6 +28,7 @@ describe('SunMemoryAsync', () => {
       universe: univ,
       sunF: sunF,
     });
+    sun = coll.sun;
   });
 
   describe('constructor', () => {

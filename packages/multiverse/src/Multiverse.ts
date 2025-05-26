@@ -222,9 +222,8 @@ export class Multiverse implements MultiverseIF {
         );
       }
 
-      // Skip exportOnly fields when converting from universal to local
       if (fieldDef.exportOnly) {
-        continue; // Skip exportOnly fields when converting to local
+        continue;
       }
 
       // Use lodash get to support nested paths

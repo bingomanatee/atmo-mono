@@ -4,7 +4,6 @@ import type { CollIF, CollSyncIF } from '../types.coll';
 import type {
   SchemaLocalIF,
   SendProps,
-  SunIF,
   SunIFSync,
   TransportResult,
   UniverseIF,
@@ -23,14 +22,13 @@ export class CollSync<RecordType, KeyType = string>
   implements CollSyncIF<RecordType, KeyType>
 {
   isAsync: false = false;
-  protected _sunF: (
-    coll: CollIF<RecordType, KeyType>,
-  ) => SunIFSync<RecordType, KeyType>;
-
+  protected _sunF = memorySunF;
   constructor(params: CollParms<RecordType, KeyType>) {
     const { name, sunF, schema, universe } = params;
     super(name, schema, universe);
-    this._sunF = sunF ?? memorySunF;
+    if (sunF) {
+      this._sunF = sunF;
+    }
     if (universe) {
       universe.add(this);
     }

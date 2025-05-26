@@ -3,7 +3,7 @@ import { FIELD_TYPES, MUTATION_ACTIONS } from '../constants';
 import { Multiverse } from '../Multiverse';
 import { SchemaLocal } from '../SchemaLocal';
 import { SchemaUniversal } from '../SchemaUniversal';
-import { memoryImmerAsyncSunF } from '../suns/SunMemoryImmerAsync';
+import { memoryAsyncSunF } from '../suns/SunMemoryAsync';
 import type { CollAsyncIF } from '../types.coll';
 import type { UniverseIF } from '../types.multiverse';
 import { Universe } from '../Universe';
@@ -101,7 +101,6 @@ describe('CollAsync', () => {
       it('should throw an error if multiverse is not set', async () => {
         const u = new Universe('default');
         const c = new CollAsync<User, number>(collDef(u));
-
         await c.set(1, { id: 1, name: 'foo', zip_code: 12345 });
 
         await expect(c.send(1, 'target')).rejects.toThrow(/multiverse not set/);
@@ -264,6 +263,7 @@ describe('CollAsync', () => {
         delete: vi.fn(),
         clear: vi.fn(),
         // No find method
+        init: vi.fn(),
       };
 
       // Create a collection with the mock sun
@@ -349,7 +349,7 @@ describe('CollAsync', () => {
         name: 'users',
         schema,
         universe: univ,
-        sunF: memoryImmerAsyncSunF,
+        sunF: memoryAsyncSunF,
       });
 
       // Set up initial data

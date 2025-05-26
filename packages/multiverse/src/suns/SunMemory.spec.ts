@@ -23,16 +23,13 @@ describe('SunMemory', () => {
       age: { type: FIELD_TYPES.number, meta: { optional: true } },
       email: { type: FIELD_TYPES.string, meta: { optional: true } },
     });
-    console.log('---- SunMemory.spec: creating the collection');
     coll = new CollSync({
       name: 'users',
       schema,
       universe: univ,
       sunF: sunF,
     });
-    console.log('---- SunMemory.spec: created the collection');
     sun = coll.sun;
-    console.log('----- SunMemory.spec: sun is ', !!sun);
   });
 
   describe('constructor', () => {

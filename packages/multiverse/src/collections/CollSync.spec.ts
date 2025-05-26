@@ -7,6 +7,7 @@ import type { CollSyncIF } from '../types.coll';
 import type { UniverseIF } from '../types.multiverse';
 import { Universe } from '../Universe';
 import { CollSync } from './CollSync';
+import memoryImmerSunF from '../suns/SunMemoryImmer';
 
 // Helper function for tests
 const delayMs = (ms: number) =>
@@ -292,7 +293,6 @@ describe('CollSync', () => {
           name: 'users',
           schema,
           universe: univ,
-          sunF: memoryImmerSunF,
         });
 
         // Set up initial data
@@ -364,7 +364,6 @@ describe('CollSync', () => {
         it('should provide access to the collection in the mutator function', () => {
           // Mutate with a function that uses the collection
           coll.mutate('user1', (draft, collection) => {
-            console.log('Collection passed to mutator:', collection);
             if (draft) {
               // Get another record from the collection
               const user2 = collection.get('user2');

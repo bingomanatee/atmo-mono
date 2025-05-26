@@ -136,7 +136,7 @@ describe('Multiverse field mapping', () => {
       complexUniverse.add(complexCollection);
     });
 
-    it.skip('should map universal fields to local fields using univFields', () => {
+    it('should map universal fields to local fields using univFields', () => {
       // Create a universal record
       const universalRecord = {
         id: 'item1',
