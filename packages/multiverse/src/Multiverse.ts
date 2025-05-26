@@ -1,7 +1,6 @@
 import { asError } from '@wonderlandlabs/atmo-utils';
 import { get, set } from 'lodash-es';
 import { Subject, Subscription } from 'rxjs';
-import { FIELD_TYPES } from './constants';
 import type {
   CollBaseIF,
   DataRecord,
@@ -46,50 +45,23 @@ export class Multiverse implements MultiverseIF {
     record: any,
     collection: CollBaseIF,
     fromUnivName: string,
+    key: KeyType,
   ): ToRecord {
     // @ts-ignore
     const out: ToRecord = {};
 
     // Get the existing record if possible (for currentValue)
-    let existingRecord: any = undefined;
-    if (record && record.id) {
-      try {
-        existingRecord = collection.get(record.id);
-      } catch (e) {
-        // If we can't get the existing record, that's okay
-        // We'll just use undefined for currentValue
-      }
-    }
+    let existingRecord = collection.get(key);
 
     // Get the field map which now includes univFields mappings
     const map = this.localToUnivFieldMap(collection, fromUnivName);
 
     // Process all field mappings including nested paths from univFields
-    for (const localName of Object.keys(map)) {
-      const universalName = map[localName];
-
-      // For nested paths like 'metadata.createdAt', we need to find the parent field
-      const parentFieldName = localName.includes('.')
-        ? localName.split('.')[0]
-        : localName;
-
-      const fieldDef = collection.schema.fields[
-        parentFieldName
-      ] as FieldLocalIF;
-
-      // Throw an error if the field definition is not present
-      if (!fieldDef) {
-        throw new Error(
-          `Field definition for '${parentFieldName}' not found in schema for collection '${collection.name}'`,
-        );
-      }
-
-      // Use lodash get to support nested paths like 'position.x' or 'metadata.createdAt'
+    for (const [localName, universalName] of Object.entries(map)) {
+      const fieldDef = collection.schema.fields[localName] as FieldLocalIF;
       // @ts-ignore
-      out[universalName] = get(record, localName);
 
-      // Apply export function if it exists and this is not a nested path
-      if (fieldDef.export && localName === parentFieldName) {
+      if (fieldDef?.export) {
         // @ts-ignore
         out[universalName] = fieldDef.export({
           currentRecord: existingRecord,
@@ -101,42 +73,8 @@ export class Multiverse implements MultiverseIF {
           newValue: get(record, localName),
           field: fieldDef,
         });
-      }
-    }
-
-    // Process exportOnly fields - these are fields that are only used during toUniversal conversion
-    // They might not exist in the record but can be generated via filters
-    for (const fieldName of Object.keys(collection.schema.fields)) {
-      const fieldDef = collection.schema.fields[fieldName] as FieldLocalIF;
-
-      // Throw an error if the field definition is not present
-      if (!fieldDef) {
-        throw new Error(
-          `Field definition for '${fieldName}' not found in schema for collection '${collection.name}'`,
-        );
-      }
-
-      // Process exportOnly fields
-      if (fieldDef.exportOnly && fieldDef.universalName) {
-        if (fieldDef.export) {
-          // If there's an export function, use it to generate the value
-          // @ts-ignore
-          out[fieldDef.universalName] = fieldDef.export({
-            currentRecord: existingRecord,
-            univName: fromUnivName,
-            inputRecord: record,
-            currentValue: existingRecord
-              ? get(existingRecord, fieldName)
-              : undefined,
-            newValue: get(record, fieldName),
-            field: fieldDef,
-          });
-        } else {
-          // If there's no export function, use lodash get to access the value using the field name
-          // This allows for dot notation paths like 'position.x'
-          // @ts-ignore
-          out[fieldDef.universalName] = get(record, fieldName);
-        }
+      } else {
+        set(out, universalName, get(record, localName));
       }
     }
 
@@ -147,163 +85,46 @@ export class Multiverse implements MultiverseIF {
     const out: Record<string, any> = {};
     const map = this.univToLocalFieldMap(coll, univName);
 
-    // First pass: Initialize all complex fields marked as isLocal
-    for (const fieldName of Object.keys(coll.schema.fields)) {
-      const fieldDef = coll.schema.fields[fieldName] as FieldLocalIF;
-
-      if (fieldDef?.isLocal && !fieldDef.exportOnly) {
-        // Initialize complex fields
-        switch (fieldDef.type) {
-          case FIELD_TYPES.object:
-            // If the field has an import function, use it
-            if (fieldDef.import) {
-              const importedValue = fieldDef.import({
-                value: {},
-                inputRecord: out,
-                currentRecord: record,
-              });
-
-              if (importedValue !== undefined) {
-                set(out, fieldName, importedValue);
-              } else {
-                // Default to empty object if import returns undefined
-                set(out, fieldName, {});
-              }
-            } else {
-              // Create an empty object
-              set(out, fieldName, {});
-
-              /* REDUNDANT CODE - Kept for reference
-              // If the field has univFields, map universal fields to local fields
-              if (
-                fieldDef.univFields &&
-                Object.keys(fieldDef.univFields).length > 0
-              ) {
-                const subObject = get(out, fieldName);
-                // Map local field names to universal field names
-                for (const [
-                  localFieldName,
-                  universalFieldName,
-                ] of Object.entries(fieldDef.univFields)) {
-                  // Get the value from the universal record
-                  if (record[universalFieldName] !== undefined) {
-                    subObject[localFieldName] = record[universalFieldName];
-                  }
-                }
-              }
-              */
-              // Note: We don't need to process univFields here anymore
-              // as they are now handled by the univToLocalFieldMap method
-            }
-            break;
-          case FIELD_TYPES.array:
-            set(out, fieldName, []);
-            break;
-        }
-      }
-    }
-
     // Process all field mappings from the map
     for (const univField of Object.keys(map)) {
       const localField = map[univField];
+      set(out, localField, get(record, univField));
+    }
 
-      // For nested paths like 'metadata.createdAt', we need to find the parent field
-      const parentFieldName = localField.includes('.')
-        ? localField.split('.')[0]
-        : localField;
-
-      // Get the field definition using the parent field name
-      const fieldDef = coll.schema.fields[parentFieldName] as FieldLocalIF;
-
-      // Throw an error if the field definition is not present
-      if (!fieldDef) {
-        throw new Error(
-          `Field definition for local field '${parentFieldName}' (mapped from universal field '${univField}') not found in schema for collection '${coll.name}'`,
-        );
-      }
-
-      if (fieldDef.exportOnly) {
-        continue;
-      }
-
-      // Use lodash get to support nested paths
-      const value = get(record, univField);
-
-      // Apply field-level import if it exists, otherwise fall back to filter
-      // Only apply these functions for non-nested fields (direct fields)
-      const finalValue =
-        localField === parentFieldName && fieldDef.import
-          ? fieldDef.import({ value, inputRecord: out, currentRecord: record })
-          : localField === parentFieldName && fieldDef.filter
-            ? fieldDef.filter({
-                value,
-                inputRecord: out,
-                currentRecord: record,
-              })
-            : value;
-
-      // Use lodash set to support nested paths in the output object
-      if (localField.includes('.')) {
-        // Check if this is a nested field with exportOnly
-        const nestedFieldPath = localField;
-        const nestedFieldDef = coll.schema.fields[
-          nestedFieldPath
-        ] as FieldLocalIF;
-
-        // Skip if this is an exportOnly field
-        if (nestedFieldDef?.exportOnly) {
-          continue;
+    // First pass: Initialize all complex fields marked as isLocal
+    for (const [fieldName, fieldDef] of Object.entries(coll.schema.fields)) {
+      if (typeof fieldDef.import === 'function') {
+        const importedValue = fieldDef.import({
+          value: get(out, fieldName),
+          inputRecord: out,
+          currentRecord: record,
+        });
+        if (importedValue !== undefined) {
+          set(out, fieldName, importedValue);
         }
-
-        // Ensure parent object exists before setting nested property
-        const parentField = localField.split('.')[0];
-        if (!get(out, parentField)) {
-          set(out, parentField, {});
-        }
-        set(out, localField, finalValue);
-      } else {
-        out[localField] = finalValue;
       }
     }
 
-    // Apply the schema's import function if it exists, otherwise fall back to filterRecord
-    if (coll.schema.import) {
-      return coll.schema.import({
-        inputRecord: out,
-        currentRecord: record,
-        univName,
-      });
-    } else if (coll.schema.filterRecord) {
-      return coll.schema.filterRecord({
-        inputRecord: out,
-        currentRecord: record,
-        univName,
-      });
-    }
-
-    // Check if the universal schema has an import function
-    const universalSchema = this.baseSchemas.get(coll.name);
-    if (universalSchema?.import) {
-      const importedRecord = universalSchema.import({
-        inputRecord: out,
-        currentRecord: record,
-        univName,
-      });
-
-      // Copy the imported record properties to the output record
-      if (importedRecord && typeof importedRecord === 'object') {
-        Object.assign(out, importedRecord);
+    try {
+      // Use the collection's validate method
+      if (typeof coll.validate === 'function') {
+        coll.validate(out);
       }
+    } catch (error) {
+      // Wrap the validation error with more context
+      console.error(
+        'cannot validate local ',
+        univName,
+        ' record:',
+        out,
+        'mapped from universal record ',
+        record,
+        'with',
+        map,
+        asError(error).message,
+      );
+      throw new Error(`toLocal validation failure: ${error.message}`);
     }
-
-    // Skip validation during development
-    // try {
-    //   // Use the collection's validate method
-    //   coll.validate(out);
-    // } catch (error) {
-    //   // Wrap the validation error with more context
-    //   throw new Error(`toLocal validation failure: ${error.message}`);
-    // }
 
     return out;
   }
@@ -339,99 +160,32 @@ export class Multiverse implements MultiverseIF {
       );
     }
 
-    // First pass: Process univFields mappings from complex local fields
-    // Build a map of universal field names to local field paths
-    const univFieldsMap = new Map<string, string>();
-
     for (const fieldName of Object.keys(collection.schema.fields)) {
       const fieldDef = collection.schema.fields[fieldName] as FieldLocalIF;
-
+      let nestedPath;
       // Check if the field has univFields and is a complex local field
-      if (
-        fieldDef?.isLocal &&
-        fieldDef.univFields &&
-        Object.keys(fieldDef.univFields).length > 0
-      ) {
+      if (fieldDef.univFields) {
         // For each univField mapping, create a path to the nested field
-        for (const [localFieldName, universalFieldName] of Object.entries(
+        for (const [localFieldName, univFieldName] of Object.entries(
           fieldDef.univFields,
         )) {
           // Create a path like 'metadata.createdAt' -> 'created_at'
-          const nestedPath = `${fieldName}.${localFieldName}`;
-          univFieldsMap.set(universalFieldName, nestedPath);
-
-          // Add the mapping
-          mappings[nestedPath] = universalFieldName;
+          nestedPath = `${fieldName}.${localFieldName}`;
+          mappings[nestedPath] = univFieldName;
         }
+      } else if (fieldDef.universalName) {
+        mappings[fieldName] = fieldDef.universalName;
+      } else {
+        mappings[fieldName] = fieldName;
       }
     }
 
     // Second pass: Process regular field mappings
     for (const universalName of Object.keys(univSchema.fields)) {
       // Skip if this field is already mapped via univFields
-      if (univFieldsMap.has(universalName)) {
-        continue;
+      if (!Array.from(Object.values(mappings).includes(universalName))) {
+        throw new Error(`universal field ${universalName} not mapped`);
       }
-
-      // First, try to find a field with matching universalName
-      let collectionField = Array.from(
-        Object.values(collection.schema.fields),
-      ).find((f) => f.universalName === universalName) as FieldLocalIF;
-
-      // If not found, try to find a field with the same name as the universal field
-      if (!collectionField) {
-        collectionField = collection.schema.fields[
-          universalName
-        ] as FieldLocalIF;
-      }
-
-      // If still not found, try to find a field with exportOnly that has matching universalName
-      if (!collectionField) {
-        collectionField = Array.from(
-          Object.values(collection.schema.fields),
-        ).find(
-          (f) => f.exportOnly && f.universalName === universalName,
-        ) as FieldLocalIF;
-      }
-
-      if (!collectionField) {
-        // Check if any field has univFields that map to this universal field
-        let foundInUnivFields = false;
-        for (const fieldName of Object.keys(collection.schema.fields)) {
-          const fieldDef = collection.schema.fields[fieldName] as FieldLocalIF;
-          if (
-            fieldDef?.isLocal &&
-            fieldDef.univFields &&
-            Object.values(fieldDef.univFields).includes(universalName)
-          ) {
-            foundInUnivFields = true;
-            break;
-          }
-        }
-
-        // Only throw an error if the field is not found in univFields
-        if (!foundInUnivFields) {
-          console.error(
-            'cannot find ',
-            universalName,
-            'in',
-            JSON.stringify(collection.schema),
-          );
-          throw new Error(
-            `collection ${collection.name} does not have an equivalent field for universal field ${universalName}`,
-          );
-        }
-
-        // Skip this field as it's handled by univFields
-        continue;
-      }
-
-      if (!collectionField.name) {
-        console.error('no name in ', collectionField);
-        throw new Error('bad schema');
-      }
-
-      mappings[collectionField.name] = universalName;
     }
 
     this.#localToUnivCache.set(collKey, mappings);
@@ -470,75 +224,26 @@ export class Multiverse implements MultiverseIF {
     const mappings: Record<string, string> = {};
 
     if (!universalSchema.fields) {
-      console.log('no fields in ', universalSchema);
+      console.warn('no fields in ', universalSchema);
     }
 
-    // First pass: Process univFields mappings from complex local fields
-    // This needs to be done first to ensure we have mappings for all universal fields
-    const univFieldsMap = new Map<string, string>();
-
-    for (const fieldName of Object.keys(collection.schema.fields)) {
-      const fieldDef = collection.schema.fields[fieldName] as FieldLocalIF;
+    for (const localFieldName of Object.keys(collection.schema.fields)) {
+      const fieldDef = collection.schema.fields[localFieldName] as FieldLocalIF;
 
       // Check if the field has univFields and is a complex local field
-      if (
-        fieldDef?.isLocal &&
-        fieldDef.univFields &&
-        Object.keys(fieldDef.univFields).length > 0
-      ) {
+      if (fieldDef.univFields) {
         // For each univField mapping, create a path to the nested field
-        for (const [localFieldName, universalFieldName] of Object.entries(
+        for (const [localSubName, localUniversalName] of Object.entries(
           fieldDef.univFields,
         )) {
-          // Map universal field name to the nested path
-          // This allows the toLocal method to find the correct field to populate
-          univFieldsMap.set(
-            universalFieldName,
-            `${fieldName}.${localFieldName}`,
-          );
-
           // Add the mapping directly to the mappings object
-          mappings[universalFieldName] = `${fieldName}.${localFieldName}`;
+          mappings[localUniversalName] = `${localFieldName}.${localSubName}`;
         }
+      } else if (fieldDef.universalName) {
+        mappings[fieldDef.universalName] = localFieldName;
+      } else {
+        mappings[localFieldName] = localFieldName;
       }
-    }
-
-    // Second pass: Process regular field mappings
-    for (const universalFieldName of Object.keys(universalSchema.fields)) {
-      // Skip if this field is already mapped via univFields
-      if (univFieldsMap.has(universalFieldName)) {
-        continue;
-      }
-
-      // First, try to find a field with matching universalName
-      let localFieldDef = Array.from(
-        Object.values(collection.schema.fields),
-      ).find((field) => field.universalName === universalFieldName);
-
-      // If not found, try to find a field with the same name as the universal field
-      if (!localFieldDef) {
-        localFieldDef = collection.schema.fields[universalFieldName];
-      }
-
-      const universalFieldDef = universalSchema.fields[universalFieldName];
-
-      if (!localFieldDef) {
-        if (universalFieldDef.meta?.defaultValue) {
-          mappings[universalFieldName] = universalFieldDef.meta.defaultValue;
-          continue;
-        }
-        console.error(
-          'univToLocalFieldMap: cannot make map from ',
-          collection.schema.fields,
-          'to universal schema',
-          universalSchema.fields,
-        );
-        throw new Error(
-          `universalizeLocalSchema: ${universalFieldName} not present in local schema and no default value supplied to universal schema `,
-        );
-      }
-
-      mappings[universalFieldName] = localFieldDef.name;
     }
 
     this.#univToLocalCache.set(collKey, mappings);
@@ -561,7 +266,7 @@ export class Multiverse implements MultiverseIF {
       return;
     }
 
-    const localize = this.#translateRecord(record, props);
+    const localize = this.#translateRecord(record, props, key);
     return toColl.set(key, localize);
   }
 
@@ -583,13 +288,14 @@ export class Multiverse implements MultiverseIF {
       return;
     }
 
-    const localize = this.#translateRecord(record, props);
+    const localize = this.#translateRecord(record, props, key);
     return toColl.set(key, localize);
   }
 
   #translateRecord<RecordType = DataRecord, KeyType = any>(
-    value: RecordType,
+    localRecord: RecordType,
     props: TransportProps<RecordType, KeyType>,
+    key: KeyType,
   ): any {
     const { fromU, toU, collectionName } = props;
     const { fromColl, toColl } = this.#initTransport<RecordType, KeyType>(
@@ -598,13 +304,12 @@ export class Multiverse implements MultiverseIF {
 
     // Convert to universal format
     const universalRecord = this.toUniversal(
-      value,
+      localRecord,
       fromColl as CollBaseIF,
       fromU,
     );
 
-    const out = this.toLocal(universalRecord, toColl as CollBaseIF, toU);
-    return out;
+    return this.toLocal(universalRecord, toColl as CollBaseIF, toU);
   }
 
   #initTransport<RecordType = DataRecord, KeyType = any>(
@@ -648,7 +353,7 @@ export class Multiverse implements MultiverseIF {
     const { toColl } = this.#initTransport<RecordType, KeyType>(props);
     let subscription = listener ? feedbackStream.subscribe(listener) : null;
     let data: IteratorResult<Map<KeyType, RecordType>>;
-    let outBatchSize = toColl.batchSize ?? 30;
+    let outBatchSize = 30;
 
     let outMap = new Map();
     let total = 0;
@@ -712,7 +417,7 @@ export class Multiverse implements MultiverseIF {
         for (const [key, value] of dataMap) {
           if (value) {
             try {
-              const targetRecord = this.#translateRecord(value, props);
+              const targetRecord = this.#translateRecord(value, props, key);
               outMap.set(key, targetRecord);
               flush();
             } catch (error) {

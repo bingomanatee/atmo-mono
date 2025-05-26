@@ -61,19 +61,6 @@ describe('Multiverse field mapping', () => {
           type: FIELD_TYPES.string,
           universalName: 'name',
         },
-        metadata: {
-          type: FIELD_TYPES.object,
-          isLocal: true,
-          // Use univFields to map universal fields to local metadata fields
-          univFields: {
-            createdAt: 'created_at',
-            tags: 'tags',
-          },
-          // Add import function to ensure metadata object is properly initialized
-          import: ({ value }) => {
-            return value || {};
-          },
-        },
         // Add fields for universal mapping
         created_at: {
           type: FIELD_TYPES.string,
@@ -111,10 +98,6 @@ describe('Multiverse field mapping', () => {
             tags: 'tags',
             status: 'status',
           },
-          // Add import function to ensure metadata object is properly initialized
-          import: ({ value }) => {
-            return value || { createdAt: '', tags: [], status: '' };
-          },
         },
       });
 
@@ -145,12 +128,13 @@ describe('Multiverse field mapping', () => {
         tags: ['test', 'item'],
         status: 'pending',
       };
-
       // Set the record in the simple collection
       simpleCollection.set(universalRecord.id, {
         id: universalRecord.id,
         name: universalRecord.name,
-        metadata: {},
+        created_at: universalRecord.created_at,
+        tags: universalRecord.tags,
+        status: universalRecord.status,
       });
 
       // Transport the record to the complex universe
@@ -225,7 +209,7 @@ describe('Multiverse field mapping', () => {
       expect(retrievedRecord?.metadata).toEqual({});
     });
 
-    it.skip('should use import function for special conditions', () => {
+    it('should use import function for special conditions', () => {
       // Create a schema with import function for special conditions
       const specialSchema = new SchemaLocal<ComplexRecord>('items', {
         id: {
@@ -241,6 +225,7 @@ describe('Multiverse field mapping', () => {
           isLocal: true,
           univFields: {
             createdAt: 'created_at',
+            status: 'status',
             tags: 'tags',
           },
           // Use import for special conditions - calculating a derived value
@@ -277,11 +262,6 @@ describe('Multiverse field mapping', () => {
         tags: {
           type: FIELD_TYPES.array,
           universalName: 'tags',
-          exportOnly: true,
-        },
-        status: {
-          type: FIELD_TYPES.string,
-          universalName: 'status',
           exportOnly: true,
         },
       });
@@ -358,11 +338,13 @@ describe('Multiverse field mapping', () => {
       });
 
       // Transport the records
+      console.log('-----------------transporting important record ');
       multiverse.transport(importantRecord.id, {
         collectionName: 'items',
         fromU: 'simple-universe',
         toU: 'special-universe',
       });
+      console.log('-----------------done transporting important tecord ');
       multiverse.transport(archivedRecord.id, {
         collectionName: 'items',
         fromU: 'simple-universe',

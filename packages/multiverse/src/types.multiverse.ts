@@ -207,7 +207,7 @@ export interface MultiverseIF {
     univName: string,
   ): Record<string, string>;
   toLocal(record: any, coll: CollBaseIF, uName: string): any; //convert record from a "multiversal" record to a collection
-  toUniversal(record: any, coll: CollBaseIF, uName: string): any; //convert record from a collection to a "multiversal" record
+  toUniversal(record: any, coll: CollBaseIF, uName: string, key: KeyType): any; //convert record from a collection to a "multiversal" record
   transportGenerator<RecordType = DataRecord, KeyType = any>(
     props: TransportProps<KeyType, RecordType>,
   ): TransportResult;
