@@ -20,6 +20,7 @@ export interface Platelet {
   density: number; // Mass per unit volume
   thickness: number; // thisness in km
   elevation?: number; // Floating elevation in kilometers
+  averageNeighborDistance?: number; // New property for calculated average distance to neighbors
 
   // State
   velocity: Vector3;

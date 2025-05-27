@@ -3,19 +3,24 @@ import type { Universe, Multiverse } from '@wonderlandlabs/multiverse';
 import type {
   PlateIF,
   PlateExtendedIF,
-  SimSimulation,
   Identifiable,
   SimPlanetIF,
 } from '../types.atmo-plates';
 import type { PlateSpectrumGenerator } from '../generator/PlateSpectrumGenerator';
 import { Planet } from './Planet';
 
+// Define SimSimulation interface here
+export interface SimSimulation {
+  step: number;
+  // Add other properties of the simulation state as needed based on usage
+  // e.g., plates, planets, etc., though these might be accessed via the PlateSimulationIF
+}
+
 // Simulation plate interface with identity and relational links
 export interface SimPlateIF extends PlateExtendedIF, Identifiable {
   name?: string;
   planetId: string;
   position: Vector3Like;
-  plateletIds?: string[];
 }
 
 export interface SimProps {

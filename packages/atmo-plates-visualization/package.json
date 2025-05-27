@@ -8,9 +8,10 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "three": "^0.162.0",
-    "@wonderlandlabs/atmo-utils": "^0.1.0",
-    "@wonderlandlabs/atmo-plates": "^0.1.0"
+    "@wonderlandlabs/atmo-plates": "workspace:*",
+    "@wonderlandlabs/atmo-three-orbit": "workspace:*",
+    "@wonderlandlabs/atmo-utils": "workspace:*",
+    "three": "^0.162.0"
   },
   "devDependencies": {
     "typescript": "^5.0.0",

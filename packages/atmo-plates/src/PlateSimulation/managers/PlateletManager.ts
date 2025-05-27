@@ -3,10 +3,10 @@ import { Platelet } from '../schemas/platelet';
 import type { PlateSimulationIF } from '../types.PlateSimulation';
 import { COLLECTIONS } from '../constants';
 import { getH0CellForPosition, processH0Cell } from '../utils/plateletUtils';
+import { h3HexRadiusAtResolution } from '@wonderlandlabs/atmo-utils';
 
 export class PlateletManager {
-  private static plateletCache: Map<string, Platelet[]> = new Map();
-  private static readonly PLATELET_CELL_LEVEL = 3; // Resolution level for platelets
+  public static readonly PLATELET_CELL_LEVEL = 3; // Resolution level for platelets
 
   private sim: PlateSimulationIF;
 
@@ -15,12 +15,6 @@ export class PlateletManager {
   }
 
   generatePlatelets(plateId: string): Platelet[] {
-    // Check cache first
-    const cached = PlateletManager.plateletCache.get(plateId);
-    if (cached) {
-      return cached;
-    }
-
     // Get the plate data
     const plate = this.sim.getPlate(plateId);
     if (!plate) {
@@ -38,9 +32,10 @@ export class PlateletManager {
 
     // Initialize data structures for platelet generation
     const processedH0Cells = new Set<string>();
-    const platelets: Platelet[] = [];
-    const plateletIds: string[] = [];
-    const index = { value: 0 };
+
+    // Get the platelets collection from the simulation
+    const plateletsCollection = this.sim.simUniv.get(COLLECTIONS.PLATELETS);
+    if (!plateletsCollection) throw new Error('platelets collection not found');
 
     // Get the H0 cell for the plate's position
     const platePosition = new Vector3(
@@ -50,43 +45,25 @@ export class PlateletManager {
     );
     const plateCenterH0Cell = getH0CellForPosition(platePosition, planetRadius);
 
-    // Process the plate's H0 cell and its neighbors
+    // Process the plate's H0 cell and its neighbors, adding platelets directly to the collection
     processH0Cell(
       plateCenterH0Cell,
       plate,
       planetRadius,
       PlateletManager.PLATELET_CELL_LEVEL,
       processedH0Cells,
-      platelets,
-      plateletIds,
-      index,
+      plateletsCollection, // Pass collection
     );
 
-    // Update the plate with the generated platelet IDs
-    const platesCollection = this.sim.simUniv.get(COLLECTIONS.PLATES);
-    if (!platesCollection) throw new Error('plates collection not found');
-    const latestPlate = platesCollection.get(plate.id);
-    if (!latestPlate)
-      throw new Error(
-        `Plate ${plate.id} not found in collection after generation setup`,
-      );
-    platesCollection.set(plate.id, { ...latestPlate, plateletIds });
+    // Return the generated platelets by filtering the collection
+    const generatedPlatelets: Platelet[] = [];
+    plateletsCollection.each((platelet: Platelet) => {
+      if (platelet.plateId === plateId) {
+        generatedPlatelets.push(platelet);
+      }
+    });
 
-    // Cache the result
-    PlateletManager.plateletCache.set(plate.id, platelets);
-    return platelets;
-  }
-
-  getCachedPlatelets(plateId: string): Platelet[] | undefined {
-    return PlateletManager.plateletCache.get(plateId);
-  }
-
-  clearCache(plateId?: string) {
-    if (plateId) {
-      PlateletManager.plateletCache.delete(plateId);
-    } else {
-      PlateletManager.plateletCache.clear();
-    }
+    return generatedPlatelets;
   }
 
   /**

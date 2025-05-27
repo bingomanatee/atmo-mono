@@ -1,16 +1,20 @@
-import { SunMemory } from '@wonderlandlabs/multiverse/src/suns/SunMemory';
-import { SunIndex } from './SunIndex';
-import type { CollSyncIF } from '@wonderlandlabs/multiverse/src/types.coll';
-import { SchemaLocal } from '@wonderlandlabs/multiverse';
-import type { Universe } from '@wonderlandlabs/multiverse';
-import type { TransportResult } from '@wonderlandlabs/multiverse/src/types.multiverse';
-import type { SendProps } from '@wonderlandlabs/multiverse/src/types.multiverse';
-import type { UniverseName } from '@wonderlandlabs/multiverse/src/types.multiverse';
-import type { MutationAction } from '@wonderlandlabs/multiverse/src/types.multiverse';
+import {
+  SunMemory,
+  SchemaLocal,
+  CollSync,
+  isColl,
+  Universe,
+} from '@wonderlandlabs/multiverse';
 import { STREAM_ACTIONS } from '@wonderlandlabs/multiverse/src/constants';
+import { SunIndex } from './SunIndex';
+import type {
+  CollSyncIF,
+  TransportResult,
+  SendProps,
+  UniverseName,
+  MutationAction,
+} from '@wonderlandlabs/multiverse/src/types.multiverse';
 import type { Pair } from '@wonderlandlabs/multiverse/src/type.schema';
-import { CollSync } from '@wonderlandlabs/multiverse/src/collections/CollSync';
-import { isColl } from '@wonderlandlabs/multiverse/src/typeguards.multiverse';
 
 export class IndexedSun<
     RecordType extends Record<string, any> = any,

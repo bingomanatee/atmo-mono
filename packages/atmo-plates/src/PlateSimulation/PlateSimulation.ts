@@ -14,8 +14,8 @@ import type {
   PlateExtendedIF,
   PlateIF,
   SimPlanetIF,
-  SimSimulation,
-} from '../types.atmo-plates';
+  Identifiable,
+} from './types.PlateSimulation';
 import { simUniverse } from '../utils';
 import { extendPlate } from '../utils/plateUtils';
 import { COLLECTIONS } from './constants';
@@ -51,6 +51,7 @@ export class PlateSimulation implements PlateSimulationIF {
   #defaultSimId: string | undefined;
   readonly managers: Map<string, any>; // Map to store manager instances
   #l0NeighborCache: Map<string, string[]> = new Map(); // Cache for L0 cell neighbors
+  #step: number = 0;
 
   /**
    * Create a new plate simulation
@@ -307,6 +308,10 @@ export class PlateSimulation implements PlateSimulationIF {
    * Get the current simulation
    * @returns The simulation object
    */
+  get step(): number {
+    return this.#step;
+  }
+
   get simulation(): SimSimulation {
     if (!this.#defaultSimId) {
       throw new Error('No default simulation ID set');

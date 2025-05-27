@@ -1,5 +1,6 @@
 import { PlateSimulation } from './PlateSimulation';
-import { Platelet } from './Platelet';
+import { Platelet } from '../schemas/platelet';
+import type { PlateletIF } from '../types.PlateSimulation';
 import { Vector3 } from 'three';
 import { COLLECTIONS } from './constants';
 

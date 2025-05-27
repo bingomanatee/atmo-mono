@@ -20,54 +20,54 @@ describe('PlateletCollisionSimulator', () => {
     sim.init();
     planetId = uuidV4();
 
-    // Determine realistic radius for platelets at level 3 on Earth
-    const EARTH_RADIUS = 6371000; // meters
-    const plateletRadius = h3HexRadiusAtResolution(EARTH_RADIUS, 3);
-    const plateRadius = plateletRadius * 5; // Plate radius is 5x larger than platelet radius
-
     // Create test platelets in the sector with specific interaction patterns
     const plateletsCollection = sim.simUniv.get(COLLECTIONS.PLATELETS);
 
     // Create 5 platelets:
     // 1-2-3 form a chain of interactions (1 interacts with 2, 2 interacts with 3)
     // 4-5 are isolated
+    const basePosition = new Vector3(0, 0, 0);
+    const baseCell = '8928308280fffff'; // Example H3 cell
+    const baseRadius = 1000; // Base radius in meters
+    const baseThickness = 1; // Base thickness in km
+
     platelets = [
       new Platelet({
-        position: new Vector3(0, 0, 0),
-        radius: plateletRadius,
-        thickness: 1,
+        position: basePosition,
+        radius: baseRadius,
+        thickness: baseThickness,
         density: 1,
         sector: sectorId,
         planetId,
       }),
       new Platelet({
-        position: new Vector3(plateletRadius * 1.5, 0, 0), // Should interact with first
-        radius: plateletRadius,
-        thickness: 1,
+        position: new Vector3(baseRadius * 1.5, 0, 0), // Should interact with first
+        radius: baseRadius,
+        thickness: baseThickness,
         density: 1,
         sector: sectorId,
         planetId,
       }),
       new Platelet({
-        position: new Vector3(plateletRadius * 4, 0, 0), // Should NOT interact with first two
-        radius: plateletRadius,
-        thickness: 1,
+        position: new Vector3(baseRadius * 4, 0, 0), // Should NOT interact with first two
+        radius: baseRadius,
+        thickness: baseThickness,
         density: 1,
         sector: sectorId,
         planetId,
       }),
       new Platelet({
-        position: new Vector3(plateletRadius * 6, 0, 0), // Far away
-        radius: plateletRadius,
-        thickness: 1,
+        position: new Vector3(baseRadius * 6, 0, 0), // Far away
+        radius: baseRadius,
+        thickness: baseThickness,
         density: 1,
         sector: sectorId,
         planetId,
       }),
       new Platelet({
-        position: new Vector3(plateletRadius * 8, 0, 0), // Far away
-        radius: plateletRadius,
-        thickness: 1,
+        position: new Vector3(baseRadius * 8, 0, 0), // Far away
+        radius: baseRadius,
+        thickness: baseThickness,
         density: 1,
         sector: sectorId,
         planetId,

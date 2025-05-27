@@ -4,6 +4,7 @@ import { PlateletManager } from '../src/PlateSimulation/managers/PlateletManager
 import { PlateSimulation } from '../src/PlateSimulation/PlateSimulation';
 import { Vector3 } from 'three';
 import type { SimPlateIF } from '../src/PlateSimulation/types.PlateSimulation';
+import { h3HexRadiusAtResolution } from '@wonderlandlabs/atmo-utils';
 
 // Scene setup
 const scene = new THREE.Scene();
@@ -79,35 +80,57 @@ function getPlateColor(plateId: string): THREE.Color {
   return plateColors.get(plateId)!;
 }
 
-// Create platelet meshes
-platelets.forEach((platelet) => {
-  // Create a disc geometry
-  const geometry = new THREE.CircleGeometry(platelet.radius, 32);
+// Get the platelets collection from the simulation
+const plateletsCollection = sim.simUniv.get('platelets');
+if (!plateletsCollection) throw new Error('platelets collection not found');
 
-  // Create material with plate color
-  const material = new THREE.MeshPhongMaterial({
-    color: getPlateColor(platelet.plateId),
-    side: THREE.DoubleSide,
-    transparent: true,
-    opacity: 0.8,
-  });
+// Create a single geometry for all platelets - use a base radius of 1 since we'll scale it per instance
+const geometry = new THREE.CylinderGeometry(1, 1, 1, 6); // radius, radius, height (1km), segments
 
-  // Create mesh
-  const mesh = new THREE.Mesh(geometry, material);
-
-  // Position the mesh
-  mesh.position.copy(platelet.position);
-
-  // Scale height based on density
-  const heightScale = platelet.density / 2700; // Normalize to average density
-  mesh.scale.z = heightScale;
-
-  // Make the disc face outward from the center
-  mesh.lookAt(new Vector3(0, 0, 0));
-
-  // Add to scene
-  scene.add(mesh);
+// Create a single material for all platelets
+const material = new THREE.MeshPhongMaterial({
+  side: THREE.DoubleSide,
+  transparent: true,
+  opacity: 0.8,
 });
+
+// Create instanced mesh
+const instancedMesh = new THREE.InstancedMesh(
+  geometry,
+  material,
+  platelets.length,
+);
+
+// Create matrices for each instance
+const matrix = new THREE.Matrix4();
+const position = new THREE.Vector3();
+const quaternion = new THREE.Quaternion();
+const scale = new THREE.Vector3();
+
+// Set up each instance
+platelets.forEach((platelet, index) => {
+  // Set position
+  position.copy(platelet.position);
+
+  // Set scale (x,z scale by the platelet's radius, y scales by thickness in km)
+  scale.set(platelet.radius, platelet.thickness, platelet.radius);
+
+  // Set rotation to face outward from center
+  const direction = platelet.position.clone().normalize();
+  quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), direction);
+
+  // Combine into matrix
+  matrix.compose(position, quaternion, scale);
+
+  // Set instance matrix
+  instancedMesh.setMatrixAt(index, matrix);
+
+  // Set instance color
+  instancedMesh.setColorAt(index, getPlateColor(platelet.plateId));
+});
+
+// Add to scene
+scene.add(instancedMesh);
 
 // Animation loop
 function animate() {

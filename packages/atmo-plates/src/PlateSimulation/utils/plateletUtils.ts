@@ -11,6 +11,9 @@ import { gridDisk } from 'h3-js';
 import type { Platelet } from '../schemas/platelet';
 import type { SimPlateIF } from '../types.PlateSimulation';
 import { floatElevation } from '../../utils/plateUtils';
+import type { CollSyncIF } from '@wonderlandlabs/multiverse/src/types.coll';
+
+declare module '@wonderlandlabs/atmo-utils';
 
 /**
  * Converts a 3D position to latitude and longitude
@@ -74,19 +77,47 @@ export function createPlateletFromCell(
   plate: SimPlateIF,
   planetRadius: number,
   resolution: number,
-  index: number,
 ): Platelet {
   const position = cellToVector(cell, planetRadius);
+
   const neighborCellIds = gridDisk(cell, 1).filter(
     (neighbor) => neighbor !== cell,
   );
 
+  // Calculate average distance to neighbor cell positions
+  let totalNeighborDistance = 0;
+  let validNeighborCount = 0;
+
+  neighborCellIds.forEach((neighborH3Cell) => {
+    try {
+      const neighborPosition = cellToVector(neighborH3Cell, planetRadius);
+      totalNeighborDistance += position.distanceTo(neighborPosition);
+      validNeighborCount++;
+    } catch (error) {
+      // Handle cases where cellToVector might fail for some reason (e.g., invalid cell ID)
+      console.error(
+        `Error getting position for neighbor cell ${neighborH3Cell}:`,
+        error,
+      );
+    }
+  });
+
+  const averageNeighborDistance =
+    validNeighborCount > 0 ? totalNeighborDistance / validNeighborCount : 0; // Default to 0 if no valid neighbors
+
+  // Calculate radius based on average neighbor distance (half the average distance)
+  // Use H3 radius as a fallback if no valid neighbors are found.
+  const calculatedRadius =
+    averageNeighborDistance > 0
+      ? averageNeighborDistance / 2
+      : h3HexRadiusAtResolution(planetRadius, resolution);
+
   return {
-    id: `${plate.id}-${index}`,
+    id: `${plate.id}-${cell}`,
     plateId: plate.id,
     h3Cell: cell,
     position,
-    radius: h3HexRadiusAtResolution(planetRadius, resolution) * 1.25,
+    radius: calculatedRadius, // Set radius based on calculated average neighbor distance
     thickness: plate.thickness,
     density: plate.density,
     isActive: true,
@@ -94,14 +125,16 @@ export function createPlateletFromCell(
     connections: {},
     neighborCellIds,
     elevation: floatElevation(plate.thickness, plate.density),
-    mass: plate.thickness * plate.density * Math.PI * Math.pow(plate.radius, 2),
+    mass:
+      plate.thickness * plate.density * Math.PI * Math.pow(calculatedRadius, 2), // Use calculated radius for mass
     elasticity: 0.5,
     velocity: new Vector3(),
+    averageNeighborDistance: averageNeighborDistance, // Store the calculated average distance
   };
 }
 
 /**
- * Processes a single H0 cell and its neighbors recursively
+ * Processes a single H0 cell and its neighbors recursively, adding platelets directly to the collection
  */
 export function processH0Cell(
   h0Cell: string,
@@ -109,9 +142,7 @@ export function processH0Cell(
   planetRadius: number,
   resolution: number,
   processedH0Cells: Set<string>,
-  platelets: Platelet[],
-  plateletIds: string[],
-  index: { value: number },
+  plateletsCollection: CollSyncIF<Platelet, string>,
 ): void {
   if (processedH0Cells.has(h0Cell)) return;
   processedH0Cells.add(h0Cell);
@@ -133,10 +164,8 @@ export function processH0Cell(
       plate,
       planetRadius,
       resolution,
-      index.value++,
     );
-    platelets.push(platelet);
-    plateletIds.push(platelet.id);
+    plateletsCollection.set(platelet.id, platelet);
   });
 
   // Process neighboring H0 cells
@@ -149,9 +178,7 @@ export function processH0Cell(
         planetRadius,
         resolution,
         processedH0Cells,
-        platelets,
-        plateletIds,
-        index,
+        plateletsCollection,
       );
     }
   });

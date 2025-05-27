@@ -2,7 +2,8 @@
   "name": "@wonderlandlabs/mono",
   "packageManager": "yarn@4.9.1",
   "workspaces": [
-    "packages/*"
+    "packages/*",
+    "packages/atmo-plates-visualization"
   ],
   "private": true,
   "devDependencies": {
