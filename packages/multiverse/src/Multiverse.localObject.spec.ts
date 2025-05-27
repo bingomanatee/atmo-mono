@@ -163,22 +163,6 @@ describe('Multiverse local object creation', () => {
           tags: 'meta_tags',
         },
       },
-      // Add fields to match the universal schema
-      meta_created_at: {
-        type: FIELD_TYPES.string,
-        universalName: 'meta_created_at',
-        exportOnly: true,
-      },
-      meta_status: {
-        type: FIELD_TYPES.string,
-        universalName: 'meta_status',
-        exportOnly: true,
-      },
-      meta_tags: {
-        type: FIELD_TYPES.array,
-        universalName: 'meta_tags',
-        exportOnly: true,
-      },
     });
 
     // Register the universal schema

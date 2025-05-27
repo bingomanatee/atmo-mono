@@ -13,6 +13,7 @@ import type {
 
 export interface CollBaseIF<RecordType = DataRecord, KeyType = DataKey> {
   name: CollName;
+  debug?: boolean;
   schema: SchemaLocalIF;
   isAsync: boolean;
   find(...query: any[]): any;

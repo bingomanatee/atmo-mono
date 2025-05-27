@@ -17,6 +17,7 @@ export abstract class CollBase<RecordType, KeyType = string>
   implements CollBaseIF
 {
   name: string;
+  debug: false;
   protected universe: UniverseIF;
   schema: SchemaLocalIF;
   protected _sun?: SunIF<RecordType, KeyType>;
@@ -148,6 +149,9 @@ export abstract class CollBase<RecordType, KeyType = string>
 
         // Skip optional fields that are undefined
         if (field.meta?.optional && record[fieldName] === undefined) {
+          continue;
+        }
+        if (field.exportOnly) {
           continue;
         }
 

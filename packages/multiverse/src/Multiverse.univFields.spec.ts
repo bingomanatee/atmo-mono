@@ -4,6 +4,7 @@ import { SchemaLocal } from './SchemaLocal';
 import { SchemaUniversal } from './SchemaUniversal';
 import { Universe } from './Universe';
 import { CollSync } from './collections/CollSync';
+import { describe, it, beforeEach } from 'vitest';
 
 describe('Multiverse univFields mapping', () => {
   let multiverse: Multiverse;

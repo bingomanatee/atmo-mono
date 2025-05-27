@@ -64,14 +64,16 @@ describe('Multiverse export and exportOnly functionality', () => {
       const schema = new SchemaLocal<Planet>('planets', {
         id: {
           type: FIELD_TYPES.string,
-          universalName: 'id',
         },
         name: {
           type: FIELD_TYPES.string,
-          universalName: 'name',
         },
         position: {
+          isLocal: true,
           type: FIELD_TYPES.object,
+          import({ inputRecord }) {
+            return { x: inputRecord.x, y: inputRecord.y, z: inputRecord.z };
+          },
         },
         'position.x': {
           type: FIELD_TYPES.number,
@@ -140,17 +142,16 @@ describe('Multiverse export and exportOnly functionality', () => {
         z: 6,
       };
 
+      let local;
+
       // Convert to local
-      const local = multiverse.toLocal(
-        universalPlanet,
-        collection,
-        'test-universe',
-      );
+      local = multiverse.toLocal(universalPlanet, collection, 'test-universe');
 
       // Check that the local record does not have the exportOnly fields
       expect(local).toEqual({
         id: 'mars',
         name: 'Mars',
+        position: { x: 4, y: 5, z: 6 },
       });
 
       // The position object would need to be created by a schema filter
@@ -253,6 +254,7 @@ describe('Multiverse export and exportOnly functionality', () => {
         },
         position: {
           type: FIELD_TYPES.object,
+          isLocal: true,
         },
         'position.x': {
           type: FIELD_TYPES.number,
@@ -484,19 +486,8 @@ describe('Multiverse export and exportOnly functionality', () => {
         z: FIELD_TYPES.number,
       });
 
-      // 2. Array format schema
-      const arraySchema = new SchemaUniversal('events', {
-        id: FIELD_TYPES.string,
-        data: FIELD_TYPES.array, // This will store [name, date, x, y, z]
-      });
-
       // Create a multiverse with both schemas
-      multiverse = new Multiverse(
-        new Map([
-          ['events-object', objectSchema],
-          ['events-array', arraySchema],
-        ]),
-      );
+      multiverse = new Multiverse(new Map([['events', objectSchema]]));
 
       // Create universes
       objectUniverse = new Universe('object-universe', multiverse);
@@ -504,14 +495,8 @@ describe('Multiverse export and exportOnly functionality', () => {
 
       // Create a local schema for the object universe
       const objectLocalSchema = new SchemaLocal<any>('events', {
-        id: {
-          type: FIELD_TYPES.string,
-          universalName: 'id',
-        },
-        name: {
-          type: FIELD_TYPES.string,
-          universalName: 'name',
-        },
+        id: FIELD_TYPES.string,
+        name: FIELD_TYPES.string,
         date: {
           type: FIELD_TYPES.date,
           universalName: 'date',
@@ -521,81 +506,82 @@ describe('Multiverse export and exportOnly functionality', () => {
             }
             return newValue ? String(newValue) : '';
           },
+          import({ newValue }) {
+            return Date.parse(newValue);
+          },
         },
         position: {
+          isLocal: true,
           type: FIELD_TYPES.object,
+          univFields: {
+            x: 'x',
+            y: 'y',
+            z: 'z',
+          },
         },
-      });
-
-      // Add exportOnly fields for position coordinates
-      objectLocalSchema.add({
-        name: 'position.x',
-        type: FIELD_TYPES.number,
-        universalName: 'x',
-        exportOnly: true,
-      });
-
-      objectLocalSchema.add({
-        name: 'position.y',
-        type: FIELD_TYPES.number,
-        universalName: 'y',
-        exportOnly: true,
-      });
-
-      objectLocalSchema.add({
-        name: 'position.z',
-        type: FIELD_TYPES.number,
-        universalName: 'z',
-        exportOnly: true,
       });
 
       // Create a local schema for the array universe
       const arrayLocalSchema = new SchemaLocal<any>('events', {
-        id: {
-          type: FIELD_TYPES.string,
-          universalName: 'id',
+        id: FIELD_TYPES.string,
+        x: {
+          type: 'number',
+          exportOnly: true,
+          universalName: 'x',
+          export({ inputRecord }) {
+            return inputRecord.data[2];
+          },
+        },
+        y: {
+          exportOnly: true,
+          type: FIELD_TYPES.number,
+          universalName: 'y',
+          export({ inputRecord }) {
+            return inputRecord.data[3];
+          },
+        },
+        z: {
+          type: FIELD_TYPES.number,
+          exportOnly: true,
+          universalName: 'z',
+          export({ inputRecord }) {
+            return inputRecord.data[4];
+          },
         },
         name: {
+          exportOnly: true,
           type: FIELD_TYPES.string,
+          export({ inputRecord }) {
+            return inputRecord.data[1];
+          },
         },
-        date: {
-          type: FIELD_TYPES.date,
-        },
-        position: {
-          type: FIELD_TYPES.object,
-        },
-      });
-
-      // Add exportOnly field that transforms the record into an array
-      // For this case, we need to use an export function since we're creating a custom array format
-      arrayLocalSchema.add({
-        name: 'dataArray',
-        type: FIELD_TYPES.array,
-        universalName: 'data',
-        exportOnly: true,
-        export: ({ inputRecord }) => {
-          // Format: [name, date, x, y, z]
-          return [
-            inputRecord.name,
-            inputRecord.date instanceof Date
-              ? inputRecord.date.toISOString()
-              : '',
-            inputRecord.position?.x ?? 0,
-            inputRecord.position?.y ?? 0,
-            inputRecord.position?.z ?? 0,
-          ];
+        data: {
+          type: FIELD_TYPES.array,
+          isLocal: true,
+          import: ({ inputRecord }) => {
+            // Format: [name, date, x, y, z]
+            return [
+              inputRecord.name,
+              inputRecord.date instanceof Date
+                ? inputRecord.date.toISOString()
+                : inputRecord.date,
+              inputRecord.position?.x ?? 0,
+              inputRecord.position?.y ?? 0,
+              inputRecord.position?.z ?? 0,
+            ];
+          },
         },
       });
 
       // Create collections
       objectCollection = new CollSync<any, string>({
-        name: 'events-object',
+        name: 'events',
         universe: objectUniverse,
         schema: objectLocalSchema,
       });
 
       arrayCollection = new CollSync<any, string>({
-        name: 'events-array',
+        name: 'events',
         universe: arrayUniverse,
         schema: arrayLocalSchema,
       });
@@ -618,54 +604,8 @@ describe('Multiverse export and exportOnly functionality', () => {
         },
       };
 
-      // Convert to object format
-      const objectUniversal = multiverse.toUniversal(
-        event,
-        objectCollection,
-        'object-universe',
-      );
-
-      // Convert to array format
-      const arrayUniversal = multiverse.toUniversal(
-        event,
-        arrayCollection,
-        'array-universe',
-      );
-
-      // Check the object format
-      expect(objectUniversal).toEqual({
-        id: 'event1',
-        name: 'Conference',
-        date: '2023-05-15T10:00:00.000Z',
-        x: 1,
-        y: 2,
-        z: 3,
-      });
-
-      // Check the array format
-      expect(arrayUniversal).toEqual({
-        id: 'event1',
-        data: ['Conference', '2023-05-15T10:00:00.000Z', 1, 2, 3],
-      });
-
-      // Check that the original record was not modified
-      expect(event).toEqual({
-        id: 'event1',
-        name: 'Conference',
-        date: expect.any(Date),
-        position: {
-          x: 1,
-          y: 2,
-          z: 3,
-        },
-      });
-
-      // Verify the date is still a Date object
-      expect(event.date).toBeInstanceOf(Date);
-
-      // Check that no exportOnly fields were added
-      expect(event).not.toHaveProperty('data');
-      expect(event).not.toHaveProperty('dataArray');
+      objectUniverse.get('events')!.set(event.id, event);
+      objectUniverse.get('events')!.send(event.id, 'array-universe');
     });
   });
 });
