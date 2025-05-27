@@ -71,7 +71,6 @@ describe('SunMemoryImmer', () => {
   describe('set and get', () => {
     it('should store and retrieve a value', () => {
       const user = { id: 1, name: 'John Doe' };
-      console.log('set and get sun is ', sun);
       sun.set(1, user);
 
       const result = sun.get(1);

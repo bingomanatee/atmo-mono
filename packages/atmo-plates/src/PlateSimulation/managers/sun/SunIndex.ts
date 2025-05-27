@@ -1,12 +1,24 @@
 import type { CollSyncIF } from '@wonderlandlabs/multiverse/src/types.coll';
-import { isObj } from '@wonderlandlabs/atmo-utils';
+
+// Simple isObj implementation to avoid external dependency
+const isObj = (value: unknown): value is Record<string, any> => {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+};
+
+// Type that ensures synchronous get method
+type SyncCollection<RecordType, KeyType> = Omit<
+  CollSyncIF<RecordType, KeyType>,
+  'get'
+> & {
+  get(key: KeyType): RecordType | undefined;
+};
 
 export class SunIndex<RecordType extends Record<string, any>, ValueType = any> {
-  readonly #coll: CollSyncIF<RecordType, string>;
+  readonly #coll: SyncCollection<RecordType, string>;
   readonly #key: string;
   #cache: Map<ValueType, Set<string>> | null = null;
 
-  constructor(coll: CollSyncIF<RecordType, string>, key: string) {
+  constructor(coll: SyncCollection<RecordType, string>, key: string) {
     this.#coll = coll;
     this.#key = key;
   }
@@ -16,7 +28,7 @@ export class SunIndex<RecordType extends Record<string, any>, ValueType = any> {
    * @param value The value to match
    * @returns Generator yielding matching records
    */
-  *find(value: ValueType): Generator<RecordType> {
+  *find(value: ValueType): Generator<[string, RecordType]> {
     if (!this.#cache) {
       this.#build();
     }
@@ -26,7 +38,7 @@ export class SunIndex<RecordType extends Record<string, any>, ValueType = any> {
 
     for (const id of matchingIds) {
       const record = this.#coll.get(id);
-      if (record) yield record;
+      if (record) yield [id, record];
     }
   }
 
@@ -47,7 +59,7 @@ export class SunIndex<RecordType extends Record<string, any>, ValueType = any> {
    */
   #build(): void {
     this.#cache = new Map();
-    for (const { value: record } of this.#coll.getAll()) {
+    for (const [key, record] of this.#coll.values()) {
       this.#indexRecord(record);
     }
   }
@@ -69,5 +81,13 @@ export class SunIndex<RecordType extends Record<string, any>, ValueType = any> {
    */
   clear(): void {
     this.#cache = null;
+  }
+
+  /**
+   * Get all records as a generator of [key, value] pairs
+   * @returns Generator yielding [key, value] pairs
+   */
+  *values(): Generator<[string, RecordType]> {
+    return this.#coll.values();
   }
 }

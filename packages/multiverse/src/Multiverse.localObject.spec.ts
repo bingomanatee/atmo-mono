@@ -226,13 +226,15 @@ describe('Multiverse local object creation', () => {
       metadata: {
         type: FIELD_TYPES.object,
         isLocal: true,
-        import: ({ currentRecord }) => {
+        import: ({ inputRecord }) => {
+          const createdAt = inputRecord?.meta_created_at
+            ? new Date(inputRecord.meta_created_at).toISOString()
+            : new Date().toISOString();
+
           return {
-            createdAt: currentRecord?.meta_created_at
-              ? new Date(currentRecord.meta_created_at).toISOString()
-              : new Date().toISOString(),
+            createdAt,
             status:
-              currentRecord?.meta_status === 'active' ? 'enabled' : 'disabled',
+              inputRecord?.meta_status === 'active' ? 'enabled' : 'disabled',
             lastUpdated: new Date().toISOString(),
           };
         },

@@ -42,7 +42,10 @@ export class CollSync<RecordType, KeyType = string>
     return this.sun.has(key);
   }
 
-  set(key: KeyType, value: RecordType): void {
+  set(key: KeyType, value: RecordType, skipValidate = false): void {
+    if (!skipValidate) {
+      this.validate(value);
+    }
     this.sun.set(key, value);
   }
 

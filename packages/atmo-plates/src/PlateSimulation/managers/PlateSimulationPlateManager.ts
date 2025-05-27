@@ -132,12 +132,19 @@ export default class PlateSimulationPlateManager {
     const stepsGen = this.stepsCollection.find('plateId', plateId) as Iterable<
       [string, SimStepIF]
     >;
-    const stepsMap = new Map<string, SimStepIF>(stepsGen);
-    if (!stepsMap.size) throw new Error('no steps found for plate');
+    const steps = [...stepsGen];
+    if (!steps.length) throw new Error('no steps found for plate');
 
-    return [...stepsMap.values()].reduce((latest, step) => {
-      return step.step > latest.step ? step : latest;
-    });
+    const result = steps.reduce(
+      (latest, [_, value]) => {
+        if (!latest) return value;
+        return value.step > latest.step ? value : latest;
+      },
+      null as SimStepIF | null,
+    );
+
+    if (!result) throw new Error('no steps found for plate');
+    return result;
   }
 
   /**

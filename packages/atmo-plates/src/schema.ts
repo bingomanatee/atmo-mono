@@ -32,13 +32,17 @@ export const SIM_PLANETS_SCHEMA = {
 };
 
 export const SIM_PLATES_SCHEMA = {
-  id: FIELD_TYPES.string,
+  id: { type: FIELD_TYPES.string, meta: { required: true } },
   name: { type: FIELD_TYPES.string, meta: { optional: true } },
-  radius: FIELD_TYPES.number,
-  density: FIELD_TYPES.number,
-  thickness: FIELD_TYPES.number,
-  position: { type: FIELD_TYPES.object, isLocal: true },
-  planetId: FIELD_TYPES.string,
+  radius: { type: FIELD_TYPES.number, meta: { required: true } },
+  density: { type: FIELD_TYPES.number, meta: { required: true } },
+  thickness: { type: FIELD_TYPES.number, meta: { required: true } },
+  position: {
+    type: FIELD_TYPES.object,
+    isLocal: true,
+    meta: { required: true },
+  },
+  planetId: { type: FIELD_TYPES.string, meta: { required: true } },
   plateletIds: {
     type: FIELD_TYPES.array,
     meta: {
@@ -49,21 +53,22 @@ export const SIM_PLATES_SCHEMA = {
 };
 
 export const SIM_PLATELETS_SCHEMA = new SchemaLocal<Platelet>('platelets', {
-  id: FIELD_TYPES.string,
-  plateId: FIELD_TYPES.string,
-  planetId: FIELD_TYPES.string,
+  id: { type: FIELD_TYPES.string, meta: { required: true } },
+  plateId: { type: FIELD_TYPES.string, meta: { required: true } },
+  planetId: { type: FIELD_TYPES.string, meta: { required: true } },
   position: {
     type: FIELD_TYPES.object,
     meta: {
+      required: true,
       fields: {
-        x: FIELD_TYPES.number,
-        y: FIELD_TYPES.number,
-        z: FIELD_TYPES.number,
+        x: { type: FIELD_TYPES.number, meta: { required: true } },
+        y: { type: FIELD_TYPES.number, meta: { required: true } },
+        z: { type: FIELD_TYPES.number, meta: { required: true } },
       },
     },
   },
-  density: FIELD_TYPES.number,
-  thickness: FIELD_TYPES.number,
+  density: { type: FIELD_TYPES.number, meta: { required: true } },
+  thickness: { type: FIELD_TYPES.number, meta: { required: true } },
 });
 
 export const SIM_SIMULATIONS_SCHEMA = {

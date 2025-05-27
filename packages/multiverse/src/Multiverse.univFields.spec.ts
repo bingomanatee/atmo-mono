@@ -1,10 +1,10 @@
+import { beforeEach, describe, expect, it } from 'vitest';
+import { CollSync } from './collections/CollSync';
 import { FIELD_TYPES } from './constants';
 import { Multiverse } from './Multiverse';
 import { SchemaLocal } from './SchemaLocal';
 import { SchemaUniversal } from './SchemaUniversal';
 import { Universe } from './Universe';
-import { CollSync } from './collections/CollSync';
-import { describe, it, beforeEach } from 'vitest';
 
 describe('Multiverse univFields mapping', () => {
   let multiverse: Multiverse;
@@ -156,17 +156,18 @@ describe('Multiverse univFields mapping', () => {
           universalName: 'name',
         },
         // Add fields for the universal fields with exportOnly: true
-        created_at: {
+
+        'metadata.createdAt': {
           type: FIELD_TYPES.string,
           universalName: 'created_at',
           exportOnly: true,
         },
-        tags: {
+        'metadata.tags': {
           type: FIELD_TYPES.array,
           universalName: 'tags',
           exportOnly: true,
         },
-        status: {
+        'metadata.status': {
           type: FIELD_TYPES.string,
           universalName: 'status',
           exportOnly: true,
@@ -181,8 +182,8 @@ describe('Multiverse univFields mapping', () => {
             status: 'status',
           },
           // Add import function to ensure metadata object is properly initialized
-          import: ({ value }) => {
-            return value || { createdAt: '', tags: [], status: '' };
+          import: (props) => {
+            return props.value || { createdAt: '', tags: [], status: '' };
           },
         },
       });

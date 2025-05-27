@@ -1,4 +1,3 @@
-import { deGenerateMaps } from '@wonderlandlabs/multiverse';
 import { describe, it, expect, beforeEach } from 'vitest';
 import { PlateSimulation, MANAGERS } from '../PlateSimulation';
 import PlateSimulationPlateManager from './PlateSimulationPlateManager';
@@ -38,7 +37,7 @@ describe('PlateSimulationPlateManager', () => {
   it('should initialize steps for a plate when initPlateSteps is called', () => {
     manager.initPlateSteps(testPlateId);
     const stepsCollection = sim.simUniv.get(COLLECTIONS.PLATELET_STEPS);
-    const steps = deGenerateMaps(stepsCollection.getAll());
+    const steps = new Map(stepsCollection.values());
     expect(steps.size).toBeGreaterThan(0);
   });
 

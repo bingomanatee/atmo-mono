@@ -96,11 +96,11 @@ describe('Multiverse.toLocal', () => {
         position: {
           type: FIELD_TYPES.object,
           isLocal: true,
-          import: ({ currentRecord }) => {
+          import: ({ inputRecord }) => {
             return {
-              x: currentRecord?.x ?? 0,
-              y: currentRecord?.y ?? 0,
-              z: currentRecord?.z ?? 0,
+              x: inputRecord?.x ?? 0,
+              y: inputRecord?.y ?? 0,
+              z: inputRecord?.z ?? 0,
             };
           },
         },
@@ -235,6 +235,7 @@ describe('Multiverse.toLocal', () => {
         'test-universe',
       );
 
+      console.log('local record:', localRecord);
       // Verify the nested object was created with mapped fields
       expect(localRecord).toEqual({
         id: 'obj1',

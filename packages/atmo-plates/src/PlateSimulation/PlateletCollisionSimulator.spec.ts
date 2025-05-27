@@ -1,4 +1,4 @@
-import { PlateletCollisionSimulator } from './PlateletCollection';
+import { PlateletCollisionSimulator } from './PlateletCollisionSimulator';
 import { PlateSimulation } from './PlateSimulation';
 import { Vector3 } from 'three';
 import { v4 as uuidV4 } from 'uuid';

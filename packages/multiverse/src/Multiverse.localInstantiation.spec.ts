@@ -52,65 +52,24 @@ describe('Multiverse local object instantiation', () => {
 
       // Create a schema for the flat universe
       const flatSchema = new SchemaLocal<FlatRecord>('objects', {
-        id: {
-          type: FIELD_TYPES.string,
-          universalName: 'id',
-        },
-        name: {
-          type: FIELD_TYPES.string,
-          universalName: 'name',
-        },
-        x: {
-          type: FIELD_TYPES.number,
-          universalName: 'x',
-        },
-        y: {
-          type: FIELD_TYPES.number,
-          universalName: 'y',
-        },
-        z: {
-          type: FIELD_TYPES.number,
-          universalName: 'z',
-        },
+        id: FIELD_TYPES.string,
+        name: FIELD_TYPES.string,
+        x: FIELD_TYPES.number,
+        y: FIELD_TYPES.number,
+        z: FIELD_TYPES.number,
       });
 
       // Create a schema for the nested universe with position object
       const nestedSchema = new SchemaLocal<NestedRecord>('objects', {
-        id: {
-          type: FIELD_TYPES.string,
-          universalName: 'id',
-        },
-        name: {
-          type: FIELD_TYPES.string,
-          universalName: 'name',
-        },
+        id: FIELD_TYPES.string,
+        name: FIELD_TYPES.string,
         position: {
           type: FIELD_TYPES.object,
-          isLocal: true, // Mark as local-only
-          // Use import function to ensure the position object is properly initialized
-          import: ({ currentRecord }) => {
-            // Create a position object with values from the universal record
-            return {
-              x: currentRecord?.x ?? 0,
-              y: currentRecord?.y ?? 0,
-              z: currentRecord?.z ?? 0,
-            };
+          univFields: {
+            x: 'x',
+            y: 'y',
+            z: 'z',
           },
-        },
-        'position.x': {
-          type: FIELD_TYPES.number,
-          universalName: 'x',
-          exportOnly: true,
-        },
-        'position.y': {
-          type: FIELD_TYPES.number,
-          universalName: 'y',
-          exportOnly: true,
-        },
-        'position.z': {
-          type: FIELD_TYPES.number,
-          universalName: 'z',
-          exportOnly: true,
         },
       });
 

@@ -27,7 +27,11 @@ export interface CollBaseIF<RecordType = DataRecord, KeyType = DataKey> {
     keys: KeyType[],
     props: SendProps<RecordType, KeyType>,
   ): TransportResult;
-  set(key: KeyType, value: RecordType): void | Promise<void>;
+  set(
+    key: KeyType,
+    value: RecordType,
+    skipValidate?: boolean,
+  ): void | Promise<void>;
   setMany(values: Map<KeyType, RecordType>): void | Promise<void>;
   delete(key: KeyType): void | Promise<void>;
   [Symbol.iterator](): Iterator<Pair<KeyType, RecordType>>;
@@ -113,7 +117,7 @@ export interface CollAsyncIF<RecordType = DataRecord, KeyType = DataKey>
     keys: KeyType[],
     props: SendProps<RecordType, KeyType>,
   ): TransportResult;
-  set(key: KeyType, value: RecordType): Promise<void>;
+  set(key: KeyType, value: RecordType, skiplValidate?: boolean): Promise<void>;
   setMany(input: Map<KeyType, RecordType>): Promise<void>;
   [Symbol.iterator](): Iterator<Pair<KeyType, RecordType>>;
 }

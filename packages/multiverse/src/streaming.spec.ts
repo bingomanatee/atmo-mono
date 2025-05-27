@@ -319,8 +319,6 @@ describe('Streaming Data Transport', () => {
       );
 
       const users = generatorToMap(userGenerator);
-      console.log('Found users:', Array.from(users.entries()));
-      console.log('User keys:', Array.from(users.keys()));
       expect(Array.from(users.keys()).sort()).toEqual([1, 3]);
     });
     it('should find records and return them as a generator', async () => {

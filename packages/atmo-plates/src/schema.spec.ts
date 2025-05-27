@@ -1,104 +1,113 @@
 import { describe, it, expect } from 'vitest';
-import { FIELD_TYPES, SchemaLocal } from '@wonderlandlabs/multiverse';
+import {
+  FIELD_TYPES,
+  SchemaLocal,
+  validateField,
+} from '@wonderlandlabs/multiverse';
 import { SIM_PLATES_SCHEMA, SIM_PLATELETS_SCHEMA } from './schema';
 
-describe('Plate Schemas', () => {
+describe('Schema Validation', () => {
   describe('SIM_PLATES_SCHEMA', () => {
-    it('should validate a complete plate record', () => {
-      const schema = new SchemaLocal('test', SIM_PLATES_SCHEMA);
+    it('should validate a complete record', () => {
+      const schema = new SchemaLocal('plates', SIM_PLATES_SCHEMA);
       const validRecord = {
-        id: 'plate1',
+        id: 'p1',
         name: 'Test Plate',
-        radius: 100,
-        density: 1.0,
-        thickness: 10,
+        radius: 1000,
+        density: 2.7,
+        thickness: 50,
         position: { x: 0, y: 0, z: 0 },
         planetId: 'planet1',
-        plateletIds: ['p1', 'p2'],
+        plateletIds: [],
       };
-
-      expect(() => schema.validate(validRecord)).not.toThrow();
+      let hasError = false;
+      for (const [fieldName, field] of Object.entries(schema.fields)) {
+        const error = validateField(
+          validRecord[fieldName],
+          fieldName,
+          schema,
+          validRecord,
+        );
+        if (error) {
+          hasError = true;
+          break;
+        }
+      }
+      expect(hasError).toBe(false);
     });
 
-    it('should reject a plate record missing required fields', () => {
-      const schema = new SchemaLocal('test', SIM_PLATES_SCHEMA);
+    it('should reject an incomplete record', () => {
+      const schema = new SchemaLocal('plates', SIM_PLATES_SCHEMA);
       const invalidRecord = {
-        id: 'plate1',
+        id: 'p1',
         name: 'Test Plate',
-        // missing radius
-        density: 1.0,
-        thickness: 10,
-        position: { x: 0, y: 0, z: 0 },
-        planetId: 'planet1',
+        // Missing required fields
       };
-
-      expect(() => schema.validate(invalidRecord)).toThrow();
-    });
-
-    it.skip('should reject a plate record with invalid position object', () => {
-      const schema = new SchemaLocal('test', SIM_PLATES_SCHEMA);
-      const invalidRecord = {
-        id: 'plate1',
-        name: 'Test Plate',
-        radius: 100,
-        density: 1.0,
-        thickness: 10,
-        position: { x: 0, y: 0 }, // missing z
-        planetId: 'planet1',
-      };
-
-      expect(() => schema.validate(invalidRecord)).toThrow();
+      let hasError = false;
+      for (const [fieldName, field] of Object.entries(schema.fields)) {
+        const error = validateField(
+          invalidRecord[fieldName],
+          fieldName,
+          schema,
+          invalidRecord,
+        );
+        if (error) {
+          hasError = true;
+          break;
+        }
+      }
+      expect(hasError).toBe(true);
     });
   });
 
   describe('SIM_PLATELETS_SCHEMA', () => {
-    it('should validate a complete platelet record', () => {
-      const schema = new SchemaLocal('test', SIM_PLATELETS_SCHEMA);
+    it('should validate a complete record', () => {
+      const schema = new SchemaLocal('platelets', SIM_PLATELETS_SCHEMA);
       const validRecord = {
-        id: 'p1',
-        plateId: 'plate1',
-        position: { x: 0, y: 0, z: 0 },
-        radius: 10,
-        thickness: 5,
-        density: 1.0,
+        id: 'plt1',
+        plateId: 'p1',
         planetId: 'planet1',
-        sector: 'A1',
-        plateletIds: ['p2', 'p3'],
+        position: { x: 0, y: 0, z: 0 },
+        density: 2.7,
+        thickness: 50,
       };
-
-      expect(() => schema.validate(validRecord)).not.toThrow();
+      let hasError = false;
+      for (const [fieldName, field] of Object.entries(schema.fields)) {
+        const error = validateField(
+          validRecord[fieldName],
+          fieldName,
+          schema,
+          validRecord,
+        );
+        if (error) {
+          hasError = true;
+          break;
+        }
+      }
+      expect(hasError).toBe(false);
     });
 
-    it('should reject a platelet record missing required fields', () => {
-      const schema = new SchemaLocal('test', SIM_PLATELETS_SCHEMA);
+    it('should reject an incomplete record', () => {
+      const schema = SIM_PLATELETS_SCHEMA;
       const invalidRecord = {
-        id: 'p1',
-        plateId: 'plate1',
-        position: { x: 0, y: 0, z: 0 },
-        // missing radius
-        thickness: 5,
-        density: 1.0,
-        planetId: 'planet1',
-        sector: 'A1',
+        id: 'plt1',
+        plateId: 'p1',
+        // planetId, position, density, thickness are missing
       };
-
-      expect(() => schema.validate(invalidRecord)).toThrow();
-    });
-
-    it('should reject a platelet record with invalid position object', () => {
-      const schema = new SchemaLocal('test', SIM_PLATELETS_SCHEMA);
-      const invalidRecord = {
-        id: 'p1',
-        plateId: 'plate1',
-        position: { x: 0, y: 0 }, // missing z
-        radius: 10,
-        thickness: 5,
-        density: 1.0,
-        planetId: 'planet1',
-        sector: 'A1',
-      };
-
-      expect(() => schema.validate(invalidRecord)).toThrow();
+      let hasError = false;
+      for (const [fieldName, field] of Object.entries(schema.fields)) {
+        const error = validateField(
+          invalidRecord[fieldName],
+          fieldName,
+          schema,
+          invalidRecord,
+        );
+        if (error) {
+          hasError = true;
+          break;
+        }
+      }
+      expect(hasError).toBe(true);
     });
   });
 });

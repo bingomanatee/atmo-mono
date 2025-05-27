@@ -156,7 +156,7 @@ export class PlateSimulation implements PlateSimulationIF {
 
       // Check if there are any plates for this planet
       let hasPlatesForPlanet = false;
-      for (const { value } of platesCollection.getAll()) {
+      for (const [_, value] of platesCollection.values()) {
         if (value.planetId === planetId) {
           hasPlatesForPlanet = true;
           break;
@@ -191,7 +191,11 @@ export class PlateSimulation implements PlateSimulationIF {
     // Check if we already have a default simulation ID
     if (this.#defaultSimId && simulationsCollection.has(this.#defaultSimId)) {
       // Get the simulation
-      const simulation = this.simulation;
+      const simulation = simulationsCollection.get(this.#defaultSimId);
+      if (!simulation) {
+        throw new Error(`Simulation ${this.#defaultSimId} not found`);
+      }
+
       let plateCount = simulation.plateCount;
 
       // Get the planet directly from the simulation's planetId
@@ -225,25 +229,12 @@ export class PlateSimulation implements PlateSimulationIF {
         });
       }
     } else {
-      // If no simulation exists, check if a planet exists
-      const planetsCollection = this.simUniv.get(COLLECTIONS.PLANETS);
-      let planetFound = false;
-
-      // Try to find an existing planet
-      for (const { value } of planetsCollection.getAll()) {
-        this.planet = value;
-        planetFound = true;
-        break;
-      }
-
-      // If no planet exists, create one
-      if (!planetFound) {
-        this.planet = this.makePlanet(this.planetRadius);
-      }
+      // If no simulation exists, create a new planet
+      this.planet = this.makePlanet(this.planetRadius);
 
       // Create a new simulation with the plateCount
       this.addSimulation({
-        planetId: this.planet!.id,
+        planetId: this.planet.id,
         plateCount: plateCount,
       });
     }

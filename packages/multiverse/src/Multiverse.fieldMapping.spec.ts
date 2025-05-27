@@ -75,7 +75,6 @@ describe('Multiverse field mapping', () => {
         status: {
           type: FIELD_TYPES.string,
           universalName: 'status',
-          exportOnly: true,
         },
       });
 
@@ -108,6 +107,7 @@ describe('Multiverse field mapping', () => {
         schema: simpleSchema,
       });
 
+      simpleCollection.debug = true;
       complexCollection = new CollSync<ComplexRecord, string>({
         name: 'items',
         universe: complexUniverse,
@@ -210,6 +210,7 @@ describe('Multiverse field mapping', () => {
     });
 
     it('should use import function for special conditions', () => {
+      console.log('---- start ', expect.getState().currentTestName);
       // Create a schema with import function for special conditions
       const specialSchema = new SchemaLocal<ComplexRecord>('items', {
         id: {
@@ -229,19 +230,14 @@ describe('Multiverse field mapping', () => {
             tags: 'tags',
           },
           // Use import for special conditions - calculating a derived value
-          import: ({ value, currentRecord }) => {
+          import: ({ value: metadata, currentRecord }) => {
             // First, copy all the values from univFields
-            const metadata = { ...value };
 
             // Add a derived status based on the tags
-            if (
-              currentRecord &&
-              currentRecord.tags &&
-              Array.isArray(currentRecord.tags)
-            ) {
-              if (currentRecord.tags.includes('important')) {
+            if (metadata && metadata.tags && Array.isArray(metadata.tags)) {
+              if (metadata.tags.includes('important')) {
                 metadata.status = 'high-priority';
-              } else if (currentRecord.tags.includes('archived')) {
+              } else if (metadata.tags.includes('archived')) {
                 metadata.status = 'inactive';
               } else {
                 metadata.status = 'normal';
@@ -273,6 +269,7 @@ describe('Multiverse field mapping', () => {
         universe: specialUniverse,
         schema: specialSchema,
       });
+      specialCollection.debug = true;
       specialUniverse.add(specialCollection);
 
       // Create records with different tags
@@ -321,6 +318,7 @@ describe('Multiverse field mapping', () => {
         metadata: {},
         created_at: importantRecord.created_at,
         tags: importantRecord.tags,
+        status: '',
       });
       simpleCollection.set(archivedRecord.id, {
         id: archivedRecord.id,
@@ -328,6 +326,7 @@ describe('Multiverse field mapping', () => {
         metadata: {},
         created_at: archivedRecord.created_at,
         tags: archivedRecord.tags,
+        status: '',
       });
       simpleCollection.set(normalRecord.id, {
         id: normalRecord.id,
@@ -335,16 +334,17 @@ describe('Multiverse field mapping', () => {
         metadata: {},
         created_at: normalRecord.created_at,
         tags: normalRecord.tags,
+        status: '',
       });
 
+      specialCollection.debug = true;
+
       // Transport the records
-      console.log('-----------------transporting important record ');
       multiverse.transport(importantRecord.id, {
         collectionName: 'items',
         fromU: 'simple-universe',
         toU: 'special-universe',
       });
-      console.log('-----------------done transporting important tecord ');
       multiverse.transport(archivedRecord.id, {
         collectionName: 'items',
         fromU: 'simple-universe',

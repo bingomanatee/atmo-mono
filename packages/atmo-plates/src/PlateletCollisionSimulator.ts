@@ -1,5 +1,5 @@
-import { FIELD_TYPES, SchemaLocal } from '@atmo/multiverse';
-import type { PostParams } from '@atmo/multiverse';
+import { FIELD_TYPES, SchemaLocal } from '@wonderlandlabs/multiverse';
+import type { PostParams } from '@wonderlandlabs/multiverse';
 import { Platelet } from './types/Platelet';
 
 // This schema is no longer needed as its fields are either:

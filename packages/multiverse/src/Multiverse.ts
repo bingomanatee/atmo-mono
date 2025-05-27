@@ -101,7 +101,7 @@ export class Multiverse implements MultiverseIF {
     const map = this.univToLocalFieldMap(coll, univName);
 
     if (coll.debug) {
-      console.log('converting ', record, 'to', univName, 'with', map);
+      console.log('toLocal: converting ', record, 'to', univName, 'with', map);
     }
     // Process all field mappings from the map
     for (const univField of Object.keys(map)) {
@@ -123,6 +123,9 @@ export class Multiverse implements MultiverseIF {
         }
       }
 
+      if (fieldDef.exportOnly) {
+        continue;
+      }
       const outValue = get(out, fieldName);
 
       switch (fieldDef.type) {
@@ -147,7 +150,7 @@ export class Multiverse implements MultiverseIF {
     } catch (error) {
       // Wrap the validation error with more context
       console.error(
-        'cannot validate local ',
+        'toLocal: cannot validate local ',
         univName,
         ' record:',
         out,
@@ -158,6 +161,10 @@ export class Multiverse implements MultiverseIF {
         asError(error).message,
       );
       throw new Error(`toLocal validation failure: ${error.message}`);
+    }
+
+    if (coll.debug) {
+      console.log('toLocal: result = ', out);
     }
 
     return out;
@@ -256,7 +263,7 @@ export class Multiverse implements MultiverseIF {
     }
 
     if (collection.debug) {
-      console.log('translating to LOCAL with schema', collection.schema.fields);
+      console.log('univToLocalFieldMap translating to LOCAL ');
     }
 
     const mappings: Record<string, string> = {};
