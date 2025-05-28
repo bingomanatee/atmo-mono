@@ -52,6 +52,7 @@ export class PlateSimulation implements PlateSimulationIF {
   readonly managers: Map<string, any>; // Map to store manager instances
   #l0NeighborCache: Map<string, string[]> = new Map(); // Cache for L0 cell neighbors
   #step: number = 0;
+  #maxPlateRadius: number | undefined;
 
   /**
    * Create a new plate simulation
@@ -67,6 +68,7 @@ export class PlateSimulation implements PlateSimulationIF {
       universeName = UNIVERSES.SIM,
       simulationId,
       plateCount = 0,
+      maxPlateRadius, // Extract maxPlateRadius
     } = props;
 
     // Initialize basic properties
@@ -90,6 +92,9 @@ export class PlateSimulation implements PlateSimulationIF {
     this.managers = new Map<string, any>();
     this.managers.set(MANAGERS.PLATE, new PlateSimulationPlateManager(this));
     this.managers.set(MANAGERS.PLATELET, new PlateletManager(this));
+
+    // Store maxPlateRadius
+    this.#maxPlateRadius = maxPlateRadius;
   }
 
   /**
@@ -114,7 +119,8 @@ export class PlateSimulation implements PlateSimulationIF {
 
       this.loadExistingSimulation(this.simulationId);
     } else {
-      this.setupNewSimulation(this.#initPlateCount);
+      // Pass maxPlateRadius to setupNewSimulation
+      this.setupNewSimulation(this.#initPlateCount, this.#maxPlateRadius);
     }
   }
 
@@ -147,8 +153,9 @@ export class PlateSimulation implements PlateSimulationIF {
     // Set the planet
     this.planet = planet;
 
-    // Get the plateCount from the simulation record
+    // Get the plateCount and maxPlateRadius from the simulation record
     const plateCount = simulation.plateCount;
+    const maxPlateRadius = simulation.maxPlateRadius; // Extract maxPlateRadius
 
     // Check if we need to generate plates
     if (plateCount) {
@@ -166,7 +173,11 @@ export class PlateSimulation implements PlateSimulationIF {
 
       // Only generate plates if there are none for this planet
       if (!hasPlatesForPlanet) {
-        const { plates } = this.plateGenerator(plateCount).generate();
+        // Pass maxPlateRadius to plateGenerator
+        const { plates } = this.plateGenerator(
+          plateCount,
+          maxPlateRadius,
+        ).generate();
 
         for (const plate of plates) {
           this.addPlate(
@@ -184,8 +195,12 @@ export class PlateSimulation implements PlateSimulationIF {
   /**
    * Set up a new simulation if none is specified
    * @param plateCount - Number of plates to generate
+   * @param maxPlateRadius - Optional maximum plate radius in radians
    */
-  private setupNewSimulation(plateCount: number = 0): void {
+  private setupNewSimulation(
+    plateCount: number = 0,
+    maxPlateRadius?: number,
+  ): void {
     // Check if a simulation exists, if not create one
     const simulationsCollection = this.simUniv.get(COLLECTIONS.SIMULATIONS);
 
@@ -198,6 +213,7 @@ export class PlateSimulation implements PlateSimulationIF {
       }
 
       let plateCount = simulation.plateCount;
+      let maxPlateRadius = simulation.maxPlateRadius; // Extract maxPlateRadius
 
       // Get the planet directly from the simulation's planetId
       if (simulation.planetId) {
@@ -214,10 +230,11 @@ export class PlateSimulation implements PlateSimulationIF {
           );
           this.planet = this.makePlanet(this.planetRadius);
 
-          // Update the simulation with the new planet ID
+          // Update the simulation with the new planet ID and maxPlateRadius
           simulationsCollection.set(this.#defaultSimId, {
             ...simulation,
             planetId: this.planet.id,
+            maxPlateRadius: maxPlateRadius, // Include maxPlateRadius
           });
         }
       } else {
@@ -227,16 +244,18 @@ export class PlateSimulation implements PlateSimulationIF {
         simulationsCollection.set(this.#defaultSimId, {
           ...simulation,
           planetId: this.planet.id,
+          maxPlateRadius: maxPlateRadius, // Include maxPlateRadius
         });
       }
     } else {
       // If no simulation exists, create a new planet
       this.planet = this.makePlanet(this.planetRadius);
 
-      // Create a new simulation with the plateCount
+      // Create a new simulation with the plateCount and maxPlateRadius
       this.addSimulation({
         planetId: this.planet.id,
         plateCount: plateCount,
+        maxPlateRadius: maxPlateRadius, // Include maxPlateRadius
       });
     }
 
@@ -246,7 +265,11 @@ export class PlateSimulation implements PlateSimulationIF {
 
     // Generate plates if the simulation has a plateCount and there are none already
     if (plateCount > 0 && existingPlatesCount === 0) {
-      const { plates } = this.plateGenerator(plateCount).generate();
+      // Pass maxPlateRadius to plateGenerator
+      const { plates } = this.plateGenerator(
+        plateCount,
+        maxPlateRadius,
+      ).generate();
 
       for (const plate of plates) {
         this.addPlate(plate);
@@ -254,10 +277,11 @@ export class PlateSimulation implements PlateSimulationIF {
     }
   }
 
-  plateGenerator(plateCount: number) {
+  plateGenerator(plateCount: number, maxPlateRadius?: number) {
     return new PlateSpectrumGenerator({
       planetRadius: this.planetRadius,
       plateCount: plateCount,
+      maxPlateRadius: maxPlateRadius, // Pass maxPlateRadius to the generator
     });
   }
 
@@ -266,7 +290,7 @@ export class PlateSimulation implements PlateSimulationIF {
   }
 
   addSimulation(props: SimProps): string {
-    let { name, id, radius, planetId, plateCount = 0 } = props;
+    let { name, id, radius, planetId, plateCount = 0, maxPlateRadius } = props; // Extract maxPlateRadius
 
     if (!id) id = uuidV4();
     if (!name) name = `sim-${id}`;
@@ -294,6 +318,7 @@ export class PlateSimulation implements PlateSimulationIF {
       name,
       planetId,
       plateCount,
+      maxPlateRadius, // Include maxPlateRadius in simulation record
     });
 
     // Set as default if no default exists

@@ -76,6 +76,10 @@ export const SIM_SIMULATIONS_SCHEMA = {
   name: FIELD_TYPES.string,
   planetId: FIELD_TYPES.string,
   plateCount: FIELD_TYPES.number,
+  maxPlateRadius: {
+    type: FIELD_TYPES.number,
+    meta: { optional: true, default: Math.PI / 6 },
+  },
 };
 
 export const SIM_PLATE_STEPS_SCHEMA = {
@@ -192,6 +196,7 @@ export const UNIVERSAL_SIMULATIONS_SCHEMA = {
   name: FIELD_TYPES.string,
   planetId: FIELD_TYPES.string,
   plateCount: FIELD_TYPES.number,
+  maxPlateRadius: FIELD_TYPES.number,
 };
 
 export const UNIVERSAL_PLATE_STEPS_SCHEMA = {

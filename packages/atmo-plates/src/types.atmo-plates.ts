@@ -70,6 +70,7 @@ export interface PlateGeneratorConfig {
   minThickness?: number; // km, lower bound
   maxThickness?: number; // km, upper bound
   variationFactor?: number; // 0-1 random variation
+  maxPlateRadius?: number; // Add maxPlateRadius in radians
 }
 
 // Extended plate interface with simulation-specific properties

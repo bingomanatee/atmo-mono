@@ -43,6 +43,7 @@ export interface PlateSimulationProps {
   multiverse?: Multiverse;
   universeName?: string;
   simulationId?: string;
+  maxPlateRadius?: number;
 }
 
 export interface PlateSimulationIF {
