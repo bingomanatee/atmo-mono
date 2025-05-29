@@ -1,10 +1,11 @@
 import { Vector3 } from 'three';
-import type { PlateletIF } from '../types.PlateSimulation';
-import type { SimStepIF } from '../types.PlateSimulation';
-import type { PlateletStepIF } from '../types.PlateSimulation';
-import type { PlateSimulationIF } from '../types.PlateSimulation';
 import { COLLECTIONS } from '../constants';
-import type { Platelet } from '../schemas/platelet';
+import type {
+  PlateletIF,
+  PlateletStepIF,
+  PlateSimulationIF,
+  SimStepIF,
+} from '../types.PlateSimulation';
 
 export class PlateSimulationPlateManager {
   private sim: PlateSimulationIF;
@@ -86,8 +87,18 @@ export class PlateSimulationPlateManager {
       // const movement = this.calculatePlateletMovement(platelet, plate);
 
       // Update platelet position and properties
-      platelet.position.add(movement);
-      platelet.float += movement.y;
+      // Convert to Vector3 if needed to use add method
+      if ('add' in platelet.position) {
+        (platelet.position as any).add(movement);
+      } else {
+        // Create a new position object since Vector3Like properties are readonly
+        platelet.position = {
+          x: platelet.position.x + movement.x,
+          y: platelet.position.y + movement.y,
+          z: platelet.position.z + movement.z,
+        };
+      }
+      platelet.float = (platelet.float || 0) + movement.y;
       platelet.thickness = Math.max(0, platelet.thickness + movement.y);
 
       // Update H3 index if position changed significantly (Assuming updateH3Index exists)

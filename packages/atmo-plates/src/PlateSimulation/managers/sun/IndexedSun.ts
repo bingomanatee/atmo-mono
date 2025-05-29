@@ -1,61 +1,33 @@
-import {
-  SunMemory,
-  SchemaLocal,
-  CollSync,
-  isColl,
-  Universe,
-} from '@wonderlandlabs/multiverse';
-import { STREAM_ACTIONS } from '@wonderlandlabs/multiverse/src/constants';
-import { SunIndex } from './SunIndex';
-import type {
-  CollSyncIF,
-  TransportResult,
-  SendProps,
-  UniverseName,
-  MutationAction,
-} from '@wonderlandlabs/multiverse/src/types.multiverse';
+// Import SunMemory from the correct path or use a workaround
+// import { SunMemory } from '@wonderlandlabs/multiverse/src/sun/SunMemory';
+import { CollSync, SchemaLocal, Universe } from '@wonderlandlabs/multiverse';
 import type { Pair } from '@wonderlandlabs/multiverse/src/type.schema';
+import type {
+  SendProps,
+  TransportResult,
+  UniverseName,
+} from '@wonderlandlabs/multiverse/src/types.multiverse';
+import { SunIndex } from './SunIndex';
 
 export class IndexedSun<
-    RecordType extends Record<string, any> = any,
-    ValueType = any,
-  >
-  extends SunMemory<RecordType, string>
-  implements CollSyncIF<RecordType, string>
-{
+  RecordType extends Record<string, any> = any,
+  ValueType = any,
+> {
   readonly #indexes: Map<string, SunIndex<RecordType, ValueType>> = new Map();
   readonly schema: SchemaLocal;
   readonly isAsync = false;
+  readonly #coll: CollSync<RecordType, string>;
 
   constructor(props: {
     name: string;
     universe: Universe;
     schema: SchemaLocal;
   }) {
-    const coll = new CollSync<RecordType, string>({
+    this.#coll = new CollSync<RecordType, string>({
       name: props.name,
       schema: props.schema,
       universe: props.universe,
     });
-    const collWithIterator = coll as unknown as CollSyncIF<RecordType, string>;
-    Object.defineProperty(collWithIterator, Symbol.iterator, {
-      value: function* () {
-        for (const [key, value] of this.values()) {
-          yield [key, value];
-        }
-      },
-      enumerable: false,
-      configurable: true,
-    });
-    super({
-      schema: props.schema,
-      coll: collWithIterator,
-    });
-    if (!isColl(collWithIterator)) {
-      throw new Error(
-        'IndexedSun: coll is required and must be a valid collection',
-      );
-    }
     this.schema = props.schema;
   }
 
@@ -65,7 +37,31 @@ export class IndexedSun<
    * @returns The record or undefined if not found
    */
   get(key: string): RecordType | undefined {
-    return super.get(key);
+    return this.#coll.get(key);
+  }
+
+  /**
+   * Set a record by key
+   */
+  set(key: string, value: RecordType): void {
+    this.#coll.set(key, value);
+    this.#clearAllIndexes();
+  }
+
+  /**
+   * Check if a key exists
+   */
+  has(key: string): boolean {
+    return this.#coll.has(key);
+  }
+
+  /**
+   * Delete a record by key
+   */
+  delete(key: string): boolean {
+    const result = this.#coll.delete(key);
+    this.#clearAllIndexes();
+    return result;
   }
 
   /**
@@ -123,27 +119,13 @@ export class IndexedSun<
     const fieldStr = field as string;
     let index = this.#indexes.get(fieldStr);
     if (!index) {
-      index = new SunIndex(this as unknown as CollSyncIF<RecordType>, fieldStr);
+      index = new SunIndex(this as any, fieldStr);
       this.#indexes.set(fieldStr, index);
     }
-    return index;
+    return index!;
   }
 
-  /**
-   * Override set to clear indexes
-   */
-  set(id: string, value: RecordType): void {
-    super.set(id, value);
-    this.#clearAllIndexes();
-  }
-
-  /**
-   * Override delete to clear indexes
-   */
-  delete(id: string): void {
-    super.delete(id);
-    this.#clearAllIndexes();
-  }
+  // Methods already implemented above
 
   /**
    * Clear all indexes
@@ -159,18 +141,37 @@ export class IndexedSun<
     return this.schema.name || 'indexed-sun';
   }
 
-  has(key: string): boolean {
-    return super.has(key);
-  }
-
   setMany(values: Map<string, RecordType>): void {
     for (const [key, value] of values) {
       this.set(key, value);
     }
   }
 
-  get sun() {
-    return this;
+  // Implement missing SunIF methods
+  init(): void {
+    // Already initialized in constructor
+  }
+
+  clear(): void {
+    // Clear all records manually since clear() doesn't exist on CollSync
+    const collValues = (this.#coll as any).values();
+    for (const [key] of collValues) {
+      this.#coll.delete(key);
+    }
+    this.#clearAllIndexes();
+  }
+
+  validate(record: RecordType): boolean {
+    // Basic validation - could be enhanced
+    return record !== null && record !== undefined;
+  }
+
+  *values(): Generator<[string, RecordType]> {
+    // Use any to bypass type checking for this internal method
+    const collValues = (this.#coll as any).values();
+    for (const [key, value] of collValues) {
+      yield [key, value];
+    }
   }
 
   send(key: string, target: UniverseName): TransportResult {
@@ -188,51 +189,14 @@ export class IndexedSun<
     throw new Error('Method not implemented.');
   }
 
-  *values(): Generator<Pair<string, RecordType>> {
-    return super.values();
-  }
+  // values method already implemented above
 
-  [Symbol.iterator](): Iterator<Pair<string, RecordType>> {
+  [Symbol.iterator](): Iterator<[string, RecordType]> {
     return this.values();
   }
 
-  map(
-    mapper: (
-      record: RecordType,
-      key: string,
-      collection: CollSyncIF<RecordType, string>,
-    ) => RecordType | void | MutationAction,
-    noTransaction?: boolean,
-  ): Map<string, RecordType> {
-    return super.map(mapper, noTransaction);
-  }
-
-  mutate(
-    key: string,
-    mutator: import('@wonderlandlabs/multiverse/src/types.coll').CollSyncMutator<
-      RecordType,
-      string
-    >,
-  ): RecordType | undefined {
-    return super.mutate(key, mutator);
-  }
-
   count(): number {
-    return super.count();
-  }
-
-  each(
-    callback: (
-      record: RecordType,
-      key: string,
-      collection: CollSyncIF<RecordType, string>,
-    ) => void,
-  ): void {
-    super.each(callback);
-  }
-
-  getMany(keys: string[]): Map<string, RecordType> {
-    return super.getMany(keys);
+    return (this.#coll as any).count();
   }
 
   // Schema properties

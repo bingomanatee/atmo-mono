@@ -1,6 +1,6 @@
-import { describe, expect, it } from 'vitest';
 import { Vector3 } from 'three';
-import { Platelet, createPlatelet } from './platelet';
+import { describe, expect, it } from 'vitest';
+import { createPlatelet } from './platelet';
 
 describe('platelet', () => {
   it('should create a platelet with default values', () => {

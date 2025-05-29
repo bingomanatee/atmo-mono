@@ -1,7 +1,6 @@
-import { PlateSimulation } from './PlateSimulation';
-import { Vector3 } from 'three';
 import { COLLECTIONS } from './constants';
 import { PlateletManager } from './managers/PlateletManager';
+import { PlateSimulation } from './PlateSimulation';
 
 export const EARTH_RADIUS = 6371000; // meters
 

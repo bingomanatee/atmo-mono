@@ -1,11 +1,9 @@
-import { PlateletCollisionSimulator } from './PlateletCollisionSimulator';
-import { PlateSimulation } from './PlateSimulation';
 import { Vector3 } from 'three';
 import { v4 as uuidV4 } from 'uuid';
 import { COLLECTIONS } from './constants';
 import { Platelet } from './Platelet';
-import { gridDisk } from 'h3-js';
-import { h3HexRadiusAtResolution } from '@wonderlandlabs/atmo-utils';
+import { PlateletCollisionSimulator } from './PlateletCollisionSimulator';
+import { PlateSimulation } from './PlateSimulation';
 
 describe('PlateletCollisionSimulator', () => {
   let sim: PlateSimulation;

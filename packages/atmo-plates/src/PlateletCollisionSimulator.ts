@@ -1,5 +1,4 @@
 import { FIELD_TYPES, SchemaLocal } from '@wonderlandlabs/multiverse';
-import type { PostParams } from '@wonderlandlabs/multiverse/src/type.schema';
 import { Platelet } from './PlateSimulation/schemas/platelet';
 
 // This schema is no longer needed as its fields are either:

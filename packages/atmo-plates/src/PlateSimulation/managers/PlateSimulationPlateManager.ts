@@ -1,20 +1,19 @@
 import { randomNormal, varyP } from '@wonderlandlabs/atmo-utils';
+import { latLngToCell } from 'h3-js';
 import { Object3D, Vector3 } from 'three';
 import { v4 as uuidV4 } from 'uuid';
 import { COLLECTIONS } from '../../PlateSimulation/constants';
 import { varySpeedByRadius } from '../../utils';
 import { MANAGERS } from '../PlateSimulation';
+import type { Platelet } from '../schemas/platelet';
 import type {
+  PlateletStepIF,
   PlateSimulationIF,
   SimPlateIF,
   SimStepIF,
-  PlateletStepIF,
 } from '../types.PlateSimulation';
 import { createOrbitalFrame, movePlate } from '../utils/plateMovement';
-import { ThreeOrbitalFrame } from '@wonderlandlabs/atmo-three-orbit';
 import { PlateletManager } from './PlateletManager';
-import { latLngToCell } from 'h3-js';
-import type { Platelet } from '../schemas/platelet';
 
 export type PSPMProps = {
   sim: PlateSimulationIF;

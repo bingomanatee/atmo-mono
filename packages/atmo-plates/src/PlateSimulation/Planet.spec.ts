@@ -1,6 +1,6 @@
+import { EARTH_RADIUS } from '@wonderlandlabs/atmo-utils';
 import { Vector3 } from 'three';
 import { Planet } from './Planet';
-import { EARTH_RADIUS } from '@wonderlandlabs/atmo-utils';
 
 describe('Planet', () => {
   let earthPlanet: Planet;

@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
 import { Vector3 } from 'three';
+import { describe, expect, it } from 'vitest';
 import { movePlate } from './plateMovement';
 
 // Tests for the movePlate function, which simulates plate movement on a planet's surface

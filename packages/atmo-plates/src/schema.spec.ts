@@ -1,10 +1,6 @@
-import { describe, it, expect } from 'vitest';
-import {
-  FIELD_TYPES,
-  SchemaLocal,
-  validateField,
-} from '@wonderlandlabs/multiverse';
-import { SIM_PLATES_SCHEMA, SIM_PLATELETS_SCHEMA } from './schema';
+import { SchemaLocal, validateField } from '@wonderlandlabs/multiverse';
+import { describe, expect, it } from 'vitest';
+import { SIM_PLATELETS_SCHEMA, SIM_PLATES_SCHEMA } from './schema';
 
 describe('Schema Validation', () => {
   describe('SIM_PLATES_SCHEMA', () => {

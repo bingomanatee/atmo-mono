@@ -1,17 +1,17 @@
 import type { Vector3Like } from 'three';
 import { PLATE_TYPES } from './constants';
 import {
-  PlateIF,
+  Identifiable,
+  PlanetIF,
+  PlateDistributionSummary,
   PlateExtendedIF,
+  PlateGeneratorConfig,
+  PlateIF,
+  PlateManifest,
   PlateSimExtendedIF,
   PlateTypeValue,
-  Identifiable,
-  PlateDistributionSummary,
-  PlateManifest,
-  PlateGeneratorConfig,
-  SimSimulation,
-  PlanetIF,
   SimPlanetIF,
+  SimSimulation,
 } from './types.atmo-plates';
 
 /**

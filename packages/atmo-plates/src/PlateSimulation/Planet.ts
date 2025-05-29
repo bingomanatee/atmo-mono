@@ -1,14 +1,14 @@
-import { Vector3 } from 'three';
-import type { Vector3Like } from 'three';
 import {
+  cellToLatLng,
+  getH3CellForPosition,
   latLonToPoint,
   pointToLatLon,
-  getH3CellForPosition,
-  cellToLatLng,
 } from '@wonderlandlabs/atmo-utils';
 import { gridDisk } from 'h3-js';
-import type { SimPlanetIF } from '../types.atmo-plates';
+import type { Vector3Like } from 'three';
+import { Vector3 } from 'three';
 import { v4 as uuidV4 } from 'uuid';
+import type { SimPlanetIF } from '../types.atmo-plates';
 
 export class Planet implements SimPlanetIF {
   readonly id: string;

@@ -8,19 +8,18 @@
  */
 
 import { varyP } from '@wonderlandlabs/atmo-utils';
+import { v4 as uuidV4 } from 'uuid';
 import {
+  PlateExtendedIF,
   PlateGeneratorConfig,
   PlateManifest,
-  PlateExtendedIF,
-  Identifiable,
 } from '../types.atmo-plates';
 import {
-  calculateSphereSurfaceArea,
-  calculatePlateVolume,
   calculateMass,
+  calculatePlateVolume,
+  calculateSphereSurfaceArea,
   determineBehavioralType,
 } from '../utils/plateUtils';
-import { v4 as uuidV4 } from 'uuid';
 
 export class PlateSpectrumGenerator {
   private config: Required<

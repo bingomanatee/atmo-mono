@@ -1,6 +1,6 @@
-import type { PlateletIF } from '../types.PlateSimulation';
 import { Vector3 } from 'three';
 import { v4 as uuidV4 } from 'uuid';
+import type { PlateletIF } from './types.PlateSimulation';
 
 export class Platelet implements PlateletIF {
   id: string;

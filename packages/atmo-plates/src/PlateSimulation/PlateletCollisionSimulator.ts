@@ -1,8 +1,7 @@
-import { PlateSimulation } from './PlateSimulation';
-import { Platelet } from './schemas/platelet';
-import type { PlateletIF } from './types.PlateSimulation';
 import { Vector3 } from 'three';
 import { COLLECTIONS } from './constants';
+import { PlateSimulation } from './PlateSimulation';
+import { Platelet } from './schemas/platelet';
 
 export class PlateletCollisionSimulator {
   readonly #sim: PlateSimulation;

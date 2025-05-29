@@ -1,7 +1,9 @@
 import { Vector3 } from 'three';
-import type { PlateSimulationIF } from '../types.PlateSimulation';
 import { COLLECTIONS } from '../constants';
-import type { PlateletStepIF } from '../types.PlateSimulation';
+import type {
+  PlateletStepIF,
+  PlateSimulationIF,
+} from '../types.PlateSimulation';
 
 export class PlateletCollisionManager {
   readonly #sim: PlateSimulationIF;

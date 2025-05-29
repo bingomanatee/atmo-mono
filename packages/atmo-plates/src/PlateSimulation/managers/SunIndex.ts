@@ -17,7 +17,7 @@ export class SunIndex<T> {
   #build(): void {
     this.#cache.clear();
     for (const [id, record] of this.#engine.entries()) {
-      const value = String(record[this.#key]);
+      const value = String((record as Record<string, unknown>)[this.#key]);
       if (!this.#cache.has(value)) {
         this.#cache.set(value, new Set());
       }

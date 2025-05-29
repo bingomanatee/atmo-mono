@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
 import { Vector3 } from 'three';
+import { describe, expect, it } from 'vitest';
 
 // Helper function to round coordinates for easier testing
 function roundVector(vector: Vector3): Vector3 {

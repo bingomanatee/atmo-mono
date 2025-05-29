@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
-  PlateSpectrumGenerator,
   type PlateGeneratorConfig,
   type PlateManifest,
+  PlateSpectrumGenerator,
 } from './PlateSpectrumGenerator';
 
 describe('PlateSpectrumGenerator:class', () => {

@@ -1,17 +1,17 @@
-import { Vector3 } from 'three';
 import {
-  cellToVector,
-  latLngToCell,
   cellToChildren,
-  h3HexRadiusAtResolution,
   cellToLatLng,
+  cellToVector,
   getResolution,
+  h3HexRadiusAtResolution,
+  latLngToCell,
 } from '@wonderlandlabs/atmo-utils';
+import type { CollSyncIF } from '@wonderlandlabs/multiverse/src/types.coll';
 import { gridDisk } from 'h3-js';
+import { Vector3 } from 'three';
+import { floatElevation } from '../../utils/plateUtils';
 import type { Platelet } from '../schemas/platelet';
 import type { SimPlateIF } from '../types.PlateSimulation';
-import { floatElevation } from '../../utils/plateUtils';
-import type { CollSyncIF } from '@wonderlandlabs/multiverse/src/types.coll';
 
 declare module '@wonderlandlabs/atmo-utils';
 

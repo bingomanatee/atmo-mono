@@ -215,13 +215,6 @@ export interface SunIfAsync<RecordType = DataRecord, KeyType = DataKey>
     ) => void,
   ): Promise<void>;
 
-  /**
-   * Optional method to find records matching a query
-   * @param query - The query to match against
-   * @returns A generator of [key, value] pairs for matching records
-   */
-  find?(...query: any[]): AsyncGenerator<[KeyType, RecordType]>;
-
   getMany(keys: KeyType[]): AsyncGenerator<[KeyType, RecordType]>;
   getAll(): AsyncGenerator<[KeyType, RecordType]>;
 

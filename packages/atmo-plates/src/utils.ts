@@ -1,21 +1,24 @@
 import { EARTH_RADIUS } from '@wonderlandlabs/atmo-utils';
-import { FIELD_TYPES, CollSync } from '@wonderlandlabs/multiverse';
-import { SchemaLocal, Universe } from '@wonderlandlabs/multiverse';
-import { Multiverse } from '@wonderlandlabs/multiverse';
-import { Vector3 } from 'three';
+import {
+  CollSync,
+  FIELD_TYPES,
+  Multiverse,
+  SchemaLocal,
+  Universe,
+} from '@wonderlandlabs/multiverse';
 import type { Vector3Like } from 'three';
+import { Vector3 } from 'three';
 import { COLLECTIONS } from './PlateSimulation/constants';
+import { IndexedSun } from './PlateSimulation/managers/sun/IndexedSun';
 import {
   SIM_PLANETS_SCHEMA,
   SIM_PLATE_STEPS_SCHEMA,
+  SIM_PLATELET_STEPS_SCHEMA,
+  SIM_PLATELETS_SCHEMA,
   SIM_PLATES_SCHEMA,
   SIM_SIMULATIONS_SCHEMA,
   UNIVERSES,
-  SIM_PLATELETS_SCHEMA,
-  SIM_PLATELET_STEPS_SCHEMA,
-  plateletsFilterRecord,
 } from './schema';
-import { IndexedSun } from './PlateSimulation/managers/sun/IndexedSun';
 
 export function coord(prefix = '') {
   return {
@@ -72,11 +75,7 @@ export function simUniverse(mv: Multiverse) {
   const plateletsCollection = new CollSync({
     name: COLLECTIONS.PLATELETS,
     universe: simUniv,
-    schema: new SchemaLocal(
-      COLLECTIONS.PLATELETS,
-      SIM_PLATELETS_SCHEMA,
-      plateletsFilterRecord,
-    ),
+    schema: new SchemaLocal(COLLECTIONS.PLATELETS, SIM_PLATELETS_SCHEMA),
   });
 
   return simUniv;

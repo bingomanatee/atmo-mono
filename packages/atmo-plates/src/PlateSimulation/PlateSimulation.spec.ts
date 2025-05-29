@@ -1,4 +1,5 @@
 import { EARTH_RADIUS } from '@wonderlandlabs/atmo-utils';
+import type { CollSyncIF } from '@wonderlandlabs/multiverse';
 import {
   CollSync,
   FIELD_TYPES,
@@ -6,15 +7,14 @@ import {
   SchemaLocal,
   Universe,
 } from '@wonderlandlabs/multiverse';
-import type { CollSyncIF } from '@wonderlandlabs/multiverse';
+import { Vector3 } from 'three';
 import { v4 as uuidV4 } from 'uuid';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { UNIVERSES } from '../schema';
-import { COLLECTIONS } from './constants';
 import type { PlateIF } from '../types.atmo-plates';
 import { simUniverse } from '../utils';
+import { COLLECTIONS } from './constants';
 import { PlateSimulation } from './PlateSimulation';
-import { Vector3 } from 'three';
 import type { SimPlateIF } from './types.PlateSimulation';
 
 const DEFAULT_PLANET_RADIUS = 1000000;

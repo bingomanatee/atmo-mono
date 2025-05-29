@@ -1,9 +1,8 @@
 import { Vector3 } from 'three';
+import { COLLECTIONS } from '../constants';
 import { Platelet } from '../schemas/platelet';
 import type { PlateSimulationIF } from '../types.PlateSimulation';
-import { COLLECTIONS } from '../constants';
 import { getH0CellForPosition, processH0Cell } from '../utils/plateletUtils';
-import { h3HexRadiusAtResolution } from '@wonderlandlabs/atmo-utils';
 
 export class PlateletManager {
   public static readonly PLATELET_CELL_LEVEL = 3; // Resolution level for platelets

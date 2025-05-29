@@ -1,5 +1,5 @@
-import { Vector3, Object3D } from 'three';
 import { ThreeOrbitalFrame } from '@wonderlandlabs/atmo-three-orbit';
+import { Object3D, Vector3 } from 'three';
 
 /**
  * Creates an orbital frame for plate movement

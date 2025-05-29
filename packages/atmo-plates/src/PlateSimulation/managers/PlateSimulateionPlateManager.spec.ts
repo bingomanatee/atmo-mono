@@ -1,7 +1,7 @@
-import { describe, it, expect, beforeEach } from 'vitest';
-import { PlateSimulation, MANAGERS } from '../PlateSimulation';
-import PlateSimulationPlateManager from './PlateSimulationPlateManager';
+import { beforeEach, describe, expect, it } from 'vitest';
 import { COLLECTIONS } from '../constants';
+import { MANAGERS, PlateSimulation } from '../PlateSimulation';
+import PlateSimulationPlateManager from './PlateSimulationPlateManager';
 
 describe('PlateSimulationPlateManager', () => {
   let sim: PlateSimulation;

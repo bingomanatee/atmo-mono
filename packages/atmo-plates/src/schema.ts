@@ -1,16 +1,14 @@
 // ─── Imports ─────────────────────────────────────────────────────
 import {
   FIELD_TYPES,
-  SchemaUniversal,
   SchemaLocal,
+  SchemaUniversal,
 } from '@wonderlandlabs/multiverse';
-import type { PostParams } from '@wonderlandlabs/multiverse/src/type.schema';
-import type { Plate } from './PlateSimulation/PlateSimulation';
-import type { PlateIF } from './types.atmo-plates';
-import { coord } from './utils';
+import { Vector3 } from 'three';
 import { COLLECTIONS } from './PlateSimulation/constants';
 import { Platelet } from './PlateSimulation/Platelet';
-import { Vector3 } from 'three';
+import type { Plate } from './PlateSimulation/PlateSimulation';
+import { coord } from './utils';
 
 // ─── Constants: Collections & Universes ───────────────────────────
 export const UNIVERSES = {

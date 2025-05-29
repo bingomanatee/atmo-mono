@@ -1,12 +1,12 @@
+import { EARTH_RADIUS, randomNormal } from '@wonderlandlabs/atmo-utils';
 import * as fs from 'fs';
 import * as path from 'path';
 import { Vector3 } from 'three';
-import { beforeAll, describe, expect, it, test } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 import { COLLECTIONS } from '../constants';
 import { PlateSimulation } from '../PlateSimulation';
 import { createTestPlate, setupTestSimulation } from '../test-setup';
 import { PlateletManager } from './PlateletManager';
-import { EARTH_RADIUS, randomNormal } from '@wonderlandlabs/atmo-utils';
 
 // Helper to generate a random plate
 const generateRandomPlate = () => {

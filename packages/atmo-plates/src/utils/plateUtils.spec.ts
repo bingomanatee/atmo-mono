@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { PLATE_TYPES } from '../constants';
+import { type PlateIF } from '../types.atmo-plates';
 import {
-  calculateSphereSurfaceArea,
-  calculatePlateVolume,
   calculateMass,
+  calculatePlateVolume,
+  calculateSphereSurfaceArea,
   determineBehavioralType,
   extendPlate,
 } from './plateUtils';
-import { type PlateIF } from '../types.atmo-plates';
 
 describe('plateUtils', () => {
   describe('calculateSphereSurfaceArea', () => {

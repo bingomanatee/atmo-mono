@@ -1,22 +1,23 @@
 import { EARTH_RADIUS, randomNormal } from '@wonderlandlabs/atmo-utils';
 import { Multiverse } from '@wonderlandlabs/multiverse';
 import type { Vector3Like } from 'three';
+import { Vector3 } from 'three';
 import { v4 as uuidV4 } from 'uuid';
 import { PlateSpectrumGenerator } from '../generator/PlateSpectrumGenerator';
 import { UNIVERSAL_SCHEMA, UNIVERSES } from '../schema';
 import { isPlateExtendedIF } from '../typeGuards';
-import type { SimSimulation } from '../types.atmo-plates';
 import type {
   PlateExtendedIF,
   PlateIF,
   SimPlanetIF,
-  Identifiable,
+  SimSimulation,
 } from '../types.atmo-plates';
 import { simUniverse } from '../utils';
 import { extendPlate, isostaticElevation } from '../utils/plateUtils';
 import { COLLECTIONS } from './constants';
 import { PlateletManager } from './managers/PlateletManager';
 import PlateSimulationPlateManager from './managers/PlateSimulationPlateManager';
+import { Planet } from './Planet';
 import type {
   AddPlateProps,
   PlateSimulationIF,
@@ -24,8 +25,6 @@ import type {
   SimPlateIF,
   SimProps,
 } from './types.PlateSimulation';
-import { Vector3 } from 'three';
-import { Planet } from './Planet';
 
 // Define manager keys
 export const MANAGERS = {
@@ -310,6 +309,11 @@ export class PlateSimulation implements PlateSimulationIF {
     }
     // If neither planetId nor radius is provided, use the existing planet
     else {
+      if (!this.planet) {
+        throw new Error(
+          'No planet available and no planetId or radius provided',
+        );
+      }
       planetId = this.planet.id;
     }
 
@@ -459,7 +463,6 @@ export class PlateSimulation implements PlateSimulationIF {
 
       // Add simulation-specific properties
       plateData = {
-        id, // Explicitly add id to ensure TypeScript recognizes it
         ...extendedPlate,
         name,
         planetId,

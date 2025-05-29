@@ -1,13 +1,13 @@
+import type { Multiverse, Universe } from '@wonderlandlabs/multiverse';
 import type { Vector3Like } from 'three';
-import type { Universe, Multiverse } from '@wonderlandlabs/multiverse';
+import type { PlateSpectrumGenerator } from '../generator/PlateSpectrumGenerator';
 import type {
-  PlateIF as PlateIFBase,
-  PlateExtendedIF,
   Identifiable,
+  PlateExtendedIF,
+  PlateIF as PlateIFBase,
   SimPlanetIF,
   SimSimulation,
 } from '../types.atmo-plates';
-import type { PlateSpectrumGenerator } from '../generator/PlateSpectrumGenerator';
 import { Planet } from './Planet';
 
 // Simulation plate interface with identity and relational links
@@ -66,8 +66,8 @@ export interface PlateSimulationIF {
   readonly simulation: SimSimulation;
 
   // Planet management
-  planet?: Planet;
-  makePlanet(radius?: number, name?: string): Planet;
+  planet?: SimPlanetIF;
+  makePlanet(radius?: number, name?: string): SimPlanetIF;
   getPlanet(id: string): Planet;
 }
 
@@ -125,6 +125,12 @@ export interface PlateletIF {
   sector: string;
   h3Index?: string;
   float?: number;
+  // Additional properties for tracking state
+  lastPosition?: Vector3Like;
+  lastStep?: number;
+  lastH3Index?: string;
+  lastFloat?: number;
+  lastThickness?: number;
 }
 
 // Raw platelet data interface
