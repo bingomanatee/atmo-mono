@@ -556,7 +556,7 @@ export class PlateSimulation implements PlateSimulationIF {
         if (distance < combinedRadius * 1.2) {
           // 20% buffer
           // Calculate base repulsion force magnitude based on elevation interaction
-          const baseRepulsionForceMagnitude = 100; // Base force in km
+          const baseRepulsionForceMagnitude = 500; // Increased base force in km for more visible movement
 
           // Calculate total mass and mass ratios for distributing force
           const totalMass = plate1.mass + plate2.mass;
@@ -592,7 +592,7 @@ export class PlateSimulation implements PlateSimulationIF {
     }
 
     // Apply accumulated forces to update positions using find generator again
-    const deltaTime = 0.01; // Fixed time step for consistent force application
+    const deltaTime = 2.0; // Even larger time step for breaking through force equilibrium
     for (const [id, plate] of platesCollection.find(
       'planetId',
       this.planet?.id,
