@@ -20,10 +20,23 @@ import {
   calculateMass,
   determineBehavioralType,
 } from '../utils/plateUtils';
+import { v4 as uuidV4 } from 'uuid';
 
 export class PlateSpectrumGenerator {
-  private config: Required<PlateGeneratorConfig>;
+  private config: Required<
+    Omit<
+      PlateGeneratorConfig,
+      | 'simulationSteps'
+      | 'repulsionStrength'
+      | 'attractionStrength'
+      | 'densityTolerance'
+      | 'deltaTime'
+    >
+  >;
   private planetSurfaceArea: number;
+  private readonly planetRadius: number;
+  private readonly plateCount: number;
+  private readonly maxPlateRadius?: number;
 
   /**
    * @param config - Configuration options for plate generation
@@ -38,10 +51,13 @@ export class PlateSpectrumGenerator {
       minThickness: config.minThickness ?? 7, // km (typical oceanic crust)
       maxThickness: config.maxThickness ?? 35, // km (typical continental crust)
       variationFactor: config.variationFactor ?? 0.2,
-      maxPlateRadius: config.maxPlateRadius, // Receive maxPlateRadius
+      maxPlateRadius: config.maxPlateRadius ?? Math.PI / 6, // Default to PI/6 if not provided
     };
 
     this.planetSurfaceArea = calculateSphereSurfaceArea(config.planetRadius);
+    this.planetRadius = config.planetRadius;
+    this.plateCount = config.plateCount;
+    this.maxPlateRadius = config.maxPlateRadius;
   }
 
   // Static convenience method to generate plates without creating an instance
@@ -50,7 +66,7 @@ export class PlateSpectrumGenerator {
     return generator.generate();
   }
   public generate(): PlateManifest {
-    const plates = this.generatePlates(); // Initial generation
+    let plates = this.generatePlates(); // Initial generation
 
     // --- Post-processing: Enforce maximum plate radius ---
     // Convert max allowed radius from radians to a linear distance on the planet surface
@@ -230,5 +246,131 @@ export class PlateSpectrumGenerator {
       pct: this.config.variationFactor,
       lerp,
     });
+  }
+
+  /**
+   * Generate a single plate with optional preset values
+   * @param preset - Partial plate properties to override generated values
+   * @returns A single generated plate with preset values applied where specified
+   */
+  public generateOne(preset: Partial<PlateExtendedIF>): PlateExtendedIF {
+    const { minDensity, maxDensity, minThickness, maxThickness } = this.config;
+
+    // Always calculate radius first, then derive area
+    let radius: number;
+    if (preset.radius !== undefined) {
+      radius = preset.radius;
+    } else {
+      // Generate a random size if radius not provided
+      const targetArea = this.planetSurfaceArea * this.config.targetCoverage;
+      // Generate a random rank between 1 and 100 for the power law distribution
+      const randomRank = Math.floor(Math.random() * 100) + 1;
+      const rawSize = Math.pow(randomRank, -this.config.powerLawExponent);
+      // Normalize against the sum of a typical distribution
+      const normalizedSize = rawSize / 2.5; // Approximate normalization factor for power law
+      const area = targetArea * normalizedSize;
+      radius = Math.sqrt(area / Math.PI);
+    }
+
+    // Calculate area from radius: A = πr²
+    const area = Math.PI * radius * radius;
+
+    // Use preset values if provided, otherwise generate them
+    const density =
+      preset.density ??
+      this.interpolateProperty(
+        minDensity,
+        maxDensity,
+        Math.random(), // Random rank for single plate
+      );
+
+    const thickness =
+      preset.thickness ??
+      this.interpolateProperty(
+        maxThickness,
+        minThickness,
+        Math.random(), // Random rank for single plate
+      );
+
+    // Calculate volume and mass using utility functions
+    const volume = calculatePlateVolume(area, thickness);
+    const mass = calculateMass(volume, density);
+
+    // Determine behavioral type based on density thresholds
+    const densityRange = maxDensity - minDensity;
+    const densityThreshold1 = minDensity + densityRange * 0.33;
+    const densityThreshold2 = minDensity + densityRange * 0.66;
+
+    // Determine behavioral type using utility function
+    const behavioralType = determineBehavioralType(
+      density,
+      densityThreshold1,
+      densityThreshold2,
+    );
+
+    // Calculate coverage percentage
+    const coveragePercent =
+      (area / this.planetSurfaceArea) * 100 * this.config.targetCoverage;
+
+    return {
+      id: preset.id ?? `plate-${Math.floor(Math.random() * 10000)}`,
+      radius,
+      area,
+      coveragePercent,
+      density,
+      thickness,
+      mass,
+      rank: preset.rank ?? 0,
+      behavioralType,
+    };
+  }
+
+  /**
+   * Generate plates with evenly distributed radii between specified bounds
+   * @param options - Configuration options for plate generation
+   * @param options.planetRadius - Radius of the planet in kilometers
+   * @param options.count - Number of plates to generate
+   * @param options.minRadius - Minimum radius in radians
+   * @param options.maxRadius - Maximum radius in radians
+   * @returns Array of plates with evenly distributed radii
+   */
+  public static generateLargePlates(options: {
+    planetRadius: number;
+    count: number;
+    minRadius: number;
+    maxRadius: number;
+  }): PlateExtendedIF[] {
+    const plates: PlateExtendedIF[] = [];
+
+    for (let i = 0; i < options.count; i++) {
+      // Generate random radius between minRadius and maxRadius
+      const radius =
+        options.minRadius +
+        Math.random() * (options.maxRadius - options.minRadius);
+
+      // Generate random density between 0.8 and 1.2
+      const density = 0.8 + Math.random() * 0.4;
+
+      // Generate random thickness between 1.0 and 2.0 for large plates
+      const thickness = 1.0 + Math.random();
+
+      // Generate random elevation between -4000 and 4000 meters for large plates
+      const elevation = -4000 + Math.random() * 8000;
+
+      // Calculate area based on radius
+      const area = 2 * Math.PI * (1 - Math.cos(radius));
+
+      plates.push({
+        id: uuidV4(),
+        radius,
+        density,
+        thickness,
+        elevation,
+        area,
+        isActive: true,
+      });
+    }
+
+    return plates;
   }
 }

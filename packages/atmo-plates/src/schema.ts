@@ -148,14 +148,12 @@ export const UNIVERSAL_PLATES_SCHEMA = {
   radius: FIELD_TYPES.number,
   density: FIELD_TYPES.number,
   thickness: FIELD_TYPES.number,
+  elevation: FIELD_TYPES.number,
+  area: FIELD_TYPES.number,
+  position: FIELD_TYPES.object,
+  velocity: FIELD_TYPES.object,
+  isActive: FIELD_TYPES.boolean,
   planetId: FIELD_TYPES.string,
-  plateletIds: {
-    type: FIELD_TYPES.array,
-    meta: {
-      itemType: FIELD_TYPES.string,
-      optional: true,
-    },
-  },
 };
 
 export const UNIVERSAL_PLATELETS_SCHEMA = {
@@ -213,37 +211,45 @@ export const UNIVERSAL_PLATE_STEPS_SCHEMA = {
 // ─── Universal Schema Map ───────────────────────────────────────
 export const UNIVERSAL_SCHEMA = new Map([
   [
-    COLLECTIONS.PLANETS,
-    new SchemaUniversal<Plate>(COLLECTIONS.PLANETS, UNIVERSAL_PLANETS_SCHEMA),
-  ],
-  [
-    COLLECTIONS.PLATES,
-    new SchemaUniversal<Plate>(COLLECTIONS.PLATES, UNIVERSAL_PLATES_SCHEMA),
-  ],
-  [
-    COLLECTIONS.PLATELETS,
-    new SchemaUniversal<Plate>(
-      COLLECTIONS.PLATELETS,
-      UNIVERSAL_PLATELETS_SCHEMA,
-    ),
-  ],
-  [
-    COLLECTIONS.SIMULATIONS,
-    new SchemaUniversal<Plate>(
-      COLLECTIONS.SIMULATIONS,
-      UNIVERSAL_SIMULATIONS_SCHEMA,
-    ),
-  ],
-  [
-    COLLECTIONS.STEPS,
-    new SchemaUniversal<Plate>('plate_step', UNIVERSAL_PLATE_STEPS_SCHEMA),
-  ],
-  [
-    COLLECTIONS.PLATELET_STEPS,
-    new SchemaUniversal<Plate>(
-      COLLECTIONS.PLATELET_STEPS,
-      UNIVERSAL_PLATELET_STEPS_SCHEMA,
-    ),
+    UNIVERSES.SIM,
+    new Map([
+      [
+        COLLECTIONS.PLATES,
+        new SchemaUniversal<Plate>(COLLECTIONS.PLATES, UNIVERSAL_PLATES_SCHEMA),
+      ],
+      [
+        COLLECTIONS.PLANETS,
+        new SchemaUniversal<Plate>(
+          COLLECTIONS.PLANETS,
+          UNIVERSAL_PLANETS_SCHEMA,
+        ),
+      ],
+      [
+        COLLECTIONS.PLATELETS,
+        new SchemaUniversal<Plate>(
+          COLLECTIONS.PLATELETS,
+          UNIVERSAL_PLATELETS_SCHEMA,
+        ),
+      ],
+      [
+        COLLECTIONS.SIMULATIONS,
+        new SchemaUniversal<Plate>(
+          COLLECTIONS.SIMULATIONS,
+          UNIVERSAL_SIMULATIONS_SCHEMA,
+        ),
+      ],
+      [
+        COLLECTIONS.STEPS,
+        new SchemaUniversal<Plate>('plate_step', UNIVERSAL_PLATE_STEPS_SCHEMA),
+      ],
+      [
+        COLLECTIONS.PLATELET_STEPS,
+        new SchemaUniversal<Plate>(
+          COLLECTIONS.PLATELET_STEPS,
+          UNIVERSAL_PLATELET_STEPS_SCHEMA,
+        ),
+      ],
+    ]),
   ],
 ]);
 

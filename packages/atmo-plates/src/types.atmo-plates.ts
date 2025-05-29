@@ -50,7 +50,15 @@ export interface PlateDistributionSummary {
 }
 
 // Extended plate interface with derived properties
-export interface PlateExtendedIF extends PlateIF, PlateDerivedPropertiesIF {}
+export interface PlateExtendedIF extends PlateIF {
+  id: string;
+  area: number;
+  coveragePercent: number;
+  mass: number;
+  rank: number;
+  behavioralType: 'continental-like' | 'oceanic-like' | 'transitional';
+  volume?: number;
+}
 
 // Complete manifest of generated plates
 export interface PlateManifest {

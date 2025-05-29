@@ -7,6 +7,7 @@
 export { PlateSimulation } from './PlateSimulation/PlateSimulation';
 export { PlateletManager } from './PlateSimulation/managers/PlateletManager';
 export { ThreeOrbitalFrame } from '@wonderlandlabs/atmo-three-orbit';
+export { PlateSpectrumGenerator } from './generator/PlateSpectrumGenerator';
 
 // Export types
 export type { Plate } from './PlateSimulation/PlateSimulation';

@@ -6,8 +6,9 @@ import {
   PlateletManager,
   PlateSimulation,
   type SimPlateIF,
+  PlateSpectrumGenerator,
 } from '@wonderlandlabs/atmo-plates';
-import { PlateVisualizer } from './PlateVisualizer'; // Import the new class from correct relative path
+import { PlateletVisualizer } from './PlateletVisualizer'; // Corrected import path
 
 // Scene setup
 const scene = new THREE.Scene();
@@ -79,7 +80,21 @@ const sim = new PlateSimulation({
 });
 sim.init();
 
-// Get all plates from the simulation
+// --- Add 20 Large Plates ---
+// Generate 20 large plates
+const largePlates = PlateSpectrumGenerator.generateLargePlates({
+  planetRadius: EARTH_RADIUS,
+  count: 20,
+  minRadius: Math.PI / 12, // Reduced size by 1/3
+  maxRadius: Math.PI / 6, // Reduced size by 1/3
+});
+
+// Add large plates to the simulation
+largePlates.forEach((plate) => {
+  sim.addPlate(plate);
+});
+
+// Get all plates from the simulation (including the newly added large ones)
 const platesCollection = sim.simUniv.get('plates');
 const allPlates: SimPlateIF[] = [];
 platesCollection.each((plate: SimPlateIF) => {
@@ -90,10 +105,16 @@ platesCollection.each((plate: SimPlateIF) => {
 const plateletManager = new PlateletManager(sim);
 
 // Create a PlateVisualizer for each plate
-const plateVisualizers: PlateVisualizer[] = [];
+const plateVisualizers: PlateletVisualizer[] = []; // Use PlateletVisualizer type
 allPlates.forEach((plate, index) => {
-  const visualizer = new PlateVisualizer(plate, plateletManager);
-  visualizer.addToScene(scene);
+  // Pass scene, planetRadius, plate, and plateletManager to the constructor
+  const visualizer = new PlateletVisualizer(
+    scene,
+    EARTH_RADIUS,
+    plate,
+    plateletManager,
+  );
+  visualizer.visualize(); // Call the visualize method to add to scene
   plateVisualizers.push(visualizer);
 });
 

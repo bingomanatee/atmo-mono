@@ -14,6 +14,7 @@ import { COLLECTIONS } from './constants';
 import type { PlateIF } from '../types.atmo-plates';
 import { simUniverse } from '../utils';
 import { PlateSimulation } from './PlateSimulation';
+import { Vector3 } from 'three';
 
 const DEFAULT_PLANET_RADIUS = 1000000;
 const DEFAULT_PLATE_RADIUS = 1000;
@@ -333,5 +334,190 @@ describe('PlateSimulation:class', () => {
       .get(planetId);
     expect(planet).toBeDefined();
     expect(planet.radius).toBe(EARTH_RADIUS);
+  });
+});
+
+describe('PlateSimulation', () => {
+  describe('applyForceLayout', () => {
+    it('should separate plates with similar densities by at least 20% of their combined radii', () => {
+      // Create a simulation with test plates
+      const sim = new PlateSimulation({
+        planetRadius: EARTH_RADIUS,
+        plateCount: 0, // We'll add plates manually
+      });
+      sim.init();
+
+      // Add test plates with similar densities
+      const plate1Id = sim.addPlate({
+        density: 1.0,
+        thickness: 1.0,
+        radius: Math.PI / 12, // 15 degrees
+        position: new Vector3(EARTH_RADIUS, 0, 0),
+      });
+
+      const plate2Id = sim.addPlate({
+        density: 1.1, // Within 20% of plate1
+        thickness: 1.0,
+        radius: Math.PI / 12,
+        position: new Vector3(EARTH_RADIUS * 0.9, EARTH_RADIUS * 0.1, 0),
+      });
+
+      // Add a plate with very different density
+      const plate3Id = sim.addPlate({
+        density: 2.0, // More than 20% different
+        thickness: 1.0,
+        radius: Math.PI / 12,
+        position: new Vector3(EARTH_RADIUS * 0.8, EARTH_RADIUS * 0.2, 0),
+      });
+
+      // Apply force layout
+      sim.applyForceLayout();
+
+      // Get final positions
+      const plate1 = sim.getPlate(plate1Id);
+      const plate2 = sim.getPlate(plate2Id);
+      const plate3 = sim.getPlate(plate3Id);
+
+      // Calculate distances between plates
+      const dist12 = plate1.position.distanceTo(plate2.position);
+      const dist13 = plate1.position.distanceTo(plate3.position);
+      const dist23 = plate2.position.distanceTo(plate3.position);
+
+      // Calculate minimum required distance (20% of sum of radii)
+      const minDist = 0.2 * (plate1.radius + plate2.radius) * EARTH_RADIUS;
+
+      // Verify that plates with similar densities are separated by at least minDist
+      expect(dist12).toBeGreaterThanOrEqual(minDist);
+
+      // Verify that plates with different densities can be closer
+      expect(dist13).toBeLessThan(minDist);
+      expect(dist23).toBeLessThan(minDist);
+
+      // Verify that all plates remain on the sphere surface
+      const radius = EARTH_RADIUS;
+      const tolerance = 0.001; // 0.1% tolerance for floating point errors
+
+      expect(Math.abs(plate1.position.length() - radius)).toBeLessThan(
+        tolerance,
+      );
+      expect(Math.abs(plate2.position.length() - radius)).toBeLessThan(
+        tolerance,
+      );
+      expect(Math.abs(plate3.position.length() - radius)).toBeLessThan(
+        tolerance,
+      );
+    });
+
+    it('should maintain plate positions on sphere surface', () => {
+      const sim = new PlateSimulation({
+        planetRadius: EARTH_RADIUS,
+        plateCount: 10, // Add multiple plates
+      });
+      sim.init();
+
+      // Store initial positions
+      const initialPositions = new Map();
+      sim.simUniv.get('plates').each((plate) => {
+        initialPositions.set(plate.id, plate.position.clone());
+      });
+
+      // Apply force layout
+      sim.applyForceLayout();
+
+      // Verify all plates remain on sphere surface
+      const radius = EARTH_RADIUS;
+      const tolerance = 0.001;
+
+      sim.simUniv.get('plates').each((plate) => {
+        expect(Math.abs(plate.position.length() - radius)).toBeLessThan(
+          tolerance,
+        );
+      });
+    });
+
+    it('should handle elevation-based plate interactions', () => {
+      // Create a simulation with test plates
+      const sim = new PlateSimulation({
+        planetRadius: EARTH_RADIUS,
+        plateCount: 0, // We'll add plates manually
+      });
+      sim.init();
+
+      // Add test plates with similar densities but different elevations
+      const plate1Id = sim.addPlate({
+        density: 1.0,
+        thickness: 1.0,
+        elevation: 0, // Sea level
+        radius: Math.PI / 12,
+        position: new Vector3(EARTH_RADIUS, 0, 0),
+      });
+
+      const plate2Id = sim.addPlate({
+        density: 1.1, // Within 20% of plate1
+        thickness: 1.0,
+        elevation: 4000, // High elevation
+        radius: Math.PI / 12,
+        position: new Vector3(EARTH_RADIUS * 0.9, EARTH_RADIUS * 0.1, 0),
+      });
+
+      // Add a plate with very different elevation
+      const plate3Id = sim.addPlate({
+        density: 1.05, // Similar density
+        thickness: 1.0,
+        elevation: 8000, // Very high elevation
+        radius: Math.PI / 12,
+        position: new Vector3(EARTH_RADIUS * 0.8, EARTH_RADIUS * 0.2, 0),
+      });
+
+      // Apply force layout
+      sim.applyForceLayout();
+
+      // Get final positions
+      const plate1 = sim.getPlate(plate1Id);
+      const plate2 = sim.getPlate(plate2Id);
+      const plate3 = sim.getPlate(plate3Id);
+
+      // Calculate distances between plates
+      const dist12 = plate1.position.distanceTo(plate2.position);
+      const dist13 = plate1.position.distanceTo(plate3.position);
+      const dist23 = plate2.position.distanceTo(plate3.position);
+
+      // Calculate minimum required distances based on elevation differences
+      const minDist12 =
+        0.2 *
+        (plate1.radius + plate2.radius) *
+        EARTH_RADIUS *
+        (1 + Math.abs(plate1.elevation - plate2.elevation) / 8000);
+      const minDist13 =
+        0.2 *
+        (plate1.radius + plate3.radius) *
+        EARTH_RADIUS *
+        (1 + Math.abs(plate1.elevation - plate3.elevation) / 8000);
+      const minDist23 =
+        0.2 *
+        (plate2.radius + plate3.radius) *
+        EARTH_RADIUS *
+        (1 + Math.abs(plate2.elevation - plate3.elevation) / 8000);
+
+      // Verify that plates with similar densities but different elevations
+      // are separated by at least their minimum distances
+      expect(dist12).toBeGreaterThanOrEqual(minDist12);
+      expect(dist13).toBeGreaterThanOrEqual(minDist13);
+      expect(dist23).toBeGreaterThanOrEqual(minDist23);
+
+      // Verify that all plates remain on the sphere surface
+      const radius = EARTH_RADIUS;
+      const tolerance = 0.001;
+
+      expect(Math.abs(plate1.position.length() - radius)).toBeLessThan(
+        tolerance,
+      );
+      expect(Math.abs(plate2.position.length() - radius)).toBeLessThan(
+        tolerance,
+      );
+      expect(Math.abs(plate3.position.length() - radius)).toBeLessThan(
+        tolerance,
+      );
+    });
   });
 });

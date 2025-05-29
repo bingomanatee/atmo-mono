@@ -1,3 +1,4 @@
+import './style.css';
 import { EARTH_RADIUS } from '@wonderlandlabs/atmo-utils';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
@@ -26,10 +27,10 @@ export const OVERFLOW = 1.05;
 const camera = new THREE.PerspectiveCamera(
   75,
   window.innerWidth / window.innerHeight,
-  1, // Adjusted near clipping plane
-  EARTH_RADIUS * 10, // Increased far clipping plane
+  1,
+  100000000,
 );
-camera.position.set(EARTH_RADIUS * 2, EARTH_RADIUS * 1.5, EARTH_RADIUS * 2); // Adjusted camera position
+camera.position.set(EARTH_RADIUS * 2, EARTH_RADIUS * 1.5, EARTH_RADIUS * 2);
 
 // Renderer setup
 const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -41,99 +42,46 @@ document.body.appendChild(renderer.domElement);
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 
-// Enhanced lighting
-const ambientLight = new THREE.AmbientLight(0x404040, 1.5); // Increased intensity
+// Lighting
+const ambientLight = new THREE.AmbientLight(0x404040); // soft white light
 scene.add(ambientLight);
-
-const directionalLight = new THREE.DirectionalLight(0xffffff, 2); // Increased intensity
-directionalLight.position.set(
-  EARTH_RADIUS * 5,
-  EARTH_RADIUS * 5,
-  EARTH_RADIUS * 5,
-); // Adjusted position
+const directionalLight = new THREE.DirectionalLight(0xffffff, 0.5);
+directionalLight.position.set(5, 5, 5).normalize();
 scene.add(directionalLight);
 
-// Add a second directional light from the opposite side
-const backLight = new THREE.DirectionalLight(0xffffff, 1);
-backLight.position.set(-EARTH_RADIUS * 5, -EARTH_RADIUS * 5, -EARTH_RADIUS * 5); // Adjusted position
-scene.add(backLight);
-
-// Add a helper to visualize the lights
-const lightHelper = new THREE.DirectionalLightHelper(
-  directionalLight,
-  EARTH_RADIUS / 2,
-); // Adjusted helper size
-scene.add(lightHelper);
-
-// Initialize simulation and add test plate
-const sim = new PlateSimulation({});
-sim.init();
-
-// Create Earth planet first
-const earthPlanet = sim.makePlanet(EARTH_RADIUS, 'Earth');
-
-// Create a test plate
-const testPlate: SimPlateIF = {
-  id: 'test_plate',
-  name: 'Test Plate',
-  radius: 5000000 * 1.2, // 6000 km (increased by 20%)
-  density: 2800,
-  thickness: 300, // 300 km
-  position: new Vector3(0, EARTH_RADIUS, 0), // North pole
-  planetId: earthPlanet.id,
-  velocity: new Vector3(0, 0, 0),
-  isActive: true,
-};
-
-const plateId = sim.addPlate(testPlate);
-
-// Add planet sphere
+// Add planet sphere (Earth representation)
 const planetGeometry = new THREE.SphereGeometry(EARTH_RADIUS, 32, 32); // Use full Earth radius
 const planetMaterial = new THREE.MeshPhongMaterial({
   color: 0x2233ff,
   transparent: true,
   opacity: 0.3,
   wireframe: true,
-  wireframeLinewidth: 3, // Increased wireframe thickness
 });
 const planet = new THREE.Mesh(planetGeometry, planetMaterial);
 planet.position.set(0, 0, 0); // Set position to origin
 scene.add(planet);
 
-// Create orbital frame for the plate
-const orbitalFrame = new ThreeOrbitalFrame({
-  axis: new Vector3(0, 1, 0), // Rotate around Y axis
-  velocity: 10, // Much faster rotation
+// --- Simulation Setup ---
+// Initialize simulation with 1 plate
+const sim = new PlateSimulation({ plateCount: 1 });
+sim.init();
+
+// Get the single plate (assuming there's only one)
+const plate = sim.simUniv.get('plates').values().next().value[1];
+
+// Create an orbital frame for the plate
+const testPlate = new ThreeOrbitalFrame({
+  velocity: 10, // Increased velocity
   radius: EARTH_RADIUS,
 });
+scene.add(testPlate);
 
-// Add orbital frame to scene
-scene.add(orbitalFrame);
+// Generate platelets for the test plate
+const manager = sim.managers.get('plateletManager');
+const platelets = manager.generatePlatelets(plate.id);
 
-// Add a cone to the orbital frame at (0, 0, EARTH_RADIUS) for visual validation
-const coneGeometry = new THREE.ConeGeometry(
-  EARTH_RADIUS * 0.05,
-  EARTH_RADIUS * 0.2,
-  32,
-);
-const coneMaterial = new THREE.MeshPhongMaterial({ color: 0xffff00 }); // Yellow color
-const cone = new THREE.Mesh(coneGeometry, coneMaterial);
-// Position the cone at the plate's position relative to the orbital frame
-// The plate's position in simulation is relative to planet center.
-// We assume the orbital frame is also at planet center for this single plate example.
-// So the cone position should be the plate's position.
-cone.position.copy(testPlate.position);
-orbitalFrame.add(cone);
+// Create a single geometry and material for all platelets
 
-// Create platelet manager and generate platelets
-const manager = new PlateletManager(sim);
-const platelets = manager.generatePlatelets(plateId);
-
-// Get the platelets collection from the simulation
-const plateletsCollection = sim.simUniv.get('platelets');
-if (!plateletsCollection) throw new Error('platelets collection not found');
-
-// Create a single geometry for all platelets - use a base radius of 1 since we'll scale it per instance
 // Create a standard cylinder geometry (includes side, top, and bottom caps)
 const fullCylinderGeometry = new THREE.CylinderGeometry(
   1,
@@ -199,31 +147,29 @@ if (fullCylinderGeometry.index) {
   // Attributes are already copied, so no need to do anything else
 }
 
-// Create a single material for all platelets
 const material = new THREE.MeshPhongMaterial({
   side: THREE.DoubleSide,
   transparent: true,
   opacity: 0.8,
   shininess: 30,
+  vertexColors: true, // Enable vertex colors for instancing
 });
 
-// Create instanced mesh
 const instancedMesh = new THREE.InstancedMesh(
   geometry,
   material,
   platelets.length,
 );
+testPlate.add(instancedMesh); // Add to orbital frame
 
 // Create matrices for each instance
 const position = new THREE.Vector3();
 const quaternion = new THREE.Quaternion();
 const scale = new THREE.Vector3();
-const worldMatrix = new THREE.Matrix4();
 const localMatrix = new THREE.Matrix4();
 
-// Set up each instance
 platelets.forEach((platelet, index) => {
-  // Set position
+  // Position relative to the orbital frame (which is at the planet origin)
   position.copy(platelet.position);
 
   // Set scale (x,z scale by the platelet's radius, y scales by thickness in km)
@@ -233,29 +179,16 @@ platelets.forEach((platelet, index) => {
     platelet.radius * OVERFLOW,
   );
 
-  // First rotate to face outward from center
+  // Rotation to make Y-axis point outward
   const direction = platelet.position.clone().normalize();
   const outwardRotation = new THREE.Quaternion().setFromUnitVectors(
-    new THREE.Vector3(0, 0, 1), // Assuming default cylinder height is along Z initially
-    direction,
-  );
-
-  // Then rotate 90 degrees around x-axis to make cylinder stand upright (if height is along Y)
-  // Re-evaluating this rotation for a Y-height cylinder.
-  // We want the cylinder's Y axis (height) to point outward.
-  const correctedRotation = new THREE.Quaternion().setFromUnitVectors(
     new THREE.Vector3(0, 1, 0), // Initial orientation of cylinder height along Y
     direction, // Desired outward direction
   );
+  quaternion.copy(outwardRotation);
 
-  quaternion.copy(correctedRotation);
-
-  // Create world matrix
-  worldMatrix.compose(position, quaternion, scale);
-
-  // Convert world matrix to local matrix relative to orbital frame
-  localMatrix.copy(worldMatrix);
-  localMatrix.premultiply(orbitalFrame.matrixWorld.invert());
+  // Compose local matrix
+  localMatrix.compose(position, quaternion, scale);
 
   // Set instance matrix
   instancedMesh.setMatrixAt(index, localMatrix);
@@ -300,36 +233,38 @@ platelets.forEach((platelet, index) => {
 // Update the rendering for instanced mesh colors
 instancedMesh.instanceColor.needsUpdate = true;
 
-// Add instanced mesh to orbital frame instead of scene
-orbitalFrame.add(instancedMesh);
-
-// Add axes helper
-const axesHelper = new THREE.AxesHelper(5);
-scene.add(axesHelper);
+// Add a cone to the orbital frame to visualize orientation
+const coneGeometry = new THREE.ConeGeometry(
+  EARTH_RADIUS * 0.05,
+  EARTH_RADIUS * 0.1,
+  16,
+);
+const coneMaterial = new THREE.MeshPhongMaterial({ color: 0xffff00 }); // Yellow
+const cone = new THREE.Mesh(coneGeometry, coneMaterial);
+cone.position.set(0, EARTH_RADIUS, 0); // Position at the top of the planet in the orbital frame
+cone.lookAt(new THREE.Vector3(0, 0, 0)); // Point the cone towards the origin
+cone.rotateX(Math.PI / 2); // Adjust rotation to point outward along Y-axis initially
+testPlate.add(cone);
 
 // Animation loop
-function animate() {
+const animate = () => {
   requestAnimationFrame(animate);
 
   // Update controls
   controls.update();
 
-  // Update light helper
-  lightHelper.update();
-
-  // Orbit the frame
-  orbitalFrame.orbit();
+  // Orbit the test plate frame
+  testPlate.orbit();
 
   // Render scene
   renderer.render(scene, camera);
-}
+};
 
-// Handle window resize
+animate();
+
+// Handle window resizing
 window.addEventListener('resize', () => {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
 });
-
-// Start animation
-animate();
