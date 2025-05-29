@@ -39,6 +39,9 @@ export interface Plate extends PlateIF {
 }
 
 export class PlateSimulation implements PlateSimulationIF {
+  // Static property to control force-directed layout strength (0-1 scale)
+  public static fdStrength: number = 0.33;
+
   readonly multiverse: Multiverse;
   readonly universeName: string;
   public planetRadius: number;
@@ -269,6 +272,9 @@ export class PlateSimulation implements PlateSimulationIF {
       for (const plate of plates) {
         this.addPlate(plate);
       }
+
+      // Run force-directed layout to separate overlapping plates
+      this.runForceDirectedLayout(400);
     }
   }
 
@@ -488,6 +494,27 @@ export class PlateSimulation implements PlateSimulationIF {
   }
 
   /**
+   * Run force-directed layout for a specified number of steps to separate overlapping plates
+   * @param maxSteps - Maximum number of force-directed steps to run (default: 400)
+   */
+  public runForceDirectedLayout(maxSteps: number = 400): void {
+    for (let step = 0; step < maxSteps; step++) {
+      const forces = this.applyForceLayout();
+
+      // Check if forces are minimal (simulation has stabilized)
+      let maxForce = 0;
+      forces.forEach((force) => {
+        maxForce = Math.max(maxForce, force.length());
+      });
+
+      // Stop early if forces are very small (stabilized)
+      if (maxForce < 1.0) {
+        break;
+      }
+    }
+  }
+
+  /**
    * Apply a force-directed layout to the plates based on density similarity.
    * This method modifies the positions of the plates within the simulation.
    * @returns A map of plate ID to the calculated force vector for that plate.
@@ -599,12 +626,17 @@ export class PlateSimulation implements PlateSimulationIF {
     )) {
       const force = forces.get(id);
       if (force && force.length() > 0.001) {
-        // Update position based on force with fixed time step
+        // Apply force dampening using fdStrength (0-1 scale)
+        const dampenedForce = force
+          .clone()
+          .multiplyScalar(PlateSimulation.fdStrength);
+
+        // Update position based on dampened force with fixed time step
         const newPosition = new Vector3(
           plate.position.x,
           plate.position.y,
           plate.position.z,
-        ).add(force.multiplyScalar(deltaTime));
+        ).add(dampenedForce.multiplyScalar(deltaTime));
 
         // Normalize position to maintain sphere surface constraint
         const normalizedPosition = newPosition

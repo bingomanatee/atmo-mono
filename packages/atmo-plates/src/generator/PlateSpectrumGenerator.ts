@@ -66,36 +66,14 @@ export class PlateSpectrumGenerator {
     return generator.generate();
   }
   public generate(): PlateManifest {
-    let plates = this.generatePlates(); // Initial generation
+    const plates = this.generatePlates(); // Generate plates with built-in radius constraints
 
-    // --- Post-processing: Enforce maximum plate radius ---
-    // Convert max allowed radius from radians to a linear distance on the planet surface
+    // Log the maximum enforced radius for transparency
     const maxAllowedLinearRadius =
       (this.config.maxPlateRadius ?? Math.PI / 6) * this.config.planetRadius;
     console.log(
-      `Enforcing maximum plate radius: ${maxAllowedLinearRadius} km (from ${this.config.maxPlateRadius ?? Math.PI / 6} radians)`,
-    ); // Log the maximum enforced radius
-
-    plates.forEach((plate) => {
-      if (plate.radius > maxAllowedLinearRadius) {
-        console.log(
-          `Capping plate ${plate.id} radius from ${plate.radius} to ${maxAllowedLinearRadius}`,
-        );
-        plate.radius = maxAllowedLinearRadius;
-
-        // Recalculate dependent properties based on new radius
-        plate.area = Math.PI * Math.pow(plate.radius, 2);
-        // Assuming thickness doesn't change, recalculate volume and mass
-        // Volume = Area * Thickness (simplified, assuming flat disk for calculation)
-        plate.volume = plate.area * (plate.thickness * 1000); // Convert thickness from km to meters for volume/mass calc
-        plate.mass = plate.volume * (plate.density * 1000); // Convert density from g/cm³ to kg/m³ (1 g/cm³ = 1000 kg/m³)
-
-        // Note: Behavioral type is based on density, which we are not changing here.
-        // If density/thickness were recalculated based on new size, behavioral type might change.
-        // For now, we keep original density/thickness and recalculate area/volume/mass based on capped radius.
-      }
-    });
-    // --- End post-processing ---
+      `Power law generation respects maximum plate radius: ${maxAllowedLinearRadius} km (from ${this.config.maxPlateRadius ?? Math.PI / 6} radians)`,
+    );
 
     const continentalLikePlates = plates.filter(
       (p) => p.behavioralType === 'continental-like',
@@ -162,15 +140,22 @@ export class PlateSpectrumGenerator {
       maxThickness,
     } = this.config;
 
+    // Calculate maximum allowed radius in km
+    const maxAllowedLinearRadius =
+      (this.config.maxPlateRadius ?? Math.PI / 6) * this.config.planetRadius;
+    const maxAllowedArea =
+      Math.PI * maxAllowedLinearRadius * maxAllowedLinearRadius;
+
     const targetArea = this.planetSurfaceArea * targetCoverage;
-    const rawSizes = this.generatePowerLawSizes(plateCount, powerLawExponent);
+    const plateAreas = this.generateConstrainedPowerLawSizes(
+      plateCount,
+      powerLawExponent,
+      maxAllowedArea,
+      targetArea,
+    );
 
-    const sum = rawSizes.reduce((a, b) => a + b, 0);
-    const normalizedSizes = rawSizes.map((size) => size / sum);
-
-    return normalizedSizes.map((fraction, index) => {
+    return plateAreas.map((area, index) => {
       const rank = index + 1;
-      const area = targetArea * fraction;
 
       // Calculate radius: A = πr², so r = √(A/π)
       const radius = Math.sqrt(area / Math.PI);
@@ -211,7 +196,7 @@ export class PlateSpectrumGenerator {
         id: `plate-${rank}`,
         radius,
         area,
-        coveragePercent: fraction * 100 * targetCoverage,
+        coveragePercent: (area / this.planetSurfaceArea) * 100,
         density,
         thickness,
         mass,
@@ -222,15 +207,43 @@ export class PlateSpectrumGenerator {
   }
 
   /**
-   * Generate raw power law distribution values
+   * Generate constrained power law distribution values that respect maximum area limits
    *
    * @param count - Number of values to generate
    * @param exponent - Power law exponent (higher = more skewed)
-   * @returns Array of values following a power law distribution
+   * @param maxAllowedArea - Maximum allowed area for any plate
+   * @param targetTotalArea - Target total area for all plates
+   * @returns Array of area values following a power law distribution within constraints
    */
-  private generatePowerLawSizes(count: number, exponent: number): number[] {
-    // Apply power law formula: size ∝ 1/rank^exponent
-    return Array.from({ length: count }, (_, i) => Math.pow(i + 1, -exponent));
+  private generateConstrainedPowerLawSizes(
+    count: number,
+    exponent: number,
+    maxAllowedArea: number,
+    targetTotalArea: number,
+  ): number[] {
+    // Generate initial power law distribution
+    const rawSizes = Array.from({ length: count }, (_, i) =>
+      Math.pow(i + 1, -exponent),
+    );
+
+    // Normalize to target total area
+    const rawSum = rawSizes.reduce((a, b) => a + b, 0);
+    let areas = rawSizes.map((size) => (size / rawSum) * targetTotalArea);
+
+    // Check if largest plate exceeds maximum allowed area
+    const largestArea = Math.max(...areas);
+
+    if (largestArea > maxAllowedArea) {
+      // Scale down the distribution so the largest plate equals maxAllowedArea
+      const scaleFactor = maxAllowedArea / largestArea;
+      areas = areas.map((area) => area * scaleFactor);
+
+      console.log(
+        `Scaled power law distribution by ${scaleFactor.toFixed(3)} to respect maximum radius constraint`,
+      );
+    }
+
+    return areas;
   }
 
   /**
@@ -395,6 +408,92 @@ export class PlateSpectrumGenerator {
         rank,
         behavioralType,
       });
+    }
+
+    return plates;
+  }
+
+  /**
+   * Calculate the current coverage percentage of a set of plates
+   * @param plates - Array of plates to calculate coverage for
+   * @returns Coverage percentage (0-100)
+   */
+  private calculateCoverage(plates: PlateExtendedIF[]): number {
+    const totalArea = plates.reduce((sum, plate) => sum + plate.area, 0);
+    return (totalArea / this.planetSurfaceArea) * 100;
+  }
+
+  /**
+   * Iteratively generate additional plates to achieve target coverage
+   * @param existingPlates - Current plates
+   * @param targetCoveragePercent - Target coverage percentage (0-100)
+   * @returns Updated plates array with additional plates to meet coverage
+   */
+  private iterativelyAchieveTargetCoverage(
+    existingPlates: PlateExtendedIF[],
+    targetCoveragePercent: number,
+  ): PlateExtendedIF[] {
+    let plates = [...existingPlates];
+    let currentCoverage = this.calculateCoverage(plates);
+    let iteration = 0;
+    const maxIterations = 10; // Prevent infinite loops
+
+    console.log(
+      `Initial coverage after capping: ${currentCoverage.toFixed(2)}%, target: ${targetCoveragePercent.toFixed(2)}%`,
+    );
+
+    while (
+      currentCoverage < targetCoveragePercent &&
+      iteration < maxIterations
+    ) {
+      iteration++;
+
+      // Generate a new batch of plates (same count as original)
+      const newBatch = this.generatePlates();
+
+      // Apply radius capping to new batch
+      const maxAllowedLinearRadius =
+        (this.config.maxPlateRadius ?? Math.PI / 6) * this.config.planetRadius;
+
+      newBatch.forEach((plate) => {
+        if (plate.radius > maxAllowedLinearRadius) {
+          plate.radius = maxAllowedLinearRadius;
+          plate.area = Math.PI * Math.pow(plate.radius, 2);
+          const volume = calculatePlateVolume(plate.area, plate.thickness);
+          plate.mass = calculateMass(volume, plate.density);
+        }
+      });
+
+      // Sort by area (largest first) and take the biggest 25%
+      newBatch.sort((a, b) => b.area - a.area);
+      const top25Percent = Math.max(1, Math.floor(newBatch.length * 0.25));
+      const selectedPlates = newBatch.slice(0, top25Percent);
+
+      // Update IDs to avoid conflicts
+      selectedPlates.forEach((plate, index) => {
+        plate.id = `plate-iter${iteration}-${index + 1}`;
+        plate.rank = plates.length + index + 1;
+      });
+
+      // Add selected plates to the collection
+      plates.push(...selectedPlates);
+
+      // Recalculate coverage
+      currentCoverage = this.calculateCoverage(plates);
+
+      console.log(
+        `Iteration ${iteration}: Added ${selectedPlates.length} plates, coverage now: ${currentCoverage.toFixed(2)}%`,
+      );
+    }
+
+    if (currentCoverage < targetCoveragePercent) {
+      console.log(
+        `Warning: Could not achieve target coverage after ${maxIterations} iterations. Final coverage: ${currentCoverage.toFixed(2)}%`,
+      );
+    } else {
+      console.log(
+        `Successfully achieved target coverage: ${currentCoverage.toFixed(2)}% (target: ${targetCoveragePercent.toFixed(2)}%)`,
+      );
     }
 
     return plates;

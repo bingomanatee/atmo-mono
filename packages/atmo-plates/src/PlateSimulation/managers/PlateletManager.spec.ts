@@ -162,28 +162,46 @@ describe('PlateletManager', () => {
     }
   });
 
-  it('should cache generated platelets', () => {
+  it('should generate consistent platelets', () => {
     // First generation
     const firstGen = manager.generatePlatelets(testPlateId);
     expect(firstGen.length).toBeGreaterThan(0);
 
-    // Second generation should use cache
+    // Second generation should be consistent (same count and properties)
     const secondGen = manager.generatePlatelets(testPlateId);
-    expect(secondGen).toEqual(firstGen);
+    expect(secondGen.length).toBe(firstGen.length);
+
+    // Check that platelets have consistent properties (but allow for different planetIds due to UUID generation)
+    firstGen.forEach((platelet, index) => {
+      const secondPlatelet = secondGen[index];
+      expect(secondPlatelet.plateId).toBe(platelet.plateId);
+      expect(secondPlatelet.position.x).toBeCloseTo(platelet.position.x, 5);
+      expect(secondPlatelet.position.y).toBeCloseTo(platelet.position.y, 5);
+      expect(secondPlatelet.position.z).toBeCloseTo(platelet.position.z, 5);
+      expect(secondPlatelet.radius).toBeCloseTo(platelet.radius, 5);
+      expect(secondPlatelet.density).toBe(platelet.density);
+      expect(secondPlatelet.thickness).toBe(platelet.thickness);
+    });
   });
 
-  it('should clear cache when requested', () => {
-    // Generate and cache
-    const firstGen = manager.generatePlatelets(testPlateId);
-    expect(manager.getCachedPlatelets(testPlateId)).toBeDefined();
+  it('should store platelets in the collection', () => {
+    // Generate platelets
+    const platelets = manager.generatePlatelets(testPlateId);
+    expect(platelets.length).toBeGreaterThan(0);
 
-    // Clear cache
-    manager.clearCache(testPlateId);
-    expect(manager.getCachedPlatelets(testPlateId)).toBeUndefined();
+    // Check that platelets are stored in the simulation's collection
+    const plateletsCollection = sim.simUniv.get('platelets');
+    expect(plateletsCollection).toBeDefined();
 
-    // Regenerate
-    const secondGen = manager.generatePlatelets(testPlateId);
-    expect(secondGen).toEqual(firstGen); // Should be same result
+    // Count platelets for this plate in the collection
+    let collectionCount = 0;
+    plateletsCollection.each((platelet) => {
+      if (platelet.plateId === testPlateId) {
+        collectionCount++;
+      }
+    });
+
+    expect(collectionCount).toBe(platelets.length);
   });
 
   it('should generate platelets with correct properties', () => {
