@@ -92,9 +92,6 @@ describe('PlateletCollisionSimulator', () => {
         plateletIds.map((id) => platelets.get(id)!.plateId),
       );
       if (uniquePlateIds.size < 2) {
-        console.log(
-          'Sector has fewer than two different plate IDs. Skipping interaction check.',
-        );
         return;
       }
 
@@ -156,25 +153,6 @@ describe('PlateletCollisionSimulator', () => {
       const falsePositives = results.filter(
         (result) => !result.shouldInteract && result.simulatorResult,
       ).length;
-
-      // Log summary numbers
-      console.log('Number of platelets:', plateletIds.length);
-      console.log('Actual interactions:', actualInteractions.length);
-      console.log('Same outcomes:', sameOutcomes);
-      console.log('Missed interactions:', missedInteractions);
-      console.log('False positives:', falsePositives);
-      console.log('Maximum possible interactions:', maxInteractions);
-      console.log('Count of plates A:', plateletIds.length);
-      console.log('Count of plates B:', plateletIds.length);
-      console.log('Total number of uncontested intersections:', sameOutcomes);
-      console.log(
-        'Intersections found by class and not by brute force:',
-        falsePositives,
-      );
-      console.log(
-        'Intersections found by brute force and not by class:',
-        missedInteractions,
-      );
 
       // Assertions - realistic expectations for platelet interactions
       expect(sameOutcomes).toBeGreaterThanOrEqual(0); // Allow for no interactions in sparse cases

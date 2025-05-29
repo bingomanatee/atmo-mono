@@ -68,13 +68,6 @@ export class PlateSpectrumGenerator {
   public generate(): PlateManifest {
     const plates = this.generatePlates(); // Generate plates with built-in radius constraints
 
-    // Log the maximum enforced radius for transparency
-    const maxAllowedLinearRadius =
-      (this.config.maxPlateRadius ?? Math.PI / 6) * this.config.planetRadius;
-    console.log(
-      `Power law generation respects maximum plate radius: ${maxAllowedLinearRadius} km (from ${this.config.maxPlateRadius ?? Math.PI / 6} radians)`,
-    );
-
     const continentalLikePlates = plates.filter(
       (p) => p.behavioralType === 'continental-like',
     );
@@ -237,10 +230,6 @@ export class PlateSpectrumGenerator {
       // Scale down the distribution so the largest plate equals maxAllowedArea
       const scaleFactor = maxAllowedArea / largestArea;
       areas = areas.map((area) => area * scaleFactor);
-
-      console.log(
-        `Scaled power law distribution by ${scaleFactor.toFixed(3)} to respect maximum radius constraint`,
-      );
     }
 
     return areas;

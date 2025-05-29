@@ -619,12 +619,6 @@ describe('PlateSimulation', () => {
         // If no initial overlaps, the system is already working perfectly
         expect(finalTotalOverlap).toBe(0);
       }
-
-      // Log the progression for debugging (in km)
-      console.log(
-        'Total overlap progression (km):',
-        overlapHistory.map((overlap) => Math.round(overlap)),
-      );
     });
 
     it('should automatically run force-directed layout during initialization', () => {
