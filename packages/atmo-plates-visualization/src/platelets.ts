@@ -1,6 +1,8 @@
 import './style.css';
-import { EARTH_RADIUS } from '@wonderlandlabs/atmo-utils';
 import * as THREE from 'three';
+
+// Earth radius in kilometers (not meters like the atmo-utils constant)
+const EARTH_RADIUS = 6371; // km
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import {
   PlateletManager,

@@ -1,6 +1,15 @@
 import * as THREE from 'three';
 import type { SimPlateIF } from '@wonderlandlabs/atmo-plates';
 import { PlateVisualizerBase } from './PlateVisualizerBase';
+import { ThreeOrbitalFrame } from '@wonderlandlabs/atmo-three-orbit';
+
+// Define the density range and corresponding hue/lightness ranges (same as platelets)
+const MIN_DENSITY = 2.5; // g/cm³ (typical continental crust)
+const MAX_DENSITY = 3.5; // g/cm³ (typical oceanic crust)
+const MIN_HUE = 0; // Red (for lower density, continental-like)
+const MAX_HUE = 0.75; // Bluish-purple (for higher density, oceanic-like)
+const MIN_LIGHTNESS = 0.2; // Adjusted lower lightness bound
+const MAX_LIGHTNESS = 0.5; // Adjusted upper lightness bound
 
 /**
  * Visualizes a plate as a cylinder and displays forces acting on it.
@@ -8,9 +17,21 @@ import { PlateVisualizerBase } from './PlateVisualizerBase';
 export class ForceVisualizer extends PlateVisualizerBase {
   private plateMesh: THREE.Mesh | null = null;
   private forceArrow: THREE.ArrowHelper | null = null;
+  private orbitalFrame: ThreeOrbitalFrame;
 
   constructor(scene: THREE.Scene, planetRadius: number, plate: SimPlateIF) {
     super(scene, planetRadius, plate);
+
+    // Create orbital frame for this plate
+    this.orbitalFrame = new ThreeOrbitalFrame({
+      radius: planetRadius,
+      velocity: 0, // Static for force visualization
+      axis: new THREE.Vector3(0, 1, 0), // Default axis
+    });
+    this.orbitalFrame.name = `PlateFrame_${plate.id}`;
+
+    // Add the orbital frame to the scene
+    this.addObjectToScene(this.orbitalFrame);
   }
 
   /**
@@ -19,20 +40,80 @@ export class ForceVisualizer extends PlateVisualizerBase {
   public visualize(): void {
     // Create a cylinder mesh for the plate
     const cylinderGeometry = new THREE.CylinderGeometry(1, 1, 1, 32);
-    const cylinderMaterial = new THREE.MeshPhongMaterial({ color: 0xaaaaaa }); // Default grey color
+
+    // Calculate color based on plate density (same as platelets)
+    const normalizedDensity = THREE.MathUtils.mapLinear(
+      this.plate.density,
+      MIN_DENSITY,
+      MAX_DENSITY,
+      0,
+      1,
+    );
+
+    const hue = THREE.MathUtils.mapLinear(
+      normalizedDensity,
+      0,
+      1,
+      MIN_HUE,
+      MAX_HUE,
+    );
+
+    const lightness = THREE.MathUtils.mapLinear(
+      normalizedDensity,
+      0,
+      1,
+      MAX_LIGHTNESS,
+      MIN_LIGHTNESS, // Note the inverted order for lightness
+    );
+
+    // Vary saturation for visual interest (same as platelets)
+    const saturation = 0.3 + Math.random() * 0.3; // 0.3-0.6 range
+
+    const plateColor = new THREE.Color().setHSL(hue, saturation, lightness);
+
+    // Use the same material as platelets with calculated color
+    const cylinderMaterial = new THREE.MeshPhongMaterial({
+      side: THREE.DoubleSide,
+      transparent: false,
+      opacity: 1.0,
+      shininess: 30,
+      color: plateColor,
+    });
+
+    console.log(
+      `Plate ${this.plate.id} color: density=${this.plate.density.toFixed(2)}, HSL=(${hue.toFixed(2)}, ${saturation.toFixed(2)}, ${lightness.toFixed(2)}), color=#${plateColor.getHexString()}`,
+    );
 
     this.plateMesh = new THREE.Mesh(cylinderGeometry, cylinderMaterial);
 
-    // Position the cylinder at the plate's initial position on the sphere
-    this.plateMesh.position.copy(this.plate.position as THREE.Vector3);
+    // Enable shadows for the plate cylinder
+    this.plateMesh.castShadow = true;
+    this.plateMesh.receiveShadow = true;
 
-    // Orient the cylinder to point outwards from the planet's center
+    // Position the cylinder within the orbital frame using worldToLocal
+    if (this.plate.position) {
+      // Convert world position to local position within the orbital frame
+      const worldPos = new THREE.Vector3(
+        this.plate.position.x,
+        this.plate.position.y,
+        this.plate.position.z,
+      );
+      console.log(`World position for plate ${this.plate.id}:`, worldPos);
+
+      const localPos = this.orbitalFrame.worldToLocal(worldPos.clone());
+      console.log(`Local position for plate ${this.plate.id}:`, localPos);
+
+      this.plateMesh.position.copy(localPos);
+    }
+
+    // Orient the cylinder to point outwards from the planet's center (in local space)
     this.plateMesh.lookAt(new THREE.Vector3(0, 0, 0)); // Point towards the center
     this.plateMesh.rotateX(Math.PI / 2); // Rotate to make cylinder point outwards
 
     // Scale the cylinder based on plate radius and thickness
-    const plateRadiusScaled = this.plate.radius * this.planetRadius; // Convert plate radius from radians to linear distance
-    const plateThicknessScaled = this.plate.thickness * 1000; // Convert thickness from km to meters
+    // Both plate radius and thickness are already in kilometers
+    const plateRadiusScaled = this.plate.radius; // Already in km
+    const plateThicknessScaled = this.plate.thickness; // Already in km
 
     this.plateMesh.scale.set(
       plateRadiusScaled,
@@ -40,8 +121,18 @@ export class ForceVisualizer extends PlateVisualizerBase {
       plateRadiusScaled,
     );
 
-    // Add to scene
-    this.addObjectToScene(this.plateMesh);
+    // Log cylinder dimensions and position
+    console.log(
+      `Cylinder for plate ${this.plate.id}: originalRadius=${this.plate.radius}km, scaledRadius=${plateRadiusScaled}, thickness=${plateThicknessScaled}, localPos=(${this.plateMesh.position.x.toFixed(0)}, ${this.plateMesh.position.y.toFixed(0)}, ${this.plateMesh.position.z.toFixed(0)})`,
+    );
+
+    // Add the cylinder to the orbital frame, not directly to the scene
+    this.orbitalFrame.add(this.plateMesh);
+
+    // Debug: log the orbital frame's children count
+    console.log(
+      `Orbital frame for plate ${this.plate.id} now has ${this.orbitalFrame.children.length} children`,
+    );
   }
 
   /**
@@ -60,10 +151,18 @@ export class ForceVisualizer extends PlateVisualizerBase {
       return;
     }
 
-    // Update plate mesh position
-    if (this.plateMesh) {
-      this.plateMesh.position.copy(currentPlate.position as THREE.Vector3);
-      // Re-orient the cylinder as the position changes
+    // Update plate mesh position within the orbital frame
+    if (this.plateMesh && currentPlate.position) {
+      // Convert world position to local position within the orbital frame
+      const worldPos = new THREE.Vector3(
+        currentPlate.position.x,
+        currentPlate.position.y,
+        currentPlate.position.z,
+      );
+      const localPos = this.orbitalFrame.worldToLocal(worldPos.clone());
+      this.plateMesh.position.copy(localPos);
+
+      // Re-orient the cylinder as the position changes (in local space)
       this.plateMesh.lookAt(new THREE.Vector3(0, 0, 0));
       this.plateMesh.rotateX(Math.PI / 2);
     }
@@ -71,33 +170,38 @@ export class ForceVisualizer extends PlateVisualizerBase {
     // Update or create force arrow
     const force = forces.get(this.plate.id);
 
-    if (force && force.length() > 0.001) {
+    if (force && force.length() > 0.001 && currentPlate.position) {
       // Only show arrow if there's significant force
-      const origin = currentPlate.position as THREE.Vector3;
+      const worldPos = new THREE.Vector3(
+        currentPlate.position.x,
+        currentPlate.position.y,
+        currentPlate.position.z,
+      );
+      const localOrigin = this.orbitalFrame.worldToLocal(worldPos.clone());
       const direction = force.clone().normalize();
       const length = force.length() * 1000; // Scale force vector length for visibility
       const color = 0xff0000; // Red color for repulsion
 
       if (this.forceArrow) {
         // Update existing arrow
-        this.forceArrow.position.copy(origin);
+        this.forceArrow.position.copy(localOrigin);
         this.forceArrow.setDirection(direction);
         this.forceArrow.setLength(length);
         // Color is constant for now, could be updated based on force magnitude later
       } else {
-        // Create new arrow
+        // Create new arrow within the orbital frame
         this.forceArrow = new THREE.ArrowHelper(
           direction,
-          origin,
+          localOrigin,
           length,
           color,
         );
-        this.addObjectToScene(this.forceArrow);
+        this.orbitalFrame.add(this.forceArrow);
       }
     } else {
       // Remove force arrow if no significant force exists or it was previously shown
       if (this.forceArrow) {
-        this.removeObjectFromScene(this.forceArrow);
+        this.orbitalFrame.remove(this.forceArrow);
         this.forceArrow.dispose(); // Dispose resources
         this.forceArrow = null;
       }
@@ -109,15 +213,17 @@ export class ForceVisualizer extends PlateVisualizerBase {
    */
   public clear(): void {
     if (this.plateMesh) {
-      this.removeObjectFromScene(this.plateMesh);
+      this.orbitalFrame.remove(this.plateMesh);
       this.plateMesh.geometry.dispose();
       (this.plateMesh.material as THREE.Material).dispose();
       this.plateMesh = null;
     }
     if (this.forceArrow) {
-      this.removeObjectFromScene(this.forceArrow);
+      this.orbitalFrame.remove(this.forceArrow);
       this.forceArrow.dispose();
       this.forceArrow = null;
     }
+    // Remove the orbital frame from the scene
+    this.removeObjectFromScene(this.orbitalFrame);
   }
 }
