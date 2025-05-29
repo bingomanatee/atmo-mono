@@ -95,6 +95,7 @@ export type SimSimulation = {
   planetId: string; // planet reference
   plateCount: number; // number of plates to generate
   maxPlateRadius?: number; // maximum plate radius in radians
+  step: number; // current simulation step
 };
 
 // Basic planet interface with core physical properties

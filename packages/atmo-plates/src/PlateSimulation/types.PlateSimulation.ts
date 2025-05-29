@@ -1,7 +1,7 @@
 import type { Vector3Like } from 'three';
 import type { Universe, Multiverse } from '@wonderlandlabs/multiverse';
 import type {
-  PlateIF,
+  PlateIF as PlateIFBase,
   PlateExtendedIF,
   Identifiable,
   SimPlanetIF,
@@ -101,11 +101,9 @@ export interface PlateletStepIF extends Identifiable {
   sector: string; // L0 H3 cell for tracking large-scale movement
 }
 
-export interface PlateIF {
+// Local PlateIF interface for PlateSimulation module
+export interface PlateIF extends PlateIFBase {
   id: string;
-  radius: number;
-  density: number;
-  thickness: number;
   elevation?: number; // Optional elevation in meters
   area?: number;
   position?: Vector3Like;
@@ -114,3 +112,34 @@ export interface PlateIF {
   name?: string;
   planetId?: string;
 }
+
+// Interface for Platelet in PlateSimulation context
+export interface PlateletIF {
+  id: string;
+  plateId: string;
+  planetId: string;
+  position: Vector3Like;
+  radius: number;
+  thickness: number;
+  density: number;
+  sector: string;
+  h3Index?: string;
+  float?: number;
+}
+
+// Raw platelet data interface
+export interface RawPlatelet {
+  id?: string;
+  plateId?: string;
+  planetId?: string;
+  position?: Vector3Like;
+  radius?: number;
+  thickness?: number;
+  density?: number;
+  sector?: string;
+  h3Index?: string;
+  float?: number;
+}
+
+// Re-export types that are used in imports
+export type { PlateExtendedIF, Identifiable, SimPlanetIF };

@@ -25,8 +25,9 @@ export class PlateSimulationPlateManager {
       step: currentStep,
       position: new Vector3().copy(platelet.position), // Copy position to avoid modifying original platelet object
       thickness: platelet.thickness,
-      float: platelet.float,
-      h3Index: platelet.h3Index,
+      float: platelet.float || 0,
+      h3Index: platelet.h3Index || '',
+      sector: platelet.sector,
     };
     // Ensure the collection is available before adding
     if (plateletSteps) {
@@ -101,8 +102,9 @@ export class PlateSimulationPlateManager {
         step: currentStep,
         position: new Vector3().copy(platelet.position), // Copy position
         thickness: platelet.thickness,
-        float: platelet.float,
-        h3Index: newH3Index,
+        float: platelet.float || 0,
+        h3Index: newH3Index || '',
+        sector: platelet.sector,
       };
       plateletSteps.add(step);
 

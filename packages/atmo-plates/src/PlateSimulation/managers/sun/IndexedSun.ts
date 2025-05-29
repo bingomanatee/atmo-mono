@@ -123,7 +123,7 @@ export class IndexedSun<
     const fieldStr = field as string;
     let index = this.#indexes.get(fieldStr);
     if (!index) {
-      index = new SunIndex(this, fieldStr);
+      index = new SunIndex(this as unknown as CollSyncIF<RecordType>, fieldStr);
       this.#indexes.set(fieldStr, index);
     }
     return index;
@@ -156,7 +156,21 @@ export class IndexedSun<
 
   // Required CollSyncIF methods
   get name(): string {
-    return this.id;
+    return this.schema.name || 'indexed-sun';
+  }
+
+  has(key: string): boolean {
+    return super.has(key);
+  }
+
+  setMany(values: Map<string, RecordType>): void {
+    for (const [key, value] of values) {
+      this.set(key, value);
+    }
+  }
+
+  get sun() {
+    return this;
   }
 
   send(key: string, target: UniverseName): TransportResult {

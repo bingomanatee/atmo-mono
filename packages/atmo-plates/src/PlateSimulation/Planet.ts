@@ -87,10 +87,10 @@ export class Planet implements SimPlanetIF {
    * Convert a position to lat/lon coordinates
    */
   positionToLatLon(position: Vector3Like): { lat: number; lng: number } {
-    const { lat, lng } = pointToLatLon(
+    const { lat, lon } = pointToLatLon(
       new Vector3(position.x, position.y, position.z),
     );
-    return { lat, lng };
+    return { lat, lng: lon };
   }
 
   /**

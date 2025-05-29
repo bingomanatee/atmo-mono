@@ -60,6 +60,7 @@ export function createPlatelet(
     elasticity: options.elasticity ?? 0.5,
     radius: options.radius ?? 1.0,
     density: options.density ?? 1.0,
+    thickness: options.thickness ?? 1.0,
     velocity: options.velocity?.clone() ?? new Vector3(),
     isActive: options.isActive ?? true,
     neighbors: options.neighbors ?? [],

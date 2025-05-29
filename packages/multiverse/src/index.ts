@@ -32,3 +32,7 @@ export * from './type.schema';
 // Utility functions
 export * from './typeguards.multiverse';
 export * from './utils/validateField';
+
+// Additional exports for compatibility
+export type { PostParams } from './type.schema';
+export { isColl } from './typeguards.multiverse';

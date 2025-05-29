@@ -11,7 +11,7 @@ import type {
   PlateIF,
   SimPlanetIF,
   Identifiable,
-} from './types.PlateSimulation';
+} from '../types.atmo-plates';
 import { simUniverse } from '../utils';
 import { extendPlate, isostaticElevation } from '../utils/plateUtils';
 import { COLLECTIONS } from './constants';
@@ -400,7 +400,9 @@ export class PlateSimulation implements PlateSimulationIF {
           const sim = this.getSimulationById(simId);
           planetId = sim.planetId;
         } catch (error) {
-          throw new Error(`Simulation ${simId} not found: ${error.message}`);
+          const errorMessage =
+            error instanceof Error ? error.message : String(error);
+          throw new Error(`Simulation ${simId} not found: ${errorMessage}`);
         }
       }
       // If no simId is provided, try to use the default simulation
@@ -415,6 +417,9 @@ export class PlateSimulation implements PlateSimulationIF {
 
       // If we still don't have a planetId, use the current planet
       if (!planetId) {
+        if (!this.planet) {
+          throw new Error('No planet available and no planetId provided');
+        }
         planetId = this.planet.id;
       }
     }

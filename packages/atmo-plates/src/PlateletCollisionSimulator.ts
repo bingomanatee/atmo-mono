@@ -1,6 +1,6 @@
 import { FIELD_TYPES, SchemaLocal } from '@wonderlandlabs/multiverse';
-import type { PostParams } from '@wonderlandlabs/multiverse';
-import { Platelet } from './types/Platelet';
+import type { PostParams } from '@wonderlandlabs/multiverse/src/type.schema';
+import { Platelet } from './PlateSimulation/schemas/platelet';
 
 // This schema is no longer needed as its fields are either:
 // 1. Already in SIM_PLATELETS_SCHEMA (id, position, radius)

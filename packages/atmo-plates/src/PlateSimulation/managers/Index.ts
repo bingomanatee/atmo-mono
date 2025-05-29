@@ -1,11 +1,11 @@
-import type { Sync } from '@wonderlandlabs/multiverse';
+import type { CollSync } from '@wonderlandlabs/multiverse';
 
 export class Index<T> {
-  readonly #engine: Sync<T>;
+  readonly #engine: CollSync<T>;
   readonly #key: string;
   readonly #cache: Map<string, Set<string>> = new Map();
 
-  constructor(engine: Sync<T>, key: string) {
+  constructor(engine: CollSync<T>, key: string) {
     this.#engine = engine;
     this.#key = key;
     this.#build();
@@ -42,23 +42,27 @@ export class Index<T> {
    * Update the index for a single record
    */
   update(id: string, record: T): void {
-    const value = String(record[this.#key]);
-    if (!this.#cache.has(value)) {
-      this.#cache.set(value, new Set());
+    if (record && typeof record === 'object' && this.#key in record) {
+      const value = String((record as Record<string, unknown>)[this.#key]);
+      if (!this.#cache.has(value)) {
+        this.#cache.set(value, new Set());
+      }
+      this.#cache.get(value)!.add(id);
     }
-    this.#cache.get(value)!.add(id);
   }
 
   /**
    * Remove a record from the index
    */
   remove(id: string, record: T): void {
-    const value = String(record[this.#key]);
-    const ids = this.#cache.get(value);
-    if (ids) {
-      ids.delete(id);
-      if (ids.size === 0) {
-        this.#cache.delete(value);
+    if (record && typeof record === 'object' && this.#key in record) {
+      const value = String((record as Record<string, unknown>)[this.#key]);
+      const ids = this.#cache.get(value);
+      if (ids) {
+        ids.delete(id);
+        if (ids.size === 0) {
+          this.#cache.delete(value);
+        }
       }
     }
   }

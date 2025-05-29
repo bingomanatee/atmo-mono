@@ -30,7 +30,6 @@ export function createTestPlate(sim: PlateSimulation, earthPlanetId: string) {
     radius: 5000000, // 5000 km - make sure this matches the test expectations
     density: 2800,
     thickness: 100000, // 100 km
-    position: new Vector3(0, EARTH_RADIUS, 0), // North pole
     planetId: earthPlanetId,
   });
 }
