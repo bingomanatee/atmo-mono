@@ -90,4 +90,20 @@ export class SunIndex<RecordType extends Record<string, any>, ValueType = any> {
   *values(): Generator<[string, RecordType]> {
     return this.#coll.values();
   }
+
+  /**
+   * Count records matching a specific value
+   * @param value The value to match
+   * @returns Number of matching records
+   */
+  findCount(value: ValueType): number {
+    if (!this.#cache) {
+      this.#build();
+    }
+
+    const matchingIds = this.#cache?.get(value);
+    if (!matchingIds) return 0;
+
+    return matchingIds.size;
+  }
 }

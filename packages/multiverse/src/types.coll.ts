@@ -21,6 +21,7 @@ export interface CollBaseIF<RecordType = DataRecord, KeyType = DataKey> {
 
   // Use any for methods that differ between sync/async
   find(...query: any[]): any; // Generator | AsyncGenerator
+  findCount(...query: any[]): any; // number | Promise<number>
   values(): any; // Generator | AsyncGenerator
   getMany(keys: KeyType[]): any; // Map | Promise<Map>
   get(key: KeyType): any; // RecordType | undefined | Promise<RecordType | undefined>
@@ -55,6 +56,7 @@ export interface CollSyncIF<RecordType = DataRecord, KeyType = DataKey>
     ) => void,
   ): void;
   find(...criteria: any[]): Generator<Pair<KeyType, RecordType>>;
+  findCount(...criteria: any[]): number;
   values(): Generator<Pair<KeyType, RecordType>>;
   getMany(keys: KeyType[]): Map<KeyType, RecordType>;
   has(key: KeyType): boolean;

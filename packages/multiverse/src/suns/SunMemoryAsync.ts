@@ -100,12 +100,47 @@ export class SunMemoryAsync<RecordType, KeyType>
    * @param query - The query to match against
    * @returns A promise that resolves to an array of records matching the query
    */
-  async *find(...query: any[]): AsyncGenerator<[KeyType, RecordType]> {
-    for (const [key, value] of this.#data.entries()) {
-      if (matchesQuery(value, key, query)) {
-        yield [key, value];
+  async *find(
+    query: string | ((record: RecordType) => boolean),
+    value?: any,
+  ): AsyncGenerator<[KeyType, RecordType]> {
+    if (typeof query === 'function') {
+      for (const [key, record] of this.#data.entries()) {
+        if (query(record)) {
+          yield [key, record];
+        }
+      }
+      return;
+    }
+
+    for (const [key, record] of this.#data.entries()) {
+      if (record[query] === value) {
+        yield [key, record];
       }
     }
+  }
+
+  async findCount(
+    query: string | ((record: RecordType) => boolean),
+    value?: any,
+  ): Promise<number> {
+    if (typeof query === 'function') {
+      let count = 0;
+      for (const record of this.#data.values()) {
+        if (query(record)) {
+          count++;
+        }
+      }
+      return count;
+    }
+
+    let count = 0;
+    for (const record of this.#data.values()) {
+      if (record[query] === value) {
+        count++;
+      }
+    }
+    return count;
   }
 
   /**

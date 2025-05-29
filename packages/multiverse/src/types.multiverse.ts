@@ -21,6 +21,10 @@ export interface SunIF<RecordType = DataRecord, KeyType = DataKey> {
   clear(): any; // void | Promise<void>
   values(): any; // Generator | AsyncGenerator
   find(query: string | ((record: RecordType) => boolean), value?: any): any; // Generator | AsyncGenerator
+  findCount(
+    query: string | ((record: RecordType) => boolean),
+    value?: any,
+  ): any; // number | Promise<number>
 
   /**
    * Validate a record against the schema
@@ -61,6 +65,10 @@ export interface SunIFSync<RecordType = DataRecord, KeyType = DataKey>
     query: string | ((record: RecordType) => boolean),
     value?: any,
   ): Generator<[KeyType, RecordType]>;
+  findCount(
+    query: string | ((record: RecordType) => boolean),
+    value?: any,
+  ): number;
   mutate(
     key: KeyType,
     mutator: MutatorSync<RecordType, KeyType>,
@@ -119,6 +127,10 @@ export interface SunIfAsync<RecordType = DataRecord, KeyType = DataKey>
     query: string | ((record: RecordType) => boolean),
     value?: any,
   ): AsyncGenerator<[KeyType, RecordType]>;
+  findCount(
+    query: string | ((record: RecordType) => boolean),
+    value?: any,
+  ): Promise<number>;
   mutate(
     key: KeyType,
     mutator: MutatorAsync<RecordType, KeyType>,

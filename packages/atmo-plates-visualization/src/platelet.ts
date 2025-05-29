@@ -106,7 +106,72 @@ platesCollection.each((plate: SimPlateIF) => {
 // Create platelet manager
 const plateletManager = new PlateletManager(sim);
 
-// Create a PlateVisualizer for each plate
+// Generate platelets for all plates first
+console.log('Generating platelets for all plates...');
+console.time('⏱️ Platelet Generation');
+allPlates.forEach((plate) => {
+  plateletManager.generatePlatelets(plate.id);
+});
+console.timeEnd('⏱️ Platelet Generation');
+
+// Populate neighbor relationships between platelets
+console.log('Populating platelet neighbor relationships...');
+console.time('⏱️ Neighbor Population');
+sim.populatePlateletNeighbors();
+console.timeEnd('⏱️ Neighbor Population');
+
+// Refresh neighbor relationships to clean up any invalid references
+console.log('Initial neighbor cleanup...');
+console.time('⏱️ Initial Neighbor Cleanup');
+sim.refreshNeighbors();
+console.timeEnd('⏱️ Initial Neighbor Cleanup');
+
+// Create irregular edges by deleting edge platelets BEFORE visualization
+console.log('Creating irregular plate edges...');
+console.time('⏱️ Edge Creation Total');
+
+console.time('⏱️ Pre-deletion Analysis');
+const plateletsColl = sim.simUniv.get('platelets');
+const initialPlateletCount = plateletsColl?.count() || 0;
+console.log(`Initial platelet count: ${initialPlateletCount}`);
+
+// Add debugging to see what's happening
+console.log('Checking platelets before deletion...');
+let plateletsByPlate = new Map();
+plateletsColl?.each((platelet: any) => {
+  const plateId = platelet.plateId;
+  if (!plateletsByPlate.has(plateId)) {
+    plateletsByPlate.set(plateId, []);
+  }
+  plateletsByPlate.get(plateId).push(platelet);
+});
+
+plateletsByPlate.forEach((platelets, plateId) => {
+  console.log(`Plate ${plateId}: ${platelets.length} platelets`);
+  // Check neighbor counts
+  const neighborCounts = platelets.map((p) => p.neighbors?.length || 0);
+  const minNeighbors = Math.min(...neighborCounts);
+  const maxNeighbors = Math.max(...neighborCounts);
+  const avgNeighbors =
+    neighborCounts.reduce((a, b) => a + b, 0) / neighborCounts.length;
+  console.log(
+    `  Neighbors - Min: ${minNeighbors}, Max: ${maxNeighbors}, Avg: ${avgNeighbors.toFixed(1)}`,
+  );
+});
+console.timeEnd('⏱️ Pre-deletion Analysis');
+
+console.time('⏱️ Actual Edge Deletion');
+sim.createIrregularPlateEdges();
+console.timeEnd('⏱️ Actual Edge Deletion');
+
+const finalPlateletCount = plateletsColl?.count() || 0;
+const deletedCount = initialPlateletCount - finalPlateletCount;
+console.log(`Final platelet count: ${finalPlateletCount}`);
+console.log(`Deleted ${deletedCount} platelets to create irregular edges`);
+console.timeEnd('⏱️ Edge Creation Total');
+
+// Create a PlateVisualizer for each plate AFTER deleting platelets
+console.time('⏱️ Visualization Creation');
 const plateVisualizers: PlateletVisualizer[] = []; // Use PlateletVisualizer type
 allPlates.forEach((plate, index) => {
   // Pass scene, planetRadius, plate, and plateletManager to the constructor
@@ -119,12 +184,9 @@ allPlates.forEach((plate, index) => {
   visualizer.visualize(); // Call the visualize method to add to scene
   plateVisualizers.push(visualizer);
 });
+console.timeEnd('⏱️ Visualization Creation');
 
 console.log(`Created visualizers for ${plateVisualizers.length} plates.`);
-
-// Get the platelets collection from the simulation (optional, for direct access if needed)
-const plateletsCollection = sim.simUniv.get('platelets');
-if (!plateletsCollection) console.warn('platelets collection not found');
 
 // Add axes helper
 const axesHelper = new THREE.AxesHelper(EARTH_RADIUS * 0.5); // Make axes helper relative to Earth radius

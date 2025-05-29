@@ -69,6 +69,12 @@ export interface PlateSimulationIF {
   planet?: SimPlanetIF;
   makePlanet(radius?: number, name?: string): SimPlanetIF;
   getPlanet(id: string): Planet;
+
+  // Platelet neighbor management
+  populatePlateletNeighbors(): void;
+  refreshNeighbors(): void;
+  cleanupNeighborLists(): void;
+  createIrregularPlateEdges(): void;
 }
 
 // Simulation step interface

@@ -1,5 +1,6 @@
 import { EARTH_RADIUS, randomNormal } from '@wonderlandlabs/atmo-utils';
 import { Multiverse } from '@wonderlandlabs/multiverse';
+import { shuffle } from 'lodash-es';
 import type { Vector3Like } from 'three';
 import { Vector3 } from 'three';
 import { v4 as uuidV4 } from 'uuid';
@@ -18,6 +19,7 @@ import { COLLECTIONS } from './constants';
 import { PlateletManager } from './managers/PlateletManager';
 import PlateSimulationPlateManager from './managers/PlateSimulationPlateManager';
 import { Planet } from './Planet';
+import type { Platelet } from './schemas/platelet';
 import type {
   AddPlateProps,
   PlateSimulationIF,
@@ -665,5 +667,401 @@ export class PlateSimulation implements PlateSimulationIF {
 
     // Return the calculated forces for visualization
     return forces;
+  }
+
+  /**
+   * Populate neighbor relationships between platelets based on spatial proximity
+   * This should be called after platelet generation to establish neighbor connections
+   */
+  populatePlateletNeighbors(): void {
+    console.time('  🔗 Getting platelets collection');
+    const plateletsCollection = this.simUniv.get(COLLECTIONS.PLATELETS);
+    if (!plateletsCollection) {
+      throw new Error('platelets collection not found');
+    }
+    console.timeEnd('  🔗 Getting platelets collection');
+
+    // Get all platelets as an array for easier processing
+    console.time('  🔗 Converting to array');
+    const platelets: Platelet[] = [];
+    plateletsCollection.each((platelet: Platelet) => {
+      platelets.push(platelet);
+    });
+    console.timeEnd('  🔗 Converting to array');
+    console.log(
+      `  Processing ${platelets.length} platelets for neighbor relationships`,
+    );
+
+    // For each platelet, find its neighbors based on spatial proximity
+    console.time('  🔗 Computing neighbor relationships');
+    platelets.forEach((platelet, index) => {
+      if (index % 1000 === 0) {
+        console.log(`    Processing platelet ${index}/${platelets.length}`);
+      }
+
+      const neighbors: string[] = [];
+
+      platelets.forEach((otherPlatelet) => {
+        if (platelet.id === otherPlatelet.id) return;
+
+        // Only consider platelets from the same plate as potential neighbors
+        if (platelet.plateId !== otherPlatelet.plateId) return;
+
+        // Calculate distance between platelets
+        const distance = platelet.position.distanceTo(otherPlatelet.position);
+
+        // Consider platelets neighbors if they're within a reasonable distance
+        // Use a threshold based on the average platelet radius
+        const neighborThreshold = (platelet.radius + otherPlatelet.radius) * 2;
+
+        if (distance <= neighborThreshold) {
+          // Verify the neighbor actually exists in the collection
+          if (plateletsCollection.has(otherPlatelet.id)) {
+            neighbors.push(otherPlatelet.id);
+          }
+        }
+      });
+
+      // Update the platelet with its validated neighbors
+      plateletsCollection.set(platelet.id, {
+        ...platelet,
+        neighbors,
+      });
+    });
+    console.timeEnd('  🔗 Computing neighbor relationships');
+
+    console.log('Neighbor relationships populated and validated');
+  }
+
+  /**
+   * Refresh neighbor relationships by removing invalid neighbor IDs
+   * This removes neighbors that don't exist in the collection or belong to different plates
+   */
+  refreshNeighbors(): void {
+    const plateletsCollection = this.simUniv.get(COLLECTIONS.PLATELETS);
+    if (!plateletsCollection) {
+      throw new Error('platelets collection not found');
+    }
+
+    let totalCleaned = 0;
+    let totalNeighborsRemoved = 0;
+
+    plateletsCollection.each((platelet: any) => {
+      if (platelet.neighbors && platelet.neighbors.length > 0) {
+        const originalLength = platelet.neighbors.length;
+
+        // Filter out invalid neighbors
+        const validNeighbors = platelet.neighbors.filter(
+          (neighborId: string) => {
+            // Check if neighbor exists in collection
+            if (!plateletsCollection.has(neighborId)) {
+              return false;
+            }
+
+            // Check if neighbor belongs to the same plate
+            const neighbor = plateletsCollection.get(neighborId);
+            if (neighbor && neighbor.plateId !== platelet.plateId) {
+              return false;
+            }
+
+            return true;
+          },
+        );
+
+        if (validNeighbors.length !== originalLength) {
+          // Update the platelet with cleaned neighbor list
+          plateletsCollection.set(platelet.id, {
+            ...platelet,
+            neighbors: validNeighbors,
+          });
+          totalCleaned++;
+          totalNeighborsRemoved += originalLength - validNeighbors.length;
+        }
+      }
+    });
+
+    console.log(
+      `Refreshed neighbors: cleaned ${totalCleaned} platelets, removed ${totalNeighborsRemoved} invalid neighbor references`,
+    );
+  }
+
+  /**
+   * Create irregular edges for larger plates by deleting edge platelets
+   * For plates with 40+ platelets, uses 3 deletion patterns (20% each):
+   * - 20% delete just the platelet
+   * - 20% delete platelet + 1 neighbor
+   * - 20% delete platelet + all neighbors
+   * For smaller plates (30-39), uses simple 25% deletion.
+   */
+  createIrregularPlateEdges(): void {
+    const plateletsCollection = this.simUniv.get(COLLECTIONS.PLATELETS);
+    if (!plateletsCollection) {
+      throw new Error('platelets collection not found');
+    }
+
+    // Refresh neighbor relationships BEFORE edge detection to ensure accurate neighbor counts
+    console.log('Refreshing neighbor relationships before edge detection...');
+    this.refreshNeighbors();
+
+    // Group platelets by plate
+    const plateletsByPlate = new Map<string, any[]>();
+    plateletsCollection.each((platelet: any) => {
+      const plateId = platelet.plateId;
+      if (!plateletsByPlate.has(plateId)) {
+        plateletsByPlate.set(plateId, []);
+      }
+      plateletsByPlate.get(plateId)!.push(platelet);
+    });
+
+    let totalDeleted = 0;
+
+    // Shuffle the plates to randomize processing order
+    const plateEntries = Array.from(plateletsByPlate.entries());
+    const shuffledPlateEntries = shuffle(plateEntries);
+
+    // Process each plate individually in random order
+    shuffledPlateEntries.forEach(([plateId, platelets]) => {
+      const plateSize = platelets.length;
+
+      if (plateSize <= 30) {
+        console.log(
+          `Plate ${plateId}: ${plateSize} platelets - too small, skipping edge deletion`,
+        );
+        return;
+      }
+
+      const deletedCount = this.createIrregularEdgesForPlate(
+        plateId,
+        platelets,
+      );
+      totalDeleted += deletedCount;
+
+      console.log(
+        `Plate ${plateId}: ${plateSize} platelets → deleted ${deletedCount} platelets (${((deletedCount / plateSize) * 100).toFixed(1)}%)`,
+      );
+    });
+
+    console.log(`Total deleted across all plates: ${totalDeleted} platelets`);
+
+    // Refresh neighbor relationships AFTER deletion to clean up any orphaned references
+    console.log('Refreshing neighbor relationships after deletion...');
+    this.refreshNeighbors();
+  }
+
+  /**
+   * Create irregular edges for a specific plate
+   */
+  private createIrregularEdgesForPlate(
+    plateId: string,
+    platelets: any[],
+  ): number {
+    const plateletsCollection = this.simUniv.get(COLLECTIONS.PLATELETS);
+    if (!plateletsCollection) {
+      throw new Error('platelets collection not found');
+    }
+
+    const plateSize = platelets.length;
+
+    // Get platelets for this specific plate and count their neighbors
+    const plateletNeighborCounts: Array<{
+      id: string;
+      neighborCount: number;
+      platelet: any;
+    }> = [];
+
+    platelets.forEach((platelet: any) => {
+      const neighborCount = platelet.neighbors ? platelet.neighbors.length : 0;
+      plateletNeighborCounts.push({
+        id: platelet.id,
+        neighborCount,
+        platelet,
+      });
+    });
+
+    // Sort by neighbor count (ascending) to find edge platelets
+    plateletNeighborCounts.sort((a, b) => a.neighborCount - b.neighborCount);
+
+    // Find edge platelets (those with fewer neighbors than average)
+    // For these large, densely connected plates, we need a higher threshold
+    const avgNeighborCount =
+      plateletNeighborCounts.reduce(
+        (sum, item) => sum + item.neighborCount,
+        0,
+      ) / plateletNeighborCounts.length;
+
+    // Use 60% of average neighbor count as the edge threshold
+    const EDGE_NEIGHBOR_THRESHOLD = Math.floor(avgNeighborCount * 0.6);
+
+    // Get edge platelets and add some randomness to break up uniform patterns
+    let edgePlatelets = plateletNeighborCounts.filter(
+      (item) => item.neighborCount <= EDGE_NEIGHBOR_THRESHOLD,
+    );
+
+    // If we have too many edge platelets, randomly select a subset to create more varied patterns
+    if (edgePlatelets.length > plateSize * 0.4) {
+      const shuffledEdges = shuffle(edgePlatelets);
+      edgePlatelets = shuffledEdges.slice(0, Math.floor(plateSize * 0.4));
+    }
+
+    // Get some stats for logging
+    const minNeighborCount = plateletNeighborCounts[0]?.neighborCount || 0;
+    const maxNeighborCount =
+      plateletNeighborCounts[plateletNeighborCounts.length - 1]
+        ?.neighborCount || 0;
+
+    // Log detailed info about this plate
+    console.log(
+      `  Plate ${plateId}: ${plateSize} platelets, ${edgePlatelets.length} edge platelets (≤${EDGE_NEIGHBOR_THRESHOLD} neighbors, 60% of avg ${avgNeighborCount.toFixed(1)})`,
+    );
+    console.log(
+      `    Neighbor stats: Min: ${minNeighborCount}, Max: ${maxNeighborCount}, Avg: ${avgNeighborCount.toFixed(1)}`,
+    );
+
+    if (edgePlatelets.length === 0) {
+      console.log(`  No edge platelets found for plate ${plateId}, skipping`);
+      return 0;
+    }
+
+    // Shuffle the edge platelets for random selection
+    const shuffledEdgePlatelets = shuffle(edgePlatelets);
+    const allPlateletsToDelete = new Set<string>();
+
+    if (plateSize >= 40) {
+      // For large plates (40+ platelets): Use aggressive recursive deletion
+      // Take 12.5% of edge platelets and recursively delete neighbors up to 4 levels deep
+      const deleteCount = Math.floor(shuffledEdgePlatelets.length * 0.125);
+      const plateletsToDelete = shuffledEdgePlatelets.slice(0, deleteCount);
+
+      console.log(
+        `    Large plate: deleting ${deleteCount} of ${shuffledEdgePlatelets.length} edge platelets (12.5%) with recursive 50% neighbor deletion`,
+      );
+
+      // For each selected edge platelet, delete it and recursively delete 50% of its neighbors
+      plateletsToDelete.forEach((item) => {
+        this.recursivelyDeleteNeighbors(
+          item.id,
+          allPlateletsToDelete,
+          0,
+          4,
+          platelets,
+        );
+      });
+
+      console.log(
+        `    Recursive deletion resulted in ${allPlateletsToDelete.size} total platelets marked for deletion`,
+      );
+    } else {
+      // For smaller plates (30-39 platelets): Use simple 12.5% deletion
+      const deleteCount = Math.floor(shuffledEdgePlatelets.length * 0.125);
+      const plateletsToDelete = shuffledEdgePlatelets.slice(0, deleteCount);
+
+      console.log(
+        `    Medium plate: deleting ${deleteCount} of ${shuffledEdgePlatelets.length} edge platelets (12.5%)`,
+      );
+
+      plateletsToDelete.forEach((item) => {
+        allPlateletsToDelete.add(item.id);
+      });
+    }
+
+    // Delete the selected platelets
+    allPlateletsToDelete.forEach((plateletId) => {
+      plateletsCollection.delete(plateletId);
+    });
+
+    // Clean up neighbor lists - remove invalid platelet IDs from remaining platelets' neighbor lists
+    console.log(`    Cleaning up neighbor lists...`);
+    this.cleanupNeighborLists();
+
+    // Return the number of deleted platelets for this plate
+    return allPlateletsToDelete.size;
+  }
+
+  /**
+   * Recursively delete neighbors up to a specified depth
+   */
+  private recursivelyDeleteNeighbors(
+    plateletId: string,
+    deletedSet: Set<string>,
+    currentDepth: number,
+    maxDepth: number,
+    platelets: any[],
+  ): void {
+    // Add this platelet to deletion set
+    deletedSet.add(plateletId);
+
+    // Stop if we've reached max depth
+    if (currentDepth >= maxDepth) {
+      return;
+    }
+
+    // Find the platelet in our local array
+    const platelet = platelets.find((p) => p.id === plateletId);
+    if (!platelet || !platelet.neighbors) {
+      return;
+    }
+
+    // Get 50% of neighbors (randomly selected)
+    const neighbors = platelet.neighbors.filter(
+      (neighborId: string) => !deletedSet.has(neighborId),
+    );
+    const neighborsToDelete = Math.ceil(neighbors.length * 0.5);
+    const shuffledNeighbors = shuffle(neighbors);
+    const selectedNeighbors = shuffledNeighbors.slice(0, neighborsToDelete);
+
+    // Recursively delete selected neighbors
+    selectedNeighbors.forEach((neighborId: string) => {
+      if (!deletedSet.has(neighborId)) {
+        this.recursivelyDeleteNeighbors(
+          neighborId,
+          deletedSet,
+          currentDepth + 1,
+          maxDepth,
+          platelets,
+        );
+      }
+    });
+  }
+
+  /**
+   * Clean up neighbor lists by removing neighbor IDs that don't exist in the collection
+   * This method finds all plates in the simulation and validates all neighbor references
+   */
+  cleanupNeighborLists(): void {
+    const plateletsCollection = this.simUniv.get(COLLECTIONS.PLATELETS);
+    if (!plateletsCollection) {
+      return;
+    }
+
+    let cleanedCount = 0;
+    let totalNeighborsRemoved = 0;
+
+    plateletsCollection.each((platelet: any) => {
+      if (platelet.neighbors && platelet.neighbors.length > 0) {
+        const originalLength = platelet.neighbors.length;
+
+        // Filter out neighbor IDs that don't exist in the collection
+        const validNeighbors = platelet.neighbors.filter(
+          (neighborId: string) => {
+            // Check if the neighbor platelet actually exists in the collection
+            return plateletsCollection.has(neighborId);
+          },
+        );
+
+        if (validNeighbors.length !== originalLength) {
+          // Update the platelet with cleaned neighbor list
+          plateletsCollection.set(platelet.id, {
+            ...platelet,
+            neighbors: validNeighbors,
+          });
+          cleanedCount++;
+          totalNeighborsRemoved += originalLength - validNeighbors.length;
+        }
+      }
+    });
+
+    console.log(
+      `    Cleaned neighbor lists: updated ${cleanedCount} platelets, removed ${totalNeighborsRemoved} invalid neighbor references`,
+    );
   }
 }

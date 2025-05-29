@@ -38,7 +38,8 @@ export class PlateletVisualizer extends PlateVisualizerBase {
     this.orbitalFrame.position.set(0, 0, 0);
     this.orbitalFrame.quaternion.identity();
 
-    this.platelets = this.plateletManager.generatePlatelets(this.plate.id);
+    // Get existing platelets from the simulation (they should already be generated and processed)
+    this.platelets = this.getExistingPlatelets();
 
     const fullCylinderGeometry = new THREE.CylinderGeometry(
       1,
@@ -164,15 +165,6 @@ export class PlateletVisualizer extends PlateVisualizerBase {
         lightness,
       );
 
-      if (index % 100 === 0) {
-        console.log(
-          `Platelet ${platelet.id} (Density: ${platelet.density.toFixed(2)} g/cm³):`,
-          `Normalized: ${normalizedDensity.toFixed(2)},`,
-          `HSL: (${hue.toFixed(2)}, ${saturation.toFixed(2)}, ${lightness.toFixed(2)}),`,
-          `Color: #${instanceColor.getHexString()}`,
-        );
-      }
-
       this.instancedMesh.setColorAt(index, instanceColor);
     });
 
@@ -195,5 +187,24 @@ export class PlateletVisualizer extends PlateVisualizerBase {
     this.removeObjectFromScene(this.orbitalFrame);
     this.instancedMesh.geometry.dispose();
     (this.instancedMesh.material as THREE.Material).dispose();
+  }
+
+  /**
+   * Get existing platelets for this plate from the simulation
+   */
+  private getExistingPlatelets(): any[] {
+    const platelets: any[] = [];
+    const plateletsCollection =
+      this.plateletManager['sim'].simUniv.get('platelets');
+
+    if (plateletsCollection) {
+      plateletsCollection.each((platelet: any) => {
+        if (platelet.plateId === this.plate.id) {
+          platelets.push(platelet);
+        }
+      });
+    }
+
+    return platelets;
   }
 }

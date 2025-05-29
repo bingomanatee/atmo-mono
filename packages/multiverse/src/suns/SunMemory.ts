@@ -284,6 +284,49 @@ export class SunMemory<RecordType, KeyType>
         return undefined;
     }
   }
+
+  *find(
+    query: string | ((record: RecordType) => boolean),
+    value?: any,
+  ): Generator<[KeyType, RecordType]> {
+    if (typeof query === 'function') {
+      for (const [key, record] of this.#data.entries()) {
+        if (query(record)) {
+          yield [key, record];
+        }
+      }
+      return;
+    }
+
+    for (const [key, record] of this.#data.entries()) {
+      if (record[query] === value) {
+        yield [key, record];
+      }
+    }
+  }
+
+  findCount(
+    query: string | ((record: RecordType) => boolean),
+    value?: any,
+  ): number {
+    if (typeof query === 'function') {
+      let count = 0;
+      for (const record of this.#data.values()) {
+        if (query(record)) {
+          count++;
+        }
+      }
+      return count;
+    }
+
+    let count = 0;
+    for (const record of this.#data.values()) {
+      if (record[query] === value) {
+        count++;
+      }
+    }
+    return count;
+  }
 }
 
 export default function memorySunF<R, K>(

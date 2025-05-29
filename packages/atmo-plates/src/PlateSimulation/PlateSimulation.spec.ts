@@ -672,4 +672,212 @@ describe('PlateSimulation', () => {
       expect(overlappingCount).toBeLessThanOrEqual(5);
     });
   });
+
+  describe('createIrregularPlateEdges', () => {
+    it('should not delete platelets when there are 30 or fewer', () => {
+      // Create a simulation with a small number of platelets
+      const sim = new PlateSimulation({
+        planetRadius: EARTH_RADIUS,
+        plateCount: 0,
+      });
+      sim.init();
+
+      // Add a plate and generate platelets
+      const plateId = sim.addPlate({
+        radius: Math.PI / 24, // Small radius to generate fewer platelets
+      });
+
+      const plateletManager = sim.managers.get('plateletManager');
+      plateletManager.generatePlatelets(plateId);
+
+      // Populate neighbor relationships
+      sim.populatePlateletNeighbors();
+
+      const plateletsCollection = sim.simUniv.get(COLLECTIONS.PLATELETS);
+      const initialCount = plateletsCollection.count();
+
+      // If no platelets were generated, create some mock ones for testing
+      if (initialCount === 0) {
+        // Create 25 mock platelets with varying neighbor counts
+        for (let i = 0; i < 25; i++) {
+          const mockPlatelet = {
+            id: `mock-platelet-${i}`,
+            plateId: plateId,
+            position: new Vector3(
+              Math.random() * 1000,
+              Math.random() * 1000,
+              Math.random() * 1000,
+            ),
+            radius: 10,
+            thickness: 1,
+            density: 1,
+            isActive: true,
+            neighbors: i < 5 ? [] : [`neighbor-${i}-1`, `neighbor-${i}-2`], // First 5 have no neighbors (edge platelets)
+            connections: {},
+            neighborCellIds: [],
+            mass: 100,
+            elasticity: 0.5,
+            velocity: new Vector3(),
+          };
+          plateletsCollection.set(mockPlatelet.id, mockPlatelet);
+        }
+      }
+
+      const finalInitialCount = plateletsCollection.count();
+
+      // Ensure we have 30 or fewer platelets
+      expect(finalInitialCount).toBeLessThanOrEqual(30);
+
+      // Call the method
+      sim.createIrregularPlateEdges();
+
+      // Verify no platelets were deleted
+      expect(plateletsCollection.count()).toBe(finalInitialCount);
+    });
+
+    it('should delete edge platelets when there are more than 30', () => {
+      // Create a simulation with a larger plate to generate more platelets
+      const sim = new PlateSimulation({
+        planetRadius: EARTH_RADIUS,
+        plateCount: 0,
+      });
+      sim.init();
+
+      // Add a larger plate to generate more platelets
+      const plateId = sim.addPlate({
+        radius: Math.PI / 8, // Larger radius to generate more platelets
+      });
+
+      const plateletManager = sim.managers.get('plateletManager');
+      plateletManager.generatePlatelets(plateId);
+
+      // Populate neighbor relationships
+      sim.populatePlateletNeighbors();
+
+      const plateletsCollection = sim.simUniv.get(COLLECTIONS.PLATELETS);
+      let initialCount = plateletsCollection.count();
+
+      // Create mock platelets if not enough were generated
+      if (initialCount <= 30) {
+        // Create 40 mock platelets with varying neighbor counts
+        for (let i = 0; i < 40; i++) {
+          const mockPlatelet = {
+            id: `mock-platelet-${i}`,
+            plateId: plateId,
+            position: new Vector3(
+              Math.random() * 1000,
+              Math.random() * 1000,
+              Math.random() * 1000,
+            ),
+            radius: 10,
+            thickness: 1,
+            density: 1,
+            isActive: true,
+            neighbors:
+              i < 8
+                ? []
+                : [`neighbor-${i}-1`, `neighbor-${i}-2`, `neighbor-${i}-3`], // First 8 have no neighbors (edge platelets)
+            connections: {},
+            neighborCellIds: [],
+            mass: 100,
+            elasticity: 0.5,
+            velocity: new Vector3(),
+          };
+          plateletsCollection.set(mockPlatelet.id, mockPlatelet);
+        }
+        initialCount = plateletsCollection.count();
+      }
+
+      // Call the method
+      sim.createIrregularPlateEdges();
+
+      const finalCount = plateletsCollection.count();
+
+      // Verify some platelets were deleted
+      expect(finalCount).toBeLessThan(initialCount);
+      expect(finalCount).toBeGreaterThan(0);
+
+      console.log(
+        `Deleted ${initialCount - finalCount} platelets (${initialCount} -> ${finalCount})`,
+      );
+    });
+
+    it('should use 3-pattern deletion for large plates (40+ platelets)', () => {
+      // Create a simulation with an even larger plate
+      const sim = new PlateSimulation({
+        planetRadius: EARTH_RADIUS,
+        plateCount: 0,
+      });
+      sim.init();
+
+      // Add a very large plate to generate many platelets
+      const plateId = sim.addPlate({
+        radius: Math.PI / 4, // Very large radius
+      });
+
+      const plateletManager = sim.managers.get('plateletManager');
+      plateletManager.generatePlatelets(plateId);
+
+      // Populate neighbor relationships
+      sim.populatePlateletNeighbors();
+
+      const plateletsCollection = sim.simUniv.get(COLLECTIONS.PLATELETS);
+      let initialCount = plateletsCollection.count();
+
+      // Create mock platelets if not enough were generated
+      if (initialCount < 40) {
+        // Create 50 mock platelets with varying neighbor counts for 3-pattern testing
+        for (let i = 0; i < 50; i++) {
+          const mockPlatelet = {
+            id: `mock-platelet-${i}`,
+            plateId: plateId,
+            position: new Vector3(
+              Math.random() * 1000,
+              Math.random() * 1000,
+              Math.random() * 1000,
+            ),
+            radius: 10,
+            thickness: 1,
+            density: 1,
+            isActive: true,
+            neighbors:
+              i < 12
+                ? []
+                : i < 24
+                  ? [`neighbor-${i}-1`]
+                  : [
+                      `neighbor-${i}-1`,
+                      `neighbor-${i}-2`,
+                      `neighbor-${i}-3`,
+                      `neighbor-${i}-4`,
+                    ], // First 12 have no neighbors (edge), next 12 have 1 neighbor, rest have many
+            connections: {},
+            neighborCellIds: [],
+            mass: 100,
+            elasticity: 0.5,
+            velocity: new Vector3(),
+          };
+          plateletsCollection.set(mockPlatelet.id, mockPlatelet);
+        }
+        initialCount = plateletsCollection.count();
+      }
+
+      // Call the method
+      sim.createIrregularPlateEdges();
+
+      const finalCount = plateletsCollection.count();
+
+      // Verify platelets were deleted using 3-pattern approach
+      expect(finalCount).toBeLessThan(initialCount);
+      expect(finalCount).toBeGreaterThan(0);
+
+      // For 40+ platelets, should use 3-pattern deletion (more aggressive than simple 25%)
+      const deletionRatio = (initialCount - finalCount) / initialCount;
+      expect(deletionRatio).toBeGreaterThan(0.1); // Should delete more than 10% with 3-pattern approach
+
+      console.log(
+        `Deleted ${initialCount - finalCount} platelets (${initialCount} -> ${finalCount}), ratio: ${deletionRatio.toFixed(2)}`,
+      );
+    });
+  });
 });

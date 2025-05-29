@@ -100,6 +100,40 @@ export class IndexedSun<
   }
 
   /**
+   * Count records matching multiple criteria, using indexes for efficiency
+   * @param criteria Array of [key, value] pairs to match
+   * @returns Number of matching records
+   */
+  findCount(...criteria: any[]): number {
+    if (criteria.length === 0) {
+      throw new Error('At least one search criterion is required');
+    }
+
+    // Get or create index for first criterion
+    const [firstKey, firstValue] = criteria[0];
+    const index = this.#getIndex(firstKey);
+
+    // If only one criterion, use index directly
+    if (criteria.length === 1) {
+      return index.findCount(firstValue);
+    }
+
+    // For multiple criteria, count the filtered results
+    const remainingCriteria = criteria.slice(1);
+    let count = 0;
+    for (const [id, record] of index.find(firstValue)) {
+      // Check if record matches all remaining criteria
+      const matchesAll = remainingCriteria.every(
+        ([key, value]) => record[key] === value,
+      );
+      if (matchesAll) {
+        count++;
+      }
+    }
+    return count;
+  }
+
+  /**
    * Get the set of keys for a specific value in an indexed field
    * @param field The field to look up
    * @param value The value to find keys for
