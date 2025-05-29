@@ -4,7 +4,9 @@ import type { CollName } from './types.coll';
 
 export type DataKey = string | number;
 export type FieldName = string;
-export type DataRecord = Record<string, DataValue>;
+export interface DataRecord {
+  [key: string]: any; // Allow dynamic property access for any value type
+}
 export type DataValue = (typeof FIELD_TYPES)[keyof typeof FIELD_TYPES];
 export type FieldTypeValue = (typeof FIELD_TYPES)[keyof typeof FIELD_TYPES];
 

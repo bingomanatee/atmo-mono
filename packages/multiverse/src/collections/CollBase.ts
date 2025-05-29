@@ -24,7 +24,8 @@ export abstract class CollBase<
   debug: boolean = false;
   protected universe: UniverseIF;
   schema: SchemaLocalIF;
-  protected _sun?: SunIF<RecordType, KeyType>;
+  abstract isAsync: boolean;
+  protected _sun?: any; // SunIF | SunIFSync | SunIfAsync
 
   constructor(name: string, schema: SchemaLocalIF, universe: UniverseIF) {
     this.name = name;
@@ -35,7 +36,8 @@ export abstract class CollBase<
   /**
    * The sun that powers this collection
    */
-  public get sun(): SunIF<RecordType, KeyType> {
+  public get sun(): any {
+    // SunIF | SunIFSync | SunIfAsync
     if (!this._sun) {
       if (!this._sunF) {
         throw new Error('Sun factory function is not set');
@@ -51,9 +53,7 @@ export abstract class CollBase<
     return this._sun;
   }
 
-  protected abstract _sunF: (
-    coll: CollIF<RecordType, KeyType>,
-  ) => SunIF<RecordType, KeyType>;
+  protected abstract _sunF: (coll: any) => any; // Loose typing for factory
 
   /**
    * Get a record by key
@@ -79,6 +79,13 @@ export abstract class CollBase<
   abstract has(key: KeyType): boolean | Promise<boolean>;
 
   /**
+   * Delete a record by key
+   * @param key - The key of the record to delete
+   * @returns void for sync collections, Promise<void> for async collections
+   */
+  abstract delete(key: KeyType): any; // void | Promise<void>
+
+  /**
    * Mutate a record
    * @param key - The key of the record to mutate
    * @param mutator - Function to mutate the record
@@ -100,11 +107,52 @@ export abstract class CollBase<
   abstract send(key: KeyType, target: UniverseName): void | Promise<void>;
 
   /**
+   * Get multiple records as a Map or Promise<Map>
+   * @param keys - Array of keys to get
+   * @returns Map of records or Promise<Map>
+   */
+  abstract getMany(keys: KeyType[]): any; // Map | Promise<Map>
+
+  /**
+   * Set multiple records from a Map
+   * @param recordMap - Map of records to set
+   * @returns void or Promise<void>
+   */
+  abstract setMany(recordMap: Map<KeyType, RecordType>): any; // void | Promise<void>
+
+  /**
+   * Send multiple records to another universe
+   * @param keys - Array of keys to send
+   * @param props - Transport properties
+   * @returns TransportResult or Promise<TransportResult>
+   */
+  abstract sendMany(keys: KeyType[], props: any): any; // TransportResult | Promise<TransportResult>
+
+  /**
+   * Send all records to another universe
+   * @param props - Transport properties
+   * @returns TransportResult or Promise<TransportResult>
+   */
+  abstract sendAll(props: any): any; // TransportResult | Promise<TransportResult>
+
+  /**
+   * Get all records as a generator
+   * @returns Generator or AsyncGenerator of [key, value] pairs
+   */
+  abstract values(): any; // Generator | AsyncGenerator
+
+  /**
+   * Iterator for the collection
+   * @returns Iterator of [key, value] pairs
+   */
+  abstract [Symbol.iterator](): Iterator<[KeyType, RecordType]>;
+
+  /**
    * Find records matching a query
    * @param query - The query to match against
-   * @returns An array of records matching the query
+   * @returns Generator or AsyncGenerator of [key, value] pairs
    */
-  abstract find(query: any): RecordType[] | Promise<RecordType[]>;
+  abstract find(query: any): any; // Generator | AsyncGenerator
 
   /**
    * Iterate over each record in the collection
@@ -128,7 +176,7 @@ export abstract class CollBase<
   /**
    * Map over each record in the collection and apply a transformation
    * @param mapper - Function to transform each record
-   * @returns The number of records processed
+   * @returns Map for sync collections, Promise<Map> for async collections
    * @throws MapError if any mapper function throws and noTransaction is false
    */
   abstract map(
@@ -137,7 +185,7 @@ export abstract class CollBase<
       key: KeyType,
       collection: CollIF<RecordType, KeyType>,
     ) => RecordType | void | any | Promise<RecordType | void | any>,
-  ): number | Promise<number>;
+  ): any; // Map | Promise<Map>
 
   /**
    * Validate a record against the schema
@@ -173,11 +221,5 @@ export abstract class CollBase<
     }
   }
 
-  abstract getMany$?(
-    keys: KeyType[],
-  ): Observable<{ key: KeyType; value: RecordType }>;
-  abstract getAll$?(): Observable<{ key: KeyType; value: RecordType }>;
-  abstract sendMany?(
-    keys: KeyType[],
-  ): Subscribable<{ key: KeyType; value: RecordType; sent: boolean }>;
+  // Optional streaming methods moved to concrete classes
 }

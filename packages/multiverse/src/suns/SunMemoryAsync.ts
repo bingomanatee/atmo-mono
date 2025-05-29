@@ -9,7 +9,7 @@ import { SunBase } from './SunFBase';
 
 export class SunMemoryAsync<RecordType, KeyType>
   extends SunBase<RecordType, KeyType, CollAsyncIF<RecordType, KeyType>>
-  implements SunIF<RecordType, KeyType>
+  implements SunIfAsync<RecordType, KeyType>
 {
   #batchSize = 30;
   #data: ExtendedMap<KeyType, RecordType>;
@@ -20,6 +20,10 @@ export class SunMemoryAsync<RecordType, KeyType>
     if (coll) {
       this.coll = coll;
     }
+  }
+
+  async init(coll?: CollAsyncIF<RecordType, KeyType>): Promise<void> {
+    super.init(coll);
   }
 
   async get(key: KeyType) {
@@ -96,7 +100,7 @@ export class SunMemoryAsync<RecordType, KeyType>
    * @param query - The query to match against
    * @returns A promise that resolves to an array of records matching the query
    */
-  *find(...query: any[]): Generator<[KeyType, RecordType]> {
+  async *find(...query: any[]): AsyncGenerator<[KeyType, RecordType]> {
     for (const [key, value] of this.#data.entries()) {
       if (matchesQuery(value, key, query)) {
         yield [key, value];
@@ -239,10 +243,41 @@ export class SunMemoryAsync<RecordType, KeyType>
     }
   }
 
+  /**
+   * Get multiple records as a map
+   * @param keys Array of record keys to get
+   * @returns A promise that resolves to a map of key-value pairs for matching records
+   */
+  async getMany(keys: KeyType[]): Promise<Map<KeyType, RecordType>> {
+    const result = new Map<KeyType, RecordType>();
+    for (const key of keys) {
+      const value = await this.get(key);
+      if (value !== undefined) {
+        result.set(key, value);
+      }
+    }
+    return result;
+  }
+
   async *values(): AsyncGenerator<[KeyType, RecordType]> {
     for (const [key, value] of this.#data) {
       yield [key, value];
     }
+  }
+
+  /**
+   * Get all records as an async generator of [key, value] pairs (alias for values)
+   * @returns An async generator of [key, value] pairs for all records
+   * @deprecated Use values() instead
+   */
+  getAll(): AsyncGenerator<[KeyType, RecordType]> {
+    return this.values();
+  }
+
+  [Symbol.iterator](): Iterator<[KeyType, RecordType]> {
+    // For async generators, we need to return a sync iterator that yields promises
+    const entries = Array.from(this.#data.entries());
+    return entries[Symbol.iterator]();
   }
 
   findAll() {

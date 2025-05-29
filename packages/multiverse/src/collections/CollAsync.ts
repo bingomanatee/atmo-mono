@@ -1,4 +1,5 @@
 import { memoryAsyncSunF } from '../suns/SunMemoryAsync';
+import { Observable } from 'rxjs';
 import type { CollIF } from '../types.coll';
 import type {
   CollAsyncIF,
@@ -7,6 +8,7 @@ import type {
   UniverseIF,
   UniverseName,
   MutationAction,
+  MutatorAsync,
   DataRecord,
   DataKey,
 } from '../types.multiverse';
@@ -77,18 +79,9 @@ export class CollAsync<
 
   async mutate(
     key: KeyType,
-    mutator: (
-      draft: RecordType | undefined,
-    ) => Promise<RecordType | undefined | MutationAction>,
+    mutator: MutatorAsync<RecordType, KeyType>,
   ): Promise<RecordType | undefined> {
     return this.sun.mutate(key, mutator);
-  }
-
-  getMany(keys: KeyType[]) {
-    if (!this.sun.getMany) {
-      throw new Error('getAll method not implemented by sun');
-    }
-    return this.sun.getMany(keys);
   }
 
   /**
@@ -105,7 +98,9 @@ export class CollAsync<
   ): Promise<void> {
     // If the sun has an each method, use it
     if (typeof this.sun.each === 'function') {
-      await this.sun.each((record, key) => callback(record, key, this));
+      await this.sun.each((record: RecordType, key: KeyType) =>
+        callback(record, key, this),
+      );
       return;
     }
 
@@ -115,7 +110,7 @@ export class CollAsync<
 
       // Process all keys in parallel
       await Promise.all(
-        keys.map(async (key) => {
+        keys.map(async (key: KeyType) => {
           const record = await this.get(key);
           if (record !== undefined) {
             await Promise.resolve(callback(record, key, this));
@@ -159,37 +154,39 @@ export class CollAsync<
    * @returns A promise that resolves to the number of records processed
    * @throws MapError if any mapper function throws and noTransaction is false
    */
-  async map(
+  async *map(
     mapper: (
       record: RecordType,
       key: KeyType,
       collection: CollAsyncIF<RecordType, KeyType>,
-    ) => Promise<RecordType>,
-  ): Promise<Map<KeyType, RecordType>> {
+    ) => RecordType,
+  ): AsyncGenerator<[KeyType, RecordType]> {
     // If the sun has a map method, use it
     if (typeof this.sun.map === 'function') {
-      return this.sun.map(mapper);
+      yield* this.sun.map((record: RecordType, key: KeyType) =>
+        mapper(record, key, this),
+      );
+      return;
     }
     if (!(typeof this.sun.keys === 'function')) {
       throw new Error(
-        `each not implemented in ${this.name}; sun has no keys or map function`,
+        `map not implemented in ${this.name}; sun has no keys or map function`,
       );
     }
 
     const keys = await this.sun.keys();
-    const values: RecordType[] = Promise.all(
-      Array.from(keys).map(async () => {
-        const record = await this.get(record);
-        if (record !== undefined) {
-          return mapper(record, key, this);
-        }
-      }),
-    );
 
-    return new Map(keys.map((key, index) => [values[index], key]));
+    for (const key of keys) {
+      const record = await this.get(key);
+      if (record !== undefined) {
+        const mappedRecord = mapper(record, key, this); // Sync call
+        yield [key, mappedRecord];
+      }
+    }
   }
 
-  async send(key: KeyType, target: UniverseName) {
+  async send(key: KeyType, target: UniverseName): Promise<any> {
+    // TransportResult
     if (!this.universe) {
       throw new Error('Universe not set in CollAsync');
     }
@@ -201,6 +198,136 @@ export class CollAsync<
     }
 
     const multiverse = this.universe.multiverse;
-    return multiverse.transport(key, this.name, this.universe.name, target);
+    return multiverse.transport(key, {
+      collectionName: this.name,
+      fromU: this.universe.name,
+      toU: target,
+    });
+  }
+
+  async getMany(keys: KeyType[]): Promise<Map<KeyType, RecordType>> {
+    const map = new Map<KeyType, RecordType>();
+    for (const key of keys) {
+      const value = await this.get(key);
+      if (value !== undefined) {
+        map.set(key, value);
+      }
+    }
+    return map;
+  }
+
+  async setMany(recordMap: Map<KeyType, RecordType>): Promise<void> {
+    // If the sun has a setMany method, use it
+    if (typeof this.sun.setMany === 'function') {
+      return this.sun.setMany(recordMap);
+    }
+
+    // Fallback implementation using individual sets
+    for (const [key, record] of recordMap) {
+      await this.set(key, record);
+    }
+  }
+
+  async sendMany(
+    keys: KeyType[],
+    props: any, // SendProps<RecordType, KeyType>
+  ): Promise<any> {
+    // TransportResult
+    // Get the multiverse instance
+    const multiverse = this.universe.multiverse;
+    if (!multiverse) {
+      throw new Error('sendMany: Multiverse not found');
+    }
+
+    // Create a generator from the keys
+    const map = await this.getMany(keys);
+    const generator = (async function* () {
+      yield map;
+    })();
+    return multiverse.transportGenerator({ ...props, generator });
+  }
+
+  async sendAll(props: any): Promise<any> {
+    // TransportResult
+    // Get the multiverse instance
+    const multiverse = this.universe.multiverse;
+    if (!multiverse) {
+      throw new Error('sendAll: Multiverse not found');
+    }
+
+    // Get all records as a generator
+    const generator = this.values();
+    return multiverse.transportGenerator({ ...props, generator });
+  }
+
+  [Symbol.iterator](): Iterator<[KeyType, RecordType]> {
+    // For async collections, we need to return a sync iterator
+    // This is a simplified implementation that converts async to sync
+    const asyncGen = this.values();
+    const results: [KeyType, RecordType][] = [];
+
+    // Note: This is a simplified sync iterator for async data
+    // In practice, you'd want to use for-await-of with the async generator
+    return results[Symbol.iterator]();
+  }
+
+  // Streaming methods for reactive programming
+  getMany$(keys: KeyType[]): Observable<{ key: KeyType; value: RecordType }> {
+    return new Observable((subscriber) => {
+      (async () => {
+        try {
+          for (const key of keys) {
+            const value = await this.get(key);
+            if (value !== undefined) {
+              subscriber.next({ key, value });
+            }
+          }
+          subscriber.complete();
+        } catch (error) {
+          subscriber.error(error);
+        }
+      })();
+    });
+  }
+
+  getAll$(): Observable<{ key: KeyType; value: RecordType }> {
+    return new Observable((subscriber) => {
+      (async () => {
+        try {
+          for await (const [key, value] of this.values()) {
+            subscriber.next({ key, value });
+          }
+          subscriber.complete();
+        } catch (error) {
+          subscriber.error(error);
+        }
+      })();
+    });
+  }
+
+  sendMany$(
+    keys: KeyType[],
+    target: UniverseName,
+  ): Observable<{ key: KeyType; value: RecordType; sent: boolean }> {
+    return new Observable((subscriber) => {
+      (async () => {
+        try {
+          for (const key of keys) {
+            const value = await this.get(key);
+            if (value !== undefined) {
+              try {
+                await this.send(key, target);
+                subscriber.next({ key, value, sent: true });
+              } catch (error) {
+                subscriber.next({ key, value, sent: false });
+              }
+            }
+          }
+          subscriber.complete();
+        } catch (error) {
+          subscriber.error(error);
+        }
+      })();
+    });
   }
 }

@@ -3,6 +3,8 @@ import type { Observable } from 'rxjs';
 import type { DataKey, DataRecord, SchemaLocalIF, Pair } from './type.schema';
 import type {
   MutationAction,
+  MutatorSync,
+  MutatorAsync,
   SendProps,
   SunIF,
   TransportResult,
@@ -16,26 +18,29 @@ export interface CollBaseIF<RecordType = DataRecord, KeyType = DataKey> {
   debug?: boolean;
   schema: SchemaLocalIF;
   isAsync: boolean;
-  find(...query: any[]): any;
-  values(): any;
-  getMany(keys: KeyType[]): any;
-  get(key: KeyType): RecordType | undefined | Promise<RecordType | undefined>;
-  has(key: KeyType): boolean | Promise<boolean>;
-  send(key: KeyType, target: UniverseName): TransportResult;
-  sendAll(props: SendProps<RecordType, KeyType>): TransportResult;
-  sendMany(
-    keys: KeyType[],
-    props: SendProps<RecordType, KeyType>,
-  ): TransportResult;
-  set(
-    key: KeyType,
-    value: RecordType,
-    skipValidate?: boolean,
-  ): void | Promise<void>;
-  setMany(values: Map<KeyType, RecordType>): void | Promise<void>;
-  delete(key: KeyType): void | Promise<void>;
-  [Symbol.iterator](): Iterator<Pair<KeyType, RecordType>>;
-  sun: SunIF;
+
+  // Use any for methods that differ between sync/async
+  find(...query: any[]): any; // Generator | AsyncGenerator
+  values(): any; // Generator | AsyncGenerator
+  getMany(keys: KeyType[]): any; // Map | Promise<Map>
+  get(key: KeyType): any; // RecordType | undefined | Promise<RecordType | undefined>
+  has(key: KeyType): any; // boolean | Promise<boolean>
+  send(key: KeyType, target: UniverseName): any; // TransportResult | Promise<TransportResult>
+  sendAll(props: any): any; // TransportResult | Promise<TransportResult>
+  sendMany(keys: KeyType[], props: any): any; // TransportResult | Promise<TransportResult>
+  set(key: KeyType, value: RecordType, skipValidate?: boolean): any; // void | Promise<void>
+  setMany(values: Map<KeyType, RecordType>): any; // void | Promise<void>
+  delete(key: KeyType): any; // void | Promise<void>
+  [Symbol.iterator](): any; // Iterator | AsyncIterator
+
+  // Sun can be either sync or async
+  sun: any; // SunIF | SunIFSync | SunIfAsync
+
+  // Methods that might exist in subclasses
+  count?(): any; // number | Promise<number>
+  each?(callback: any): any; // void | Promise<void>
+  map?(mapper: any, noTransaction?: boolean): any; // Map | Promise<Map>
+  mutate?(key: KeyType, mutator: any): any; // RecordType | Promise<RecordType>
 }
 
 export interface CollSyncIF<RecordType = DataRecord, KeyType = DataKey>
@@ -60,13 +65,10 @@ export interface CollSyncIF<RecordType = DataRecord, KeyType = DataKey>
       collection: CollSyncIF<RecordType, KeyType>,
     ) => RecordType | void | MutationAction,
     noTransaction?: boolean,
-  ): Map<KeyType, RecordType>;
+  ): Generator<Pair<KeyType, RecordType>>;
   mutate(
     key: KeyType,
-    mutator: (
-      draft: RecordType | undefined,
-      collection: CollSyncIF<RecordType, KeyType>,
-    ) => RecordType | MutationAction,
+    mutator: MutatorSync<RecordType, KeyType>,
   ): RecordType | undefined;
   name: CollName;
   schema: SchemaLocalIF;
@@ -102,14 +104,11 @@ export interface CollAsyncIF<RecordType = DataRecord, KeyType = DataKey>
       record: RecordType,
       key: KeyType,
       collection: CollAsyncIF<RecordType, KeyType>,
-    ) => RecordType | void | any | Promise<RecordType | void | any>,
-  ): Promise<Map<KeyType, RecordType>>;
+    ) => RecordType | void | MutationAction,
+  ): AsyncGenerator<Pair<KeyType, RecordType>>;
   mutate(
     key: KeyType,
-    mutator: (
-      draft: RecordType | undefined,
-      collection: CollAsyncIF<RecordType, KeyType>,
-    ) => Promise<RecordType | MutationAction>,
+    mutator: MutatorAsync<RecordType, KeyType>,
   ): Promise<RecordType | undefined>;
   send(key: KeyType, target: UniverseName): TransportResult;
   sendAll(props: SendProps<RecordType, KeyType>): TransportResult;

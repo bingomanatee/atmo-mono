@@ -2,7 +2,7 @@ import { produce } from 'immer';
 import { MUTATION_ACTIONS } from '../constants';
 import { isMutatorAction, isObj } from '../typeguards.multiverse';
 import type { CollIF, CollSyncIF } from '../types.coll';
-import type { MutationAction, SunIF } from '../types.multiverse';
+import type { MutationAction, MutatorSync, SunIF } from '../types.multiverse';
 import { applyFieldFilters } from './applyFieldFilters';
 import { SunMemory } from './SunMemory';
 
@@ -55,10 +55,7 @@ export class SunMemoryImmer<RecordType, KeyType = string> extends SunMemory<
 
   mutate(
     key: KeyType,
-    mutator: (
-      draft: RecordType | undefined,
-      collection: CollIF<RecordType, KeyType>,
-    ) => RecordType | undefined | MutationAction,
+    mutator: MutatorSync<RecordType, KeyType>,
   ): RecordType | undefined {
     this.#locked = true;
 

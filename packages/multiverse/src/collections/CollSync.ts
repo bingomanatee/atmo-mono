@@ -1,5 +1,6 @@
 import memorySunF from '../suns/SunMemory';
 import { CollBase } from './CollBase';
+import { Observable } from 'rxjs';
 import type { CollIF, CollSyncIF } from '../types.coll';
 import type {
   SchemaLocalIF,
@@ -9,6 +10,7 @@ import type {
   UniverseIF,
   UniverseName,
   MutationAction,
+  MutatorSync,
   DataRecord,
   DataKey,
 } from '../types.multiverse';
@@ -79,12 +81,9 @@ export class CollSync<
 
   mutate(
     key: KeyType,
-    mutator: (
-      draft: RecordType | undefined,
-      collection: CollSyncIF<RecordType, KeyType>,
-    ) => RecordType | undefined | MutationAction,
+    mutator: MutatorSync<RecordType, KeyType>,
   ): RecordType | undefined {
-    return this.sun.mutate(key, (draft) => mutator(draft, this));
+    return this.sun.mutate(key, mutator);
   }
 
   /**
@@ -93,15 +92,18 @@ export class CollSync<
    * @returns a Map of record
    * @throws MapError if any mapper function throws and noTransaction is false
    */
-  map(
+  *map(
     mapper: (
       record: RecordType,
       key: KeyType,
       collection: CollSyncIF<RecordType, KeyType>,
     ) => RecordType,
-  ): Map<KeyType, RecordType> {
+  ): Generator<[KeyType, RecordType]> {
     if (typeof this.sun.map === 'function') {
-      return this.sun.map((record, key) => mapper(record, key, this));
+      yield* this.sun.map((record: RecordType, key: KeyType) =>
+        mapper(record, key, this),
+      );
+      return;
     }
 
     if (typeof this.sun.keys !== 'function') {
@@ -110,22 +112,24 @@ export class CollSync<
       );
     }
 
-    return new Map(
-      Array.from(this.sun.keys()).map((key) => {
-        const record = this.get(key)!;
-        return [key, mapper(record, key, this)];
-      }),
-    );
+    for (const key of this.sun.keys()) {
+      const record = this.get(key);
+      if (record !== undefined) {
+        const mappedRecord = mapper(record, key, this);
+        yield [key, mappedRecord];
+      }
+    }
   }
 
-  send(key: KeyType, target: UniverseName): void {
+  send(key: KeyType, target: UniverseName): any {
+    // TransportResult
     if (!this.universe.multiverse) {
       throw new Error(
         'CollSync.send: multiverse not set on universe ' + this.universe.name,
       );
     }
     if (!this.has(key)) throw new Error(this.name + 'does not have key ' + key);
-    this.universe.multiverse.transport(key, {
+    return this.universe.multiverse.transport(key, {
       collectionName: this.name,
       fromU: this.universe.name,
       toU: target,
@@ -145,7 +149,9 @@ export class CollSync<
   ): void {
     // If the sun has an each method, use it
     if (typeof this.sun.each === 'function') {
-      this.sun.each((record, key) => callback(record, key, this));
+      this.sun.each((record: RecordType, key: KeyType) =>
+        callback(record, key, this),
+      );
       return;
     }
 
@@ -194,7 +200,8 @@ export class CollSync<
    * @param recordMap Map of records to set
    * @returns Number of records set
    */
-  setMany(recordMap: Map<KeyType, RecordType>): void {
+  setMany(recordMap: Map<KeyType, RecordType>): any {
+    // void
     // If the sun has a setMany method, use it
     if (typeof this.sun.setMany === 'function') {
       return this.sun.setMany(recordMap);
@@ -207,19 +214,24 @@ export class CollSync<
 
   sendMany(
     keys: KeyType[],
-    props: SendProps<RecordType, KeyType>,
-  ): TransportResult {
+    props: any, // SendProps<RecordType, KeyType>
+  ): any {
+    // TransportResult
     // Get the multiverse instance
     const multiverse = this.universe.multiverse;
     if (!multiverse) {
-      throw new Error('sendManny: Multiverse not found');
+      throw new Error('sendMany: Multiverse not found');
     }
 
-    const generator = this.getMany(keys);
+    const map = this.getMany(keys);
+    const generator = (function* () {
+      yield map;
+    })();
     return multiverse.transportGenerator({ ...props, generator });
   }
 
-  sendAll(props: SendProps<RecordType, KeyType>): TransportResult {
+  sendAll(props: any): any {
+    // TransportResult
     // Get the multiverse instance
     const multiverse = this.universe.multiverse;
     if (!multiverse) {
@@ -227,11 +239,65 @@ export class CollSync<
     }
 
     // Get all keys from the collection
-    const generator = this.getAll();
+    const generator = this.values();
     return multiverse.transportGenerator({ ...props, generator });
   }
 
   [Symbol.iterator](): Iterator<[KeyType, RecordType]> {
     return this.values();
+  }
+
+  // Streaming methods for reactive programming
+  getMany$(keys: KeyType[]): Observable<{ key: KeyType; value: RecordType }> {
+    return new Observable((subscriber) => {
+      try {
+        for (const key of keys) {
+          const value = this.get(key);
+          if (value !== undefined) {
+            subscriber.next({ key, value });
+          }
+        }
+        subscriber.complete();
+      } catch (error) {
+        subscriber.error(error);
+      }
+    });
+  }
+
+  getAll$(): Observable<{ key: KeyType; value: RecordType }> {
+    return new Observable((subscriber) => {
+      try {
+        for (const [key, value] of this.values()) {
+          subscriber.next({ key, value });
+        }
+        subscriber.complete();
+      } catch (error) {
+        subscriber.error(error);
+      }
+    });
+  }
+
+  sendMany$(
+    keys: KeyType[],
+    target: UniverseName,
+  ): Observable<{ key: KeyType; value: RecordType; sent: boolean }> {
+    return new Observable((subscriber) => {
+      try {
+        for (const key of keys) {
+          const value = this.get(key);
+          if (value !== undefined) {
+            try {
+              this.send(key, target);
+              subscriber.next({ key, value, sent: true });
+            } catch (error) {
+              subscriber.next({ key, value, sent: false });
+            }
+          }
+        }
+        subscriber.complete();
+      } catch (error) {
+        subscriber.error(error);
+      }
+    });
   }
 }

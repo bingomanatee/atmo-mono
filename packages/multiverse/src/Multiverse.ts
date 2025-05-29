@@ -43,7 +43,7 @@ export class Multiverse implements MultiverseIF {
     return u;
   }
 
-  toUniversal<ToRecord = DataRecord>(
+  toUniversal<ToRecord extends object = DataRecord>(
     record: any,
     collection: CollBaseIF,
     fromUnivName: string,
@@ -113,7 +113,7 @@ export class Multiverse implements MultiverseIF {
     for (const [fieldName, fieldDef] of Object.entries(coll.schema.fields)) {
       if (typeof fieldDef.import === 'function') {
         const importedValue = fieldDef.import({
-          value: get(out, fieldName),
+          newValue: get(out, fieldName),
           inputRecord: record,
           currentRecord: out,
         });
@@ -160,7 +160,9 @@ export class Multiverse implements MultiverseIF {
         map,
         asError(error).message,
       );
-      throw new Error(`toLocal validation failure: ${error.message}`);
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      throw new Error(`toLocal validation failure: ${errorMessage}`);
     }
 
     if (coll.debug) {
@@ -224,7 +226,7 @@ export class Multiverse implements MultiverseIF {
     // Second pass: Process regular field mappings
     for (const universalName of Object.keys(univSchema.fields)) {
       // Skip if this field is already mapped via univFields
-      if (!Array.from(Object.values(mappings).includes(universalName))) {
+      if (!Object.values(mappings).includes(universalName)) {
         throw new Error(`universal field ${universalName} not mapped`);
       }
     }
@@ -312,7 +314,7 @@ export class Multiverse implements MultiverseIF {
 
   async #transportAsync<RecordType = DataRecord, KeyType = any>(
     key: any,
-    props: TransportProps<RecordType, KeyType>,
+    props: Omit<TransportProps<RecordType, KeyType>, 'generator'>,
   ) {
     const { collectionName: collection, fromU, toU } = props;
     const { fromColl, toColl } = this.#initTransport<RecordType, KeyType>(
@@ -354,7 +356,7 @@ export class Multiverse implements MultiverseIF {
 
   #translateRecord<RecordType = DataRecord, KeyType = any>(
     localRecord: RecordType,
-    props: TransportProps<RecordType, KeyType>,
+    props: Omit<TransportProps<RecordType, KeyType>, 'generator'>,
     key: KeyType,
   ): any {
     const { fromU, toU, collectionName } = props;
@@ -374,7 +376,9 @@ export class Multiverse implements MultiverseIF {
   }
 
   #initTransport<RecordType = DataRecord, KeyType = any>(
-    props: TransportProps<RecordType, KeyType>,
+    props:
+      | TransportProps<RecordType, KeyType>
+      | Omit<TransportProps<RecordType, KeyType>, 'generator'>,
   ) {
     const { collectionName, fromU, toU } = props;
 
@@ -398,7 +402,7 @@ export class Multiverse implements MultiverseIF {
     }
     if (!this.baseSchemas.has(collectionName)) {
       throw new Error(
-        `cannot transport collections without a universal schema definition: ${collection}`,
+        `cannot transport collections without a universal schema definition: ${collectionName}`,
       );
     }
 

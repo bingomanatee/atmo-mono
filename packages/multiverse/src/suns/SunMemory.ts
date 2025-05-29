@@ -17,7 +17,6 @@ export class SunMemory<RecordType, KeyType>
   readonly id: CollName;
   readonly isAsync = false;
   #data: ExtendedMap<KeyType, RecordType>;
-  coll?: CollSyncIF<RecordType, KeyType>;
 
   constructor(props: {
     schema: SchemaLocalIF<RecordType>;
@@ -141,19 +140,17 @@ export class SunMemory<RecordType, KeyType>
   }
 
   /**
-   * Get multiple records as a Map
+   * Get multiple records as a generator of [key, value] pairs
    * @param keys Array of record keys to get
-   * @returns Map of records
+   * @returns A generator of [key, value] pairs for matching records
    */
-  getMany(keys: KeyType[]): Map<KeyType, RecordType> {
-    const map = new Map<KeyType, RecordType>();
+  *getMany(keys: KeyType[]): Generator<[KeyType, RecordType]> {
     for (const key of keys) {
       const value = this.#data.get(key);
       if (value !== undefined) {
-        map.set(key, value);
+        yield [key, value];
       }
     }
-    return map;
   }
 
   /**
@@ -244,6 +241,19 @@ export class SunMemory<RecordType, KeyType>
     for (const [key, value] of this.#data.entries()) {
       yield [key, value];
     }
+  }
+
+  /**
+   * Get all records as a generator of [key, value] pairs (alias for values)
+   * @returns A generator of [key, value] pairs for all records
+   * @deprecated Use values() instead
+   */
+  getAll(): Generator<Pair<KeyType, RecordType>> {
+    return this.values();
+  }
+
+  [Symbol.iterator](): Iterator<Pair<KeyType, RecordType>> {
+    return this.values();
   }
 
   get name(): CollName {

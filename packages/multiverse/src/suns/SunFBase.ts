@@ -1,6 +1,7 @@
 import { get } from 'lodash-es';
 import { isObj, isColl } from '../typeguards.multiverse';
 import type { CollBaseIF, FieldLocalIF, SunIF } from '../types.multiverse';
+import type { CollIF } from '../types.coll';
 import { validateField } from '../utils/validateField';
 
 /**
@@ -19,7 +20,7 @@ const delay = <T>(callback: () => T): Promise<T> => {
 export abstract class SunBase<
   RecordType,
   KeyType,
-  CollType extends CollBaseIF = CollBaseIF,
+  CollType extends CollIF<RecordType, KeyType> = CollIF<RecordType, KeyType>,
 > implements SunIF<RecordType, KeyType>
 {
   #coll?: CollType;

@@ -11,20 +11,17 @@ export interface SunIF<RecordType = DataRecord, KeyType = DataKey> {
    * This is where validation of the collection should occur.
    * @throws Error if initialization fails or if already initialized
    */
-  init(): void | Promise<void>;
+  init(): any; // void | Promise<void>
 
-  get(key: KeyType): RecordType | undefined | Promise<RecordType | undefined>;
-  set(key: KeyType, value: RecordType): void | Promise<void>;
-  has(key: KeyType): boolean | Promise<boolean>;
-  delete(key: KeyType): void | Promise<void>;
-  clear(): void | Promise<void>;
-  values():
-    | Generator<[KeyType, RecordType]>
-    | AsyncGenerator<[KeyType, RecordType]>;
-  find(
-    query: string | ((record: RecordType) => boolean),
-    value?: any,
-  ): Generator<[KeyType, RecordType]> | AsyncGenerator<[KeyType, RecordType]>;
+  // Use any for methods that differ between sync/async
+  get(key: KeyType): any; // RecordType | undefined | Promise<RecordType | undefined>
+  set(key: KeyType, value: RecordType): any; // void | Promise<void>
+  has(key: KeyType): any; // boolean | Promise<boolean>
+  delete(key: KeyType): any; // void | Promise<void>
+  clear(): any; // void | Promise<void>
+  values(): any; // Generator | AsyncGenerator
+  find(query: string | ((record: RecordType) => boolean), value?: any): any; // Generator | AsyncGenerator
+
   /**
    * Validate a record against the schema
    * @param record - The record to validate
@@ -32,72 +29,22 @@ export interface SunIF<RecordType = DataRecord, KeyType = DataKey> {
    * @returns void if validation passes
    */
   validate(record: RecordType): void;
+
   /**
    * Optional method to mutate a record
    * @param key - The key of the record to mutate
    * @param mutator - A function that accepts the previous record (or undefined) and returns a new record
    * @returns The mutated record or undefined if deleted
    */
-  mutate?(
-    key: KeyType,
-    mutator: (
-      draft: RecordType | undefined,
-    ) =>
-      | RecordType
-      | undefined
-      | MutationAction
-      | Promise<RecordType | undefined | MutationAction>,
-  ): RecordType | undefined | Promise<RecordType | undefined>;
+  mutate?(key: KeyType, mutator: any): any; // RecordType | undefined | Promise<RecordType | undefined>
 
-  keys?(): KeyType[] | Promise<KeyType[]>;
-
-  each(
-    callback: (
-      record: RecordType,
-      key: KeyType,
-      collection: CollBaseIF,
-    ) => void,
-  ): any;
-  /**
-   * Get the number of records in the collection
-   * @returns The number of records for sync collections, Promise<number> for async collections
-   */
-  count(): any;
-  map?(
-    mapper: (
-      record: RecordType,
-      key: KeyType,
-      collection: CollBaseIF,
-    ) => RecordType | void | any,
-    noTransaction?: boolean,
-  ): any;
-
-  /**
-   * Get multiple records as a generator of [key, value] pairs
-   * @param keys Array of record keys to get
-   * @returns A generator of [key, value] pairs for matching records
-   */
-  getMany?(keys: KeyType[]): Generator<[KeyType, RecordType]>;
-
-  /**
-   * Get all records as a generator of [key, value] pairs
-   * @returns A generator of [key, value] pairs for all records
-   */
-  getAll():
-    | Generator<[KeyType, RecordType]>
-    | Promise<Generator<[KeyType, RecordType]>>;
-
-  /**
-   * Set multiple records from a Map
-   * @param recordMap Map of records to set
-   * @returns Number of records set
-   */
-  setMany?(recordMap: Map<KeyType, RecordType>): number | Promise<number>;
-
-  /**
-   * Make the Sun engine itself iterable over [key, value] pairs
-   */
-  [Symbol.iterator](): Iterator<[KeyType, RecordType]>;
+  keys?(): any; // KeyType[] | Promise<KeyType[]>
+  each(callback: any): any; // void | Promise<void>
+  count(): any; // number | Promise<number>
+  map?(mapper: any, noTransaction?: boolean): any; // Map | Promise<Map>
+  getMany?(keys: KeyType[]): any; // Generator | AsyncGenerator | Map | Promise<Map>
+  setMany?(recordMap: Map<KeyType, RecordType>): any; // number | Promise<number>
+  [Symbol.iterator](): any; // Iterator | AsyncIterator
 }
 
 export interface SunIFSync<RecordType = DataRecord, KeyType = DataKey>
@@ -116,9 +63,7 @@ export interface SunIFSync<RecordType = DataRecord, KeyType = DataKey>
   ): Generator<[KeyType, RecordType]>;
   mutate(
     key: KeyType,
-    mutator: (
-      draft: RecordType | undefined,
-    ) => RecordType | undefined | MutationAction,
+    mutator: MutatorSync<RecordType, KeyType>,
   ): RecordType | undefined;
 
   keys?(): KeyType[];
@@ -127,7 +72,7 @@ export interface SunIFSync<RecordType = DataRecord, KeyType = DataKey>
     callback: (
       record: RecordType,
       key: KeyType,
-      collection: CollBaseIF,
+      collection: CollSyncIF<RecordType, KeyType>,
     ) => void,
   ): any;
   /**
@@ -139,7 +84,7 @@ export interface SunIFSync<RecordType = DataRecord, KeyType = DataKey>
     mapper: (
       record: RecordType,
       key: KeyType,
-      collection: CollBaseIF,
+      collection: CollSyncIF<RecordType, KeyType>,
     ) => RecordType | void | any,
     noTransaction?: boolean,
   ): any;
@@ -152,25 +97,10 @@ export interface SunIFSync<RecordType = DataRecord, KeyType = DataKey>
   getMany(keys: KeyType[]): Generator<[KeyType, RecordType]>;
 
   /**
-   * Get all records as a generator of [key, value] pairs
-   * @returns A generator of [key, value] pairs for all records
-   */
-  getAll(): Generator<[KeyType, RecordType]>;
-
-  /**
    * Optional method to get all keys in the collection
    * @returns An array of keys
    */
   keys?(): KeyType[] | Promise<KeyType[]>;
-
-  map?(
-    mapper: (
-      record: RecordType,
-      key: KeyType,
-      collection: CollBaseIF,
-    ) => RecordType | void | any,
-    noTransaction?: boolean,
-  ): Promise<Map<KeyType, RecordType>>;
 
   [Symbol.iterator](): Iterator<[KeyType, RecordType]>;
 }
@@ -191,9 +121,7 @@ export interface SunIfAsync<RecordType = DataRecord, KeyType = DataKey>
   ): AsyncGenerator<[KeyType, RecordType]>;
   mutate(
     key: KeyType,
-    mutator: (
-      draft: RecordType | undefined,
-    ) => Promise<RecordType | undefined | MutationAction>,
+    mutator: MutatorAsync<RecordType, KeyType>,
   ): Promise<RecordType | undefined>;
 
   /**
@@ -211,12 +139,11 @@ export interface SunIfAsync<RecordType = DataRecord, KeyType = DataKey>
     callback: (
       record: RecordType,
       key: KeyType,
-      collection: CollBaseIF,
+      collection: CollAsyncIF<RecordType, KeyType>,
     ) => void,
   ): Promise<void>;
 
   getMany(keys: KeyType[]): Generator<[KeyType, RecordType]>;
-  getAll(): Generator<[KeyType, RecordType]>;
 
   /**
    * Optional method to get all keys in the collection
@@ -228,7 +155,7 @@ export interface SunIfAsync<RecordType = DataRecord, KeyType = DataKey>
     mapper: (
       record: RecordType,
       key: KeyType,
-      collection: CollBaseIF,
+      collection: CollAsyncIF<RecordType, KeyType>,
     ) => RecordType | void | any,
     noTransaction?: boolean,
   ): Promise<Map<KeyType, RecordType>>;
@@ -298,6 +225,9 @@ export type StreamMsg = {
 export * from './type.schema';
 export * from './types.coll';
 
+// Import types needed for mutator definitions
+import type { CollSyncIF, CollAsyncIF } from './types.coll';
+
 /**
  * Interface for mutation action results
  */
@@ -309,3 +239,14 @@ export interface MutationAction {
   /** Optional value for the action */
   value?: any;
 }
+
+// Separate mutator types for sync and async operations
+export type MutatorSync<RecordType, KeyType> = (
+  draft: RecordType | undefined,
+  collection: CollSyncIF<RecordType, KeyType>,
+) => MutationAction | RecordType | undefined;
+
+export type MutatorAsync<RecordType, KeyType> = (
+  draft: RecordType | undefined,
+  collection: CollAsyncIF<RecordType, KeyType>,
+) => Promise<MutationAction | RecordType | undefined>;
