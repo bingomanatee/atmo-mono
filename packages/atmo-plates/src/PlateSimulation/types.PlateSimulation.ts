@@ -5,16 +5,10 @@ import type {
   PlateExtendedIF,
   Identifiable,
   SimPlanetIF,
+  SimSimulation,
 } from '../types.atmo-plates';
 import type { PlateSpectrumGenerator } from '../generator/PlateSpectrumGenerator';
 import { Planet } from './Planet';
-
-// Define SimSimulation interface here
-export interface SimSimulation {
-  step: number;
-  // Add other properties of the simulation state as needed based on usage
-  // e.g., plates, planets, etc., though these might be accessed via the PlateSimulationIF
-}
 
 // Simulation plate interface with identity and relational links
 export interface SimPlateIF extends PlateExtendedIF, Identifiable {
@@ -29,6 +23,7 @@ export interface SimProps {
   name?: string;
   radius?: number;
   plateCount?: number;
+  maxPlateRadius?: number;
 }
 
 export type AddPlateProps = (PlateExtendedIF | PlateIF) & {

@@ -80,10 +80,6 @@ export class ForceVisualizer extends PlateVisualizerBase {
       color: plateColor,
     });
 
-    console.log(
-      `Plate ${this.plate.id} color: density=${this.plate.density.toFixed(2)}, HSL=(${hue.toFixed(2)}, ${saturation.toFixed(2)}, ${lightness.toFixed(2)}), color=#${plateColor.getHexString()}`,
-    );
-
     this.plateMesh = new THREE.Mesh(cylinderGeometry, cylinderMaterial);
 
     // Enable shadows for the plate cylinder
@@ -98,10 +94,7 @@ export class ForceVisualizer extends PlateVisualizerBase {
         this.plate.position.y,
         this.plate.position.z,
       );
-      console.log(`World position for plate ${this.plate.id}:`, worldPos);
-
       const localPos = this.orbitalFrame.worldToLocal(worldPos.clone());
-      console.log(`Local position for plate ${this.plate.id}:`, localPos);
 
       this.plateMesh.position.copy(localPos);
     }
@@ -121,18 +114,8 @@ export class ForceVisualizer extends PlateVisualizerBase {
       plateRadiusScaled,
     );
 
-    // Log cylinder dimensions and position
-    console.log(
-      `Cylinder for plate ${this.plate.id}: originalRadius=${this.plate.radius}km, scaledRadius=${plateRadiusScaled}, thickness=${plateThicknessScaled}, localPos=(${this.plateMesh.position.x.toFixed(0)}, ${this.plateMesh.position.y.toFixed(0)}, ${this.plateMesh.position.z.toFixed(0)})`,
-    );
-
     // Add the cylinder to the orbital frame, not directly to the scene
     this.orbitalFrame.add(this.plateMesh);
-
-    // Debug: log the orbital frame's children count
-    console.log(
-      `Orbital frame for plate ${this.plate.id} now has ${this.orbitalFrame.children.length} children`,
-    );
   }
 
   /**
@@ -179,7 +162,7 @@ export class ForceVisualizer extends PlateVisualizerBase {
       );
       const localOrigin = this.orbitalFrame.worldToLocal(worldPos.clone());
       const direction = force.clone().normalize();
-      const length = force.length() * 1000; // Scale force vector length for visibility
+      const length = Math.max(force.length() * 10000, 100); // Much larger scale for visibility
       const color = 0xff0000; // Red color for repulsion
 
       if (this.forceArrow) {

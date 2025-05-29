@@ -1,15 +1,11 @@
-import {
-  EARTH_RADIUS,
-  randomNormal,
-  latLonToPoint,
-  getH3CellForPosition,
-} from '@wonderlandlabs/atmo-utils';
+import { EARTH_RADIUS, randomNormal } from '@wonderlandlabs/atmo-utils';
 import { Multiverse } from '@wonderlandlabs/multiverse';
 import type { Vector3Like } from 'three';
 import { v4 as uuidV4 } from 'uuid';
 import { PlateSpectrumGenerator } from '../generator/PlateSpectrumGenerator';
 import { UNIVERSAL_SCHEMA, UNIVERSES } from '../schema';
 import { isPlateExtendedIF } from '../typeGuards';
+import type { SimSimulation } from '../types.atmo-plates';
 import type {
   PlateExtendedIF,
   PlateIF,
@@ -17,7 +13,7 @@ import type {
   Identifiable,
 } from './types.PlateSimulation';
 import { simUniverse } from '../utils';
-import { extendPlate } from '../utils/plateUtils';
+import { extendPlate, isostaticElevation } from '../utils/plateUtils';
 import { COLLECTIONS } from './constants';
 import { PlateletManager } from './managers/PlateletManager';
 import PlateSimulationPlateManager from './managers/PlateSimulationPlateManager';
@@ -28,7 +24,6 @@ import type {
   SimPlateIF,
   SimProps,
 } from './types.PlateSimulation';
-import { gridDisk } from 'h3-js';
 import { Vector3 } from 'three';
 import { Planet } from './Planet';
 
@@ -497,61 +492,71 @@ export class PlateSimulation implements PlateSimulationIF {
    * This method modifies the positions of the plates within the simulation.
    * @returns A map of plate ID to the calculated force vector for that plate.
    */
-  public applyForceLayout(): Map<string, THREE.Vector3> {
-    const plates = Array.from(this.simUniv.get(COLLECTIONS.PLATES).values());
-    const planetRadius = this.planetRadius;
-    const forces = new Map<string, THREE.Vector3>();
-    plates.forEach((plate) => {
-      forces.set(plate.id, new THREE.Vector3());
-    });
+  public applyForceLayout(): Map<string, Vector3> {
+    // Get plates for THIS simulation only
+    const platesCollection = this.simUniv.get(COLLECTIONS.PLATES);
+    const forces = new Map<string, Vector3>();
 
-    // Calculate forces between all pairs of plates
-    for (let i = 0; i < plates.length; i++) {
-      for (let j = i + 1; j < plates.length; j++) {
-        const plate1 = plates[i];
-        const plate2 = plates[j];
+    // Initialize forces map using find generator
+    for (const [id, plate] of platesCollection.find(
+      'planetId',
+      this.planet?.id,
+    )) {
+      forces.set(id, new Vector3());
+    }
 
-        // Calculate distance between plates
-        const distance = plate1.position.distanceTo(plate2.position);
-        const sumOfRadii = (plate1.radius + plate2.radius) * planetRadius;
+    // Calculate forces between all pairs of plates using nested generators
+    for (const [id1, plate1] of platesCollection.find(
+      'planetId',
+      this.planet?.id,
+    )) {
+      for (const [id2, plate2] of platesCollection.find(
+        'planetId',
+        this.planet?.id,
+      )) {
+        // Skip same plate and avoid duplicate pairs
+        if (id1 >= id2) continue;
 
-        // Calculate vertical ranges for each plate (elevation ± thickness/2)
-        const plate1MinElevation =
-          plate1.elevation - (plate1.thickness * 1000) / 2; // Convert thickness from km to m
-        const plate1MaxElevation =
-          plate1.elevation + (plate1.thickness * 1000) / 2;
-        const plate2MinElevation =
-          plate2.elevation - (plate2.thickness * 1000) / 2; // Convert thickness from km to m
-        const plate2MaxElevation =
-          plate2.elevation + (plate2.thickness * 1000) / 2;
+        // Calculate distance between plates (all in km)
+        const pos1 = new Vector3(
+          plate1.position.x,
+          plate1.position.y,
+          plate1.position.z,
+        );
+        const pos2 = new Vector3(
+          plate2.position.x,
+          plate2.position.y,
+          plate2.position.z,
+        );
+        const distance = pos1.distanceTo(pos2);
 
-        // Add 20% safety margin to each range
-        const safetyMargin = 0.2;
-        const plate1MinElevationSafe = plate1MinElevation * (1 - safetyMargin);
-        const plate1MaxElevationSafe = plate1MaxElevation * (1 + safetyMargin);
-        const plate2MinElevationSafe = plate2MinElevation * (1 - safetyMargin);
-        const plate2MaxElevationSafe = plate2MaxElevation * (1 + safetyMargin);
+        // Calculate combined radius (already in km)
+        const combinedRadius = plate1.radius + plate2.radius;
 
-        // Check for vertical overlap
-        const hasVerticalOverlap =
-          (plate1MinElevationSafe <= plate2MaxElevationSafe &&
-            plate1MaxElevationSafe >= plate2MinElevationSafe) ||
-          (plate2MinElevationSafe <= plate1MaxElevationSafe &&
-            plate2MaxElevationSafe >= plate1MinElevationSafe);
+        // Calculate elevation for both plates using dynamic calculation
+        const plate1Elevation = isostaticElevation(
+          plate1.thickness,
+          plate1.density,
+        );
+        const plate2Elevation = isostaticElevation(
+          plate2.thickness,
+          plate2.density,
+        );
 
-        if (hasVerticalOverlap) {
-          // Calculate repulsion force based on distance and overlap
-          const overlapRatio = Math.min(
-            (plate1MaxElevationSafe - plate2MinElevationSafe) /
-              (plate1MaxElevationSafe - plate1MinElevationSafe),
-            (plate2MaxElevationSafe - plate1MinElevationSafe) /
-              (plate2MaxElevationSafe - plate2MinElevationSafe),
-          );
+        const elevationDifference = Math.abs(plate1Elevation - plate2Elevation);
+        const maxElevationDifference =
+          (plate1.thickness + plate2.thickness) / 2;
 
-          // Base repulsion strength based on distance and overlap
-          const baseRepulsionStrength = 0.2 * sumOfRadii * (1 + overlapRatio);
-          const baseRepulsionForceMagnitude =
-            baseRepulsionStrength / (distance * distance);
+        // If elevation difference is too large, plates don't interact
+        if (elevationDifference > maxElevationDifference) {
+          continue;
+        }
+
+        // Check if plates are overlapping or too close
+        if (distance < combinedRadius * 1.2) {
+          // 20% buffer
+          // Calculate base repulsion force magnitude based on elevation interaction
+          const baseRepulsionForceMagnitude = 100; // Base force in km
 
           // Calculate total mass and mass ratios for distributing force
           const totalMass = plate1.mass + plate2.mass;
@@ -570,39 +575,53 @@ export class PlateSimulation implements PlateSimulationIF {
           const repulsionForce2Magnitude =
             baseRepulsionForceMagnitude * massRatio2;
 
-          // Calculate direction vector between plates
-          const direction = new Vector3()
-            .subVectors(plate2.position, plate1.position)
-            .normalize();
+          // Calculate direction from plate2 to plate1 (repulsion direction for plate1)
+          const direction1 = pos1.clone().sub(pos2).normalize();
+          // Direction from plate1 to plate2 (repulsion direction for plate2)
+          const direction2 = direction1.clone().negate();
 
-          // Accumulate forces before applying
-          forces
-            .get(plate1.id)
-            ?.add(direction.clone().multiplyScalar(repulsionForce1Magnitude));
-          forces
-            .get(plate2.id)
-            ?.add(direction.clone().multiplyScalar(-repulsionForce2Magnitude));
+          // Apply forces
+          const force1 = direction1.multiplyScalar(repulsionForce1Magnitude);
+          const force2 = direction2.multiplyScalar(repulsionForce2Magnitude);
+
+          // Accumulate forces
+          forces.get(id1)!.add(force1);
+          forces.get(id2)!.add(force2);
         }
       }
     }
 
-    // Apply accumulated forces to update positions
-    plates.forEach((plate) => {
-      const force = forces.get(plate.id);
-      if (force) {
-        // Update position based on force (scaled by delta time if needed, but for layout we might apply fully)
-        // For simplicity in visualization, let's just apply the force as a position change for now.
-        // In a real simulation step, you'd use velocity and delta time.
-        const newPosition = plate.position
-          .clone()
-          .add(force.multiplyScalar(this._deltaTime)); // Use _deltaTime for scaling
+    // Apply accumulated forces to update positions using find generator again
+    const deltaTime = 0.01; // Fixed time step for consistent force application
+    for (const [id, plate] of platesCollection.find(
+      'planetId',
+      this.planet?.id,
+    )) {
+      const force = forces.get(id);
+      if (force && force.length() > 0.001) {
+        // Update position based on force with fixed time step
+        const newPosition = new Vector3(
+          plate.position.x,
+          plate.position.y,
+          plate.position.z,
+        ).add(force.multiplyScalar(deltaTime));
 
         // Normalize position to maintain sphere surface constraint
-        plate.position.copy(
-          newPosition.normalize().multiplyScalar(planetRadius),
-        );
+        const normalizedPosition = newPosition
+          .normalize()
+          .multiplyScalar(this.planetRadius);
+
+        // Update the plate position in the collection
+        platesCollection.set(id, {
+          ...plate,
+          position: {
+            x: normalizedPosition.x,
+            y: normalizedPosition.y,
+            z: normalizedPosition.z,
+          },
+        });
       }
-    });
+    }
 
     // Return the calculated forces for visualization
     return forces;

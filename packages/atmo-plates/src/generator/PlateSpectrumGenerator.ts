@@ -343,31 +343,57 @@ export class PlateSpectrumGenerator {
     const plates: PlateExtendedIF[] = [];
 
     for (let i = 0; i < options.count; i++) {
-      // Generate random radius between minRadius and maxRadius
-      const radius =
+      // Generate random radius between minRadius and maxRadius (in radians)
+      const radiusInRadians =
         options.minRadius +
         Math.random() * (options.maxRadius - options.minRadius);
 
-      // Generate random density between 0.8 and 1.2
-      const density = 0.8 + Math.random() * 0.4;
+      // Convert radius from radians to kilometers
+      // For a sphere, arc length = radius * angle, so plate radius = planet radius * angle in radians
+      const radius = options.planetRadius * radiusInRadians;
 
-      // Generate random thickness between 1.0 and 2.0 for large plates
-      const thickness = 1.0 + Math.random();
+      // Generate random density between 2.5 and 3.5 g/cm³ (geological range)
+      const density = 2.5 + Math.random() * 1.0; // 2.5-3.5 g/cm³
 
-      // Generate random elevation between -4000 and 4000 meters for large plates
-      const elevation = -4000 + Math.random() * 8000;
+      // Generate random thickness between 7 and 35 km for large plates (geological range)
+      const thickness = 7 + Math.random() * 28; // 7-35 km
 
-      // Calculate area based on radius
-      const area = 2 * Math.PI * (1 - Math.cos(radius));
+      // Calculate area based on radius (now in km)
+      const area = Math.PI * radius * radius;
+
+      // Calculate planet surface area for coverage calculation
+      const planetSurfaceArea =
+        4 * Math.PI * options.planetRadius * options.planetRadius;
+      const coveragePercent = (area / planetSurfaceArea) * 100;
+
+      // Calculate mass (volume * density, converting density from g/cm³ to kg/km³)
+      const volume = area * thickness;
+      const densityKgPerKm3 = density * 1e12; // Convert g/cm³ to kg/km³
+      const mass = volume * densityKgPerKm3;
+
+      // Assign a temporary rank (will be properly ranked later if needed)
+      const rank = i + 1;
+
+      // Determine behavioral type based on density
+      let behavioralType: 'continental-like' | 'oceanic-like' | 'transitional';
+      if (density < 0.9) {
+        behavioralType = 'continental-like';
+      } else if (density > 1.1) {
+        behavioralType = 'oceanic-like';
+      } else {
+        behavioralType = 'transitional';
+      }
 
       plates.push({
         id: uuidV4(),
         radius,
         density,
         thickness,
-        elevation,
         area,
-        isActive: true,
+        coveragePercent,
+        mass,
+        rank,
+        behavioralType,
       });
     }
 
