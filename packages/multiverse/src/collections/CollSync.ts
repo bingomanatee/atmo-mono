@@ -8,6 +8,9 @@ import type {
   TransportResult,
   UniverseIF,
   UniverseName,
+  MutationAction,
+  DataRecord,
+  DataKey,
 } from '../types.multiverse';
 
 type CollParms<RecordType, KeyType = string> = {
@@ -17,7 +20,10 @@ type CollParms<RecordType, KeyType = string> = {
   sunF?: (coll: CollIF<RecordType, KeyType>) => SunIFSync<RecordType, KeyType>; // will default to memorySunF
 };
 
-export class CollSync<RecordType, KeyType = string>
+export class CollSync<
+    RecordType extends DataRecord = DataRecord,
+    KeyType extends DataKey = DataKey,
+  >
   extends CollBase<RecordType, KeyType>
   implements CollSyncIF<RecordType, KeyType>
 {
@@ -223,5 +229,9 @@ export class CollSync<RecordType, KeyType = string>
     // Get all keys from the collection
     const generator = this.getAll();
     return multiverse.transportGenerator({ ...props, generator });
+  }
+
+  [Symbol.iterator](): Iterator<[KeyType, RecordType]> {
+    return this.values();
   }
 }

@@ -215,8 +215,8 @@ export interface SunIfAsync<RecordType = DataRecord, KeyType = DataKey>
     ) => void,
   ): Promise<void>;
 
-  getMany(keys: KeyType[]): AsyncGenerator<[KeyType, RecordType]>;
-  getAll(): AsyncGenerator<[KeyType, RecordType]>;
+  getMany(keys: KeyType[]): Generator<[KeyType, RecordType]>;
+  getAll(): Generator<[KeyType, RecordType]>;
 
   /**
    * Optional method to get all keys in the collection

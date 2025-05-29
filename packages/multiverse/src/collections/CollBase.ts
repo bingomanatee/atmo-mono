@@ -6,6 +6,8 @@ import type {
   SunIF,
   UniverseIF,
   UniverseName,
+  DataRecord,
+  DataKey,
 } from '../types.multiverse';
 import { validateField } from '../utils/validateField';
 import { get } from 'lodash-es';
@@ -13,11 +15,13 @@ import { get } from 'lodash-es';
 /**
  * Base class for collections with common functionality
  */
-export abstract class CollBase<RecordType, KeyType = string>
-  implements CollBaseIF
+export abstract class CollBase<
+  RecordType extends DataRecord = DataRecord,
+  KeyType extends DataKey = DataKey,
+> implements CollBaseIF
 {
   name: string;
-  debug: false;
+  debug: boolean = false;
   protected universe: UniverseIF;
   schema: SchemaLocalIF;
   protected _sun?: SunIF<RecordType, KeyType>;

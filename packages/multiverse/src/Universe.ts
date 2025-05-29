@@ -3,6 +3,8 @@ import type {
   MultiverseIF,
   UniverseIF,
   UniverseName,
+  DataRecord,
+  DataKey,
 } from './types.multiverse';
 import type { CollName } from './types.coll';
 
@@ -21,7 +23,9 @@ export class Universe implements UniverseIF {
     }
   }
 
-  add<RecordType = DataRecord, KeyType = DataKey>(coll: CollIF<RecordType, KeyType>): CollIF<RecordType, KeyType> {
+  add<RecordType = DataRecord, KeyType = DataKey>(
+    coll: CollIF<RecordType, KeyType>,
+  ): CollIF<RecordType, KeyType> {
     this.#colls.set(coll.name, coll as unknown as CollIF);
     return coll;
   }

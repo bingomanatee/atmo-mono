@@ -6,6 +6,9 @@ import type {
   SunIfAsync,
   UniverseIF,
   UniverseName,
+  MutationAction,
+  DataRecord,
+  DataKey,
 } from '../types.multiverse';
 import { CollBase } from './CollBase';
 
@@ -16,7 +19,10 @@ type CollParms<RecordType, KeyType = string> = {
   sunF?: (coll: CollIF<RecordType, KeyType>) => SunIfAsync<RecordType, KeyType>; // will default to memorySunF
 };
 
-export class CollAsync<RecordType, KeyType = string>
+export class CollAsync<
+    RecordType extends DataRecord = DataRecord,
+    KeyType extends DataKey = DataKey,
+  >
   extends CollBase<RecordType, KeyType>
   implements CollAsyncIF<RecordType, KeyType>
 {

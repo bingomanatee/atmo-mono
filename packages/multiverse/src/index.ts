@@ -36,3 +36,7 @@ export * from './utils/validateField';
 // Additional exports for compatibility
 export type { PostParams } from './type.schema';
 export { isColl } from './typeguards.multiverse';
+
+// Core type exports
+export type { DataRecord, DataKey } from './types.multiverse';
+export type { MutationAction } from './types.multiverse';

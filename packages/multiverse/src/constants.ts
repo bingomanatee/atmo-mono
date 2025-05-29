@@ -37,4 +37,10 @@ export const MUTATION_ACTIONS_VALUES = Array.from(
 export const STREAM_ACTIONS = {
   /** Terminate the stream immediately */
   TERMINATE: Symbol('TERMINATE_STREAM'),
+  /** Create a new record */
+  CREATE: Symbol('CREATE_RECORD'),
+  /** Update an existing record */
+  UPDATE: Symbol('UPDATE_RECORD'),
+  /** Delete a record */
+  DELETE: Symbol('DELETE_RECORD'),
 } as const;
