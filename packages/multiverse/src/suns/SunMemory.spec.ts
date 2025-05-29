@@ -163,9 +163,10 @@ describe('SunMemory', () => {
         name: 'users',
         schema,
         universe: univ,
+        sunF: sunF,
       });
 
-      sun = new SunMemory<User, number>({ coll });
+      sun = coll.sun as SunMemory<User, number>;
     });
 
     it('should apply field filters when setting a record', () => {
@@ -217,9 +218,10 @@ describe('SunMemory', () => {
         name: 'users',
         schema,
         universe: univ,
+        sunF: sunF,
       });
 
-      sun = new SunMemory<User & { lastUpdated?: string }, number>({ coll });
+      sun = coll.sun as SunMemory<User & { lastUpdated?: string }, number>;
     });
 
     it('should apply record filter when setting a record', () => {

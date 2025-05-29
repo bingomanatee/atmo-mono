@@ -118,12 +118,11 @@ describe('CollAsync', () => {
         await c.set(1, { id: 1, name: 'foo', zip_code: 12345 });
         await c.send(1, 'target');
 
-        expect(m.transport).toHaveBeenCalledWith(
-          1,
-          'users',
-          'default',
-          'target',
-        );
+        expect(m.transport).toHaveBeenCalledWith(1, {
+          collectionName: 'users',
+          fromU: 'default',
+          toU: 'target',
+        });
 
         // Restore original method
         m.transport = originalTransport;
