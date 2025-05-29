@@ -41,6 +41,7 @@ export interface CollBaseIF<RecordType = DataRecord, KeyType = DataKey> {
   each?(callback: any): any; // void | Promise<void>
   map?(mapper: any, noTransaction?: boolean): any; // Map | Promise<Map>
   mutate?(key: KeyType, mutator: any): any; // RecordType | Promise<RecordType>
+  validate?<R = RecordType>(record: R): void;
 }
 
 export interface CollSyncIF<RecordType = DataRecord, KeyType = DataKey>

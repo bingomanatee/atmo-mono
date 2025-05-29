@@ -177,10 +177,16 @@ describe('CollAsync', () => {
         await c.set(3, { id: 3, name: 'Bob Johnson', zip_code: 34567 });
         await c.set(4, { id: 4, name: 'Alice Brown', zip_code: 45678 });
 
-        const result = await c.map((record) => {
+        const generator = c.map((record) => {
           record.zip_code += 1;
           return record;
         });
+
+        // Convert async generator to Map
+        const result = new Map<number, User>();
+        for await (const [key, value] of generator) {
+          result.set(key, value);
+        }
 
         expect(result.get(1)?.zip_code).toBe(12346);
         expect(result.get(2)?.zip_code).toBe(23457);
@@ -190,24 +196,29 @@ describe('CollAsync', () => {
 
       it('should handle errors in map()', async () => {
         await expect(async () => {
-          const result = await c.map((record, key) => {
+          const result = new Map();
+          for await (const [key, value] of c.map((record, key) => {
             if (key === 3) {
               throw new Error(TEST_ERROR);
             }
             record.zip_code += 1;
             return record;
-          });
-          console.log('result of erroring map:', result);
+          })) {
+            result.set(key, value);
+          }
         }).rejects.toThrow(new RegExp(TEST_ERROR));
       });
 
       it('should handle async mapper functions', async () => {
-        const result = await c.map(async (record) => {
+        const result = new Map();
+        for await (const [key, value] of c.map(async (record) => {
           // Simulate async operation
           await new Promise((resolve) => setTimeout(resolve, 10));
           record.zip_code += 1;
           return record;
-        });
+        })) {
+          result.set(key, value);
+        }
 
         expect(result.get(1).zip_code).toBe(12346);
         expect(result.get(2).zip_code).toBe(23457);
@@ -253,7 +264,7 @@ describe('CollAsync', () => {
       });
     });
 
-    it('should throw an error if find is not implemented', () => {
+    it('should throw an error if find is not implemented', async () => {
       // Create a mock sun without find method
       const mockSun = {
         get: vi.fn(),
@@ -273,18 +284,20 @@ describe('CollAsync', () => {
         sunF: () => mockSun,
       });
 
-      // Expect find to throw an error
-      expect(() => coll.find({})).toThrow(/Find method not/);
+      // Expect find to throw an error when called with invalid arguments
+      await expect(async () => {
+        const generator = coll.find({} as any);
+        // Consume the generator to trigger the error
+        for await (const _ of generator) {
+          // This should not execute
+        }
+      }).rejects.toThrow(/Find method not/);
     });
 
     it('should find records by parameter query', async () => {
-      const generator = coll.find('status', 'active');
-      let results = new Map();
-      let data = generator.next();
-      while (!data.done) {
-        const [key, value] = data.value;
+      const results = new Map();
+      for await (const [key, value] of coll.find('status', 'active')) {
         results.set(key, value);
-        data = generator.next();
       }
 
       // Should return 2 users
@@ -298,13 +311,9 @@ describe('CollAsync', () => {
 
     it('should find records by function predicate', async () => {
       // Find users over 30
-      const generator = coll.find((user) => user.age > 30);
-      let results = new Map();
-      let data = generator.next();
-      while (!data.done) {
-        const [key, value] = data.value;
+      const results = new Map();
+      for await (const [key, value] of coll.find((user) => user.age > 30)) {
         results.set(key, value);
-        data = generator.next();
       }
 
       // Should return 2 users
@@ -318,13 +327,9 @@ describe('CollAsync', () => {
 
     it('should return empty map if no records match', async () => {
       // Find users with non-existent status
-      const generator = await coll.find('status', 'inactive');
-      let results = new Map();
-      let data = generator.next();
-      while (!data.done) {
-        const [key, value] = data.value;
+      const results = new Map();
+      for await (const [key, value] of coll.find('status', 'inactive')) {
         results.set(key, value);
-        data = generator.next();
       }
       // Should return empty map
       expect(results.size).toBe(0);

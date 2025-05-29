@@ -230,23 +230,28 @@ describe('Multiverse field mapping', () => {
             tags: 'tags',
           },
           // Use import for special conditions - calculating a derived value
-          import: ({ value: metadata, currentRecord }) => {
-            // First, copy all the values from univFields
+          import: ({ newValue: metadata, inputRecord, currentRecord }) => {
+            // Create a new metadata object with the mapped values
+            const result = {
+              createdAt: inputRecord?.created_at || '',
+              status: '',
+              tags: inputRecord?.tags || [],
+            };
 
-            // Add a derived status based on the tags
-            if (metadata && metadata.tags && Array.isArray(metadata.tags)) {
-              if (metadata.tags.includes('important')) {
-                metadata.status = 'high-priority';
-              } else if (metadata.tags.includes('archived')) {
-                metadata.status = 'inactive';
+            // Add a derived status based on the tags from inputRecord
+            if (inputRecord?.tags && Array.isArray(inputRecord.tags)) {
+              if (inputRecord.tags.includes('important')) {
+                result.status = 'high-priority';
+              } else if (inputRecord.tags.includes('archived')) {
+                result.status = 'inactive';
               } else {
-                metadata.status = 'normal';
+                result.status = 'normal';
               }
             } else {
-              metadata.status = 'unknown';
+              result.status = 'unknown';
             }
 
-            return metadata;
+            return result;
           },
         },
         // Add fields for universal mapping

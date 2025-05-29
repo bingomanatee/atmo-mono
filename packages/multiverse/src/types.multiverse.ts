@@ -193,15 +193,23 @@ export interface MultiverseIF {
     univName: string,
   ): Record<string, string>;
   toLocal(record: any, coll: CollBaseIF, uName: string): any; //convert record from a "multiversal" record to a collection
-  toUniversal(record: any, coll: CollBaseIF, uName: string, key: KeyType): any; //convert record from a collection to a "multiversal" record
-  transportGenerator<RecordType = DataRecord, KeyType = any>(
-    props: TransportProps<KeyType, RecordType>,
-  ): TransportResult;
+  toUniversal<
+    ToRecord extends object = DataRecord,
+    KeyType extends DataKey = any,
+  >(
+    record: any,
+    coll: CollBaseIF,
+    uName: string,
+    key: KeyType,
+  ): ToRecord; //convert record from a collection to a "multiversal" record
+  transportGenerator<RecordType = DataRecord, KeyType extends DataKey = any>(
+    props: TransportProps<RecordType, KeyType>,
+  ): Subscription;
 }
 
 type Listener<T> = PartialObserver<T> | ((value: T) => void);
 
-export type TransportProps<KeyType, RecordType> = {
+export type TransportProps<RecordType, KeyType> = {
   generator:
     | Generator<Map<KeyType, RecordType>>
     | AsyncGenerator<Map<KeyType, RecordType>>;
@@ -216,7 +224,10 @@ export type TransportResult =
   | undefined
   | Promise<Subscription | undefined>;
 
-export type SendProps<R, K> = Omit<TransportProps<R, K>, 'generator'>;
+export type SendProps<RecordType, KeyType> = Omit<
+  TransportProps<RecordType, KeyType>,
+  'generator'
+>;
 export type StreamMsg = {
   current?: number;
   total?: number;

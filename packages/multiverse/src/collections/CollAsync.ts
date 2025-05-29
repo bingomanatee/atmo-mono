@@ -163,6 +163,7 @@ export class CollAsync<
   ): AsyncGenerator<[KeyType, RecordType]> {
     // If the sun has a map method, use it
     if (typeof this.sun.map === 'function') {
+      // The async sun's map method returns AsyncGenerator
       yield* this.sun.map((record: RecordType, key: KeyType) =>
         mapper(record, key, this),
       );
@@ -239,11 +240,16 @@ export class CollAsync<
       throw new Error('sendMany: Multiverse not found');
     }
 
-    // Create a generator from the keys
-    const map = await this.getMany(keys);
-    const generator = (async function* () {
-      yield map;
-    })();
+    // Create an async generator that yields [key, value] pairs
+    const generator = async function* (this: CollAsync<RecordType, KeyType>) {
+      for (const key of keys) {
+        const value = await this.get(key);
+        if (value !== undefined) {
+          yield [key, value] as [KeyType, RecordType];
+        }
+      }
+    }.bind(this)();
+
     return multiverse.transportGenerator({ ...props, generator });
   }
 

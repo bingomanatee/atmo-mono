@@ -128,9 +128,11 @@ describe('CollSync', () => {
         c.set(3, { id: 3, name: 'Bob Johnson', zip_code: 34567 });
         c.set(4, { id: 4, name: 'Alice Brown', zip_code: 45678 });
 
-        const newValues: Map<number, User> = c.map((record) => {
-          return { ...record, zip_code: record.zip_code + 1 };
-        });
+        const newValues = new Map(
+          c.map((record) => {
+            return { ...record, zip_code: record.zip_code + 1 };
+          }),
+        );
 
         expect(newValues.size).toBe(4);
         // Manually update the records since the map function doesn't modify them in-place
@@ -148,13 +150,15 @@ describe('CollSync', () => {
         c.set(4, { id: 4, name: 'Alice Brown', zip_code: 45678 });
 
         expect(() => {
-          c.map((record, key) => {
-            if (key === 3) {
-              throw new Error(TEST_ERROR);
-            }
-            record.zip_code += 1;
-            return record;
-          }, true);
+          new Map(
+            c.map((record, key) => {
+              if (key === 3) {
+                throw new Error(TEST_ERROR);
+              }
+              record.zip_code += 1;
+              return record;
+            }, true),
+          );
         }).toThrow(new RegExp(TEST_ERROR));
       });
     });

@@ -223,10 +223,16 @@ export class CollSync<
       throw new Error('sendMany: Multiverse not found');
     }
 
-    const map = this.getMany(keys);
-    const generator = (function* () {
-      yield map;
-    })();
+    // Create a generator that yields [key, value] pairs
+    const generator = function* (this: CollSync<RecordType, KeyType>) {
+      for (const key of keys) {
+        const value = this.get(key);
+        if (value !== undefined) {
+          yield [key, value] as [KeyType, RecordType];
+        }
+      }
+    }.bind(this)();
+
     return multiverse.transportGenerator({ ...props, generator });
   }
 

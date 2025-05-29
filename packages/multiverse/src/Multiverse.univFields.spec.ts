@@ -182,8 +182,12 @@ describe('Multiverse univFields mapping', () => {
             status: 'status',
           },
           // Add import function to ensure metadata object is properly initialized
-          import: (props) => {
-            return props.value || { createdAt: '', tags: [], status: '' };
+          import: ({ newValue, inputRecord }) => {
+            return {
+              createdAt: inputRecord?.created_at || '',
+              tags: inputRecord?.tags || [],
+              status: inputRecord?.status || '',
+            };
           },
         },
       });
@@ -295,8 +299,12 @@ describe('Multiverse univFields mapping', () => {
             y: 'y',
             z: 'z',
           },
-          import: ({ value }) => {
-            return value || { x: 0, y: 0, z: 0 };
+          import: ({ newValue, inputRecord }) => {
+            return {
+              x: inputRecord?.x || 0,
+              y: inputRecord?.y || 0,
+              z: inputRecord?.z || 0,
+            };
           },
         },
         timestamps: {
@@ -306,8 +314,11 @@ describe('Multiverse univFields mapping', () => {
             created: 'created_at',
             updated: 'updated_at',
           },
-          import: ({ value }) => {
-            return value || { created: '', updated: '' };
+          import: ({ newValue, inputRecord }) => {
+            return {
+              created: inputRecord?.created_at || '',
+              updated: inputRecord?.updated_at || '',
+            };
           },
         },
       });

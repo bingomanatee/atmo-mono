@@ -5,6 +5,7 @@ import { FIELD_TYPES } from './constants';
 import { isObj } from './typeguards.multiverse';
 import type {
   CollBaseIF,
+  DataKey,
   DataRecord,
   FieldLocalIF,
   MultiverseIF,
@@ -43,7 +44,10 @@ export class Multiverse implements MultiverseIF {
     return u;
   }
 
-  toUniversal<ToRecord extends object = DataRecord>(
+  toUniversal<
+    ToRecord extends object = DataRecord,
+    KeyType extends DataKey = any,
+  >(
     record: any,
     collection: CollBaseIF,
     fromUnivName: string,
@@ -106,23 +110,26 @@ export class Multiverse implements MultiverseIF {
     // Process all field mappings from the map
     for (const univField of Object.keys(map)) {
       const localField = map[univField];
-      set(out, localField, get(record, univField));
+      const value = get(record, univField);
+
+      // Ensure parent objects exist for nested paths
+      if (localField.includes('.')) {
+        const pathParts = localField.split('.');
+        let current = out;
+        for (let i = 0; i < pathParts.length - 1; i++) {
+          const part = pathParts[i];
+          if (!current[part] || typeof current[part] !== 'object') {
+            current[part] = {};
+          }
+          current = current[part];
+        }
+      }
+
+      set(out, localField, value);
     }
 
     // First pass: Initialize all complex fields marked as isLocal
     for (const [fieldName, fieldDef] of Object.entries(coll.schema.fields)) {
-      if (typeof fieldDef.import === 'function') {
-        const importedValue = fieldDef.import({
-          newValue: get(out, fieldName),
-          inputRecord: record,
-          currentRecord: out,
-        });
-
-        if (importedValue !== undefined) {
-          set(out, fieldName, importedValue);
-        }
-      }
-
       if (fieldDef.exportOnly) {
         continue;
       }
@@ -139,6 +146,21 @@ export class Multiverse implements MultiverseIF {
           if (!Array.isArray(outValue)) {
             set(out, fieldName, []);
           }
+      }
+    }
+
+    // Second pass: Run import functions after all field mappings and object initialization
+    for (const [fieldName, fieldDef] of Object.entries(coll.schema.fields)) {
+      if (typeof fieldDef.import === 'function') {
+        const importedValue = fieldDef.import({
+          newValue: get(out, fieldName),
+          inputRecord: record,
+          currentRecord: out,
+        });
+
+        if (importedValue !== undefined) {
+          set(out, fieldName, importedValue);
+        }
       }
     }
 
@@ -312,7 +334,7 @@ export class Multiverse implements MultiverseIF {
     return mappings;
   }
 
-  async #transportAsync<RecordType = DataRecord, KeyType = any>(
+  async #transportAsync<RecordType = DataRecord, KeyType extends DataKey = any>(
     key: any,
     props: Omit<TransportProps<RecordType, KeyType>, 'generator'>,
   ) {
@@ -332,7 +354,7 @@ export class Multiverse implements MultiverseIF {
     return toColl.set(key, localize);
   }
 
-  transport<RecordType = DataRecord, KeyType = any>(
+  transport<RecordType = DataRecord, KeyType extends DataKey = any>(
     key: any,
     props: Omit<TransportProps<RecordType, KeyType>, 'generator'>,
   ): void | Promise<void> {
@@ -354,7 +376,7 @@ export class Multiverse implements MultiverseIF {
     return toColl.set(key, localize);
   }
 
-  #translateRecord<RecordType = DataRecord, KeyType = any>(
+  #translateRecord<RecordType = DataRecord, KeyType extends DataKey = any>(
     localRecord: RecordType,
     props: Omit<TransportProps<RecordType, KeyType>, 'generator'>,
     key: KeyType,
@@ -375,7 +397,7 @@ export class Multiverse implements MultiverseIF {
     return this.toLocal(universalRecord, toColl as CollBaseIF, toU);
   }
 
-  #initTransport<RecordType = DataRecord, KeyType = any>(
+  #initTransport<RecordType = DataRecord, KeyType extends DataKey = any>(
     props:
       | TransportProps<RecordType, KeyType>
       | Omit<TransportProps<RecordType, KeyType>, 'generator'>,
@@ -409,15 +431,17 @@ export class Multiverse implements MultiverseIF {
     return { fromColl, toColl };
   }
 
-  #transportGeneratorAsync<RecordType = DataRecord, KeyType = any>(
-    props: TransportProps<RecordType, KeyType>,
-  ) {
+  async #transportGeneratorAsync<
+    RecordType = DataRecord,
+    KeyType extends DataKey = any,
+  >(props: TransportProps<RecordType, KeyType>): Promise<Subscription> {
     const feedbackStream: Subject<StreamMsg> = new Subject();
     const { listener, generator } = props;
 
     const { toColl } = this.#initTransport<RecordType, KeyType>(props);
-    let subscription = listener ? feedbackStream.subscribe(listener) : null;
-    let data: IteratorResult<Map<KeyType, RecordType>>;
+    let subscription = listener
+      ? feedbackStream.subscribe(listener)
+      : new Subscription();
     let outBatchSize = 30;
 
     let outMap = new Map();
@@ -443,7 +467,7 @@ export class Multiverse implements MultiverseIF {
       if (!always && (outBatchSize <= 0 || map.size < outBatchSize))
         return false;
       try {
-        await toColl.setMany(map);
+        await toColl.setMany(map as Map<DataKey, DataRecord>);
         total += map.size;
         feedbackStream.next({
           total,
@@ -474,31 +498,26 @@ export class Multiverse implements MultiverseIF {
     };
 
     try {
-      do {
-        data = generator.next();
-        if (data.done) break;
-        const dataMap = data.value;
+      // Handle async generator properly - generators now yield [key, value] pairs
+      for await (const [key, value] of generator) {
+        if (value) {
+          try {
+            const targetRecord = this.#translateRecord(value, props, key);
+            outMap.set(key, targetRecord);
+            flush();
+          } catch (error) {
+            // Convert the error to an Error object if it's not already
+            const errorObj =
+              error instanceof Error ? error : new Error(String(error));
 
-        for (const [key, value] of dataMap) {
-          if (value) {
-            try {
-              const targetRecord = this.#translateRecord(value, props, key);
-              outMap.set(key, targetRecord);
-              flush();
-            } catch (error) {
-              // Convert the error to an Error object if it's not already
-              const errorObj =
-                error instanceof Error ? error : new Error(String(error));
-
-              // Send the error to the listener
-              feedbackStream.next({
-                total,
-                error: errorObj,
-              });
-            }
-          } // if value
-        } // for
-      } while (!data?.done);
+            // Send the error to the listener
+            feedbackStream.next({
+              total,
+              error: errorObj,
+            });
+          }
+        } // if value
+      } // for await generator
 
       flush(true);
     } catch (error) {
@@ -520,7 +539,7 @@ export class Multiverse implements MultiverseIF {
     return subscription;
   }
 
-  transportGenerator<RecordType = DataRecord, KeyType = any>(
+  transportGenerator<RecordType = DataRecord, KeyType extends DataKey = any>(
     props: TransportProps<RecordType, KeyType>,
   ): Subscription {
     const feedbackStream: Subject<StreamMsg> = new Subject();
@@ -528,11 +547,23 @@ export class Multiverse implements MultiverseIF {
     const { fromColl, toColl } = this.#initTransport<RecordType, KeyType>(
       props,
     );
-    if (toColl.isAsync) return this.#transportGeneratorAsync(props);
+    if (toColl.isAsync) {
+      // For async collections, we need to handle this differently
+      // Return a subscription that will be resolved asynchronously
+      const subscription = new Subscription();
+      this.#transportGeneratorAsync(props)
+        .then((result) => {
+          // The async method handles its own subscription
+        })
+        .catch((error) => {
+          console.error('Async transport error:', error);
+        });
+      return subscription;
+    }
     const { listener, generator, fromU, toU } = props;
 
     let subscription = listener ? feedbackStream.subscribe(listener) : null;
-    let outBatchSize = toColl.batchSize ?? 30;
+    let outBatchSize = 30;
     let outMap = new Map();
     let total = 0;
 
@@ -574,7 +605,10 @@ export class Multiverse implements MultiverseIF {
     };
 
     try {
-      for (const [key, value] of generator) {
+      // Handle sync generator properly - generators now yield [key, value] pairs
+      for (const [key, value] of generator as Generator<
+        [KeyType, RecordType]
+      >) {
         if (value) {
           try {
             // Convert to universal format
@@ -582,6 +616,7 @@ export class Multiverse implements MultiverseIF {
               value,
               fromColl as CollBaseIF,
               fromU,
+              key,
             );
 
             // Convert to target format
@@ -594,7 +629,7 @@ export class Multiverse implements MultiverseIF {
             outMap.set(key, targetRecord);
             if (flush()) {
               completeAndCleanup();
-              return subscription;
+              return subscription ?? new Subscription();
             }
           } catch (error) {
             // Convert the error to an Error object if it's not already
@@ -608,10 +643,10 @@ export class Multiverse implements MultiverseIF {
 
             // Complete the stream when there's an error
             completeAndCleanup();
-            return subscription;
+            return subscription ?? new Subscription();
           }
         } // if value
-      } // for
+      } // for generator
 
       flush(true);
 
@@ -631,6 +666,6 @@ export class Multiverse implements MultiverseIF {
       completeAndCleanup();
     }
 
-    return subscription;
+    return subscription ?? new Subscription();
   }
 }

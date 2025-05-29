@@ -140,7 +140,7 @@ export class SunMemoryAsync<RecordType, KeyType>
    * @returns A promise that resolves to the number of records processed
    * @throws MapError if any mapper function throws and noTransaction is false
    */
-  async map(
+  async *map(
     mapper: (
       record: RecordType,
       key: KeyType,
@@ -150,17 +150,18 @@ export class SunMemoryAsync<RecordType, KeyType>
       | void
       | MutationAction
       | Promise<RecordType | void | MutationAction>,
-  ): Promise<Map<KeyType, RecordType>> {
+  ): AsyncGenerator<[KeyType, RecordType]> {
     const keys = await this.keys();
 
-    const recordsAndKeys = await Promise.all(
-      Array.from(keys).map(async (key: KeyType) => {
-        const record = await this.get(key);
-        const result = await mapper(record, key, this);
-        return [key, result];
-      }),
-    );
-    return new Map(Array.from(recordsAndKeys));
+    for (const key of keys) {
+      const record = await this.get(key);
+      if (record !== undefined) {
+        const result = await mapper(record, key, this.coll);
+        if (result !== undefined) {
+          yield [key, result as RecordType];
+        }
+      }
+    }
   }
 
   /**
