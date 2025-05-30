@@ -1,8 +1,6 @@
 import './style.css';
 import * as THREE from 'three';
 
-// Earth radius in kilometers (not meters like the atmo-utils constant)
-const EARTH_RADIUS = 6371; // km
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import {
   PlateletManager,
@@ -10,6 +8,7 @@ import {
   type SimPlateIF,
   PlateSpectrumGenerator,
 } from '@wonderlandlabs/atmo-plates';
+import { EARTH_RADIUS } from '@wonderlandlabs/atmo-utils'; // Use the correct Earth radius in meters
 import { PlateletVisualizer } from './PlateletVisualizer'; // Corrected import path
 
 // Scene setup
@@ -103,24 +102,69 @@ platesCollection.each((plate: SimPlateIF) => {
   allPlates.push(plate);
 });
 
-// Create platelet manager
-const plateletManager = new PlateletManager(sim);
+// Wrap the async operations in an async function
+async function generateAndVisualizePlatelets() {
+  // Create platelet manager
+  const plateletManager = new PlateletManager(sim);
 
-// Create a PlateVisualizer for each plate
-const plateVisualizers: PlateletVisualizer[] = []; // Use PlateletVisualizer type
-allPlates.forEach((plate, index) => {
-  // Pass scene, planetRadius, plate, and plateletManager to the constructor
-  const visualizer = new PlateletVisualizer(
-    scene,
-    EARTH_RADIUS,
-    plate,
-    plateletManager,
+  // Generate platelets for all plates first
+  console.log('Generating platelets for all plates...');
+  console.time('⏱️ Platelet Generation');
+
+  let totalPlateletsGenerated = 0;
+  allPlates.forEach((plate, index) => {
+    console.log(
+      `🔍 Generating platelets for plate ${index + 1}/${allPlates.length}: ${plate.id}`,
+    );
+    console.log(`   Plate radius: ${plate.radius}, position:`, plate.position);
+
+    const platelets = plateletManager.generatePlatelets(plate.id);
+    console.log(
+      `   Generated ${platelets.length} platelets for plate ${plate.id}`,
+    );
+    totalPlateletsGenerated += platelets.length;
+  });
+
+  console.log(
+    `🎯 Total platelets generated across all plates: ${totalPlateletsGenerated}`,
   );
-  visualizer.visualize(); // Call the visualize method to add to scene
-  plateVisualizers.push(visualizer);
-});
+  console.timeEnd('⏱️ Platelet Generation');
 
-console.log(`Created visualizers for ${plateVisualizers.length} plates.`);
+  // Populate neighbor relationships between platelets
+  console.log('Populating platelet neighbor relationships...');
+  console.time('⏱️ Neighbor Population');
+  await sim.populatePlateletNeighbors();
+  console.timeEnd('⏱️ Neighbor Population');
+
+  // Create a PlateVisualizer for each plate
+  const plateVisualizers: PlateletVisualizer[] = []; // Use PlateletVisualizer type
+
+  console.log('Creating and initializing visualizers...');
+  console.time('⏱️ Visualizer Creation');
+
+  for (const plate of allPlates) {
+    // Pass scene, planetRadius, plate, and plateletManager to the constructor
+    const visualizer = new PlateletVisualizer(
+      scene,
+      EARTH_RADIUS,
+      plate,
+      plateletManager,
+    );
+
+    // Initialize platelets asynchronously
+    await visualizer.initializeAsync();
+
+    // Add to scene
+    visualizer.visualize();
+    plateVisualizers.push(visualizer);
+  }
+
+  console.timeEnd('⏱️ Visualizer Creation');
+  console.log(`Created visualizers for ${plateVisualizers.length} plates.`);
+}
+
+// Call the async function
+generateAndVisualizePlatelets().catch(console.error);
 
 // Get the platelets collection from the simulation (optional, for direct access if needed)
 const plateletsCollection = sim.simUniv.get('platelets');

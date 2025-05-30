@@ -39,15 +39,13 @@ export const SIM_PLATES_SCHEMA = {
     type: FIELD_TYPES.object,
     isLocal: true,
     meta: { required: true },
-  },
-  planetId: { type: FIELD_TYPES.string, meta: { required: true } },
-  plateletIds: {
-    type: FIELD_TYPES.array,
-    meta: {
-      itemType: FIELD_TYPES.string,
-      optional: true,
+    univFields: {
+      x: 'x',
+      y: 'y',
+      z: 'z',
     },
   },
+  planetId: { type: FIELD_TYPES.string, meta: { required: true } },
 };
 
 export const SIM_PLATELETS_SCHEMA = new SchemaLocal<Platelet>('platelets', {
@@ -56,13 +54,12 @@ export const SIM_PLATELETS_SCHEMA = new SchemaLocal<Platelet>('platelets', {
   planetId: { type: FIELD_TYPES.string, meta: { required: true } },
   position: {
     type: FIELD_TYPES.object,
-    meta: {
-      required: true,
-      fields: {
-        x: { type: FIELD_TYPES.number, meta: { required: true } },
-        y: { type: FIELD_TYPES.number, meta: { required: true } },
-        z: { type: FIELD_TYPES.number, meta: { required: true } },
-      },
+    isLocal: true,
+    meta: { required: true },
+    univFields: {
+      x: 'x',
+      y: 'y',
+      z: 'z',
     },
   },
   density: { type: FIELD_TYPES.number, meta: { required: true } },
@@ -250,19 +247,3 @@ export const UNIVERSAL_SCHEMA = new Map([
     ]),
   ],
 ]);
-
-export const plateletsFilterRecord = (params: { inputRecord: any }) => {
-  const { inputRecord } = params;
-  if (inputRecord instanceof Platelet) {
-    return inputRecord;
-  }
-  // Ensure position is a Vector3 instance
-  if (inputRecord.position && !(inputRecord.position instanceof Vector3)) {
-    inputRecord.position = new Vector3(
-      inputRecord.position.x,
-      inputRecord.position.y,
-      inputRecord.position.z,
-    );
-  }
-  return new Platelet(inputRecord);
-};

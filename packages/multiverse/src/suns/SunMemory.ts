@@ -172,6 +172,18 @@ export class SunMemory<RecordType, KeyType>
     }
   }
 
+  deleteMany(keys: KeyType[]): void {
+    if (this._locked) {
+      throw new Error(
+        'cannot delete during locked operations - usually mutations',
+      );
+    }
+
+    for (const key of keys) {
+      this.delete(key);
+    }
+  }
+
   /**
    * Map over each record in the collection and apply a transformation
    * @param mapper - Function to transform each record
@@ -282,26 +294,6 @@ export class SunMemory<RecordType, KeyType>
         return this.values();
       default:
         return undefined;
-    }
-  }
-
-  *find(
-    query: string | ((record: RecordType) => boolean),
-    value?: any,
-  ): Generator<[KeyType, RecordType]> {
-    if (typeof query === 'function') {
-      for (const [key, record] of this.#data.entries()) {
-        if (query(record)) {
-          yield [key, record];
-        }
-      }
-      return;
-    }
-
-    for (const [key, record] of this.#data.entries()) {
-      if (record[query] === value) {
-        yield [key, record];
-      }
     }
   }
 

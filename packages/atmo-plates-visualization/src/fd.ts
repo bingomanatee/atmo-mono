@@ -3,12 +3,10 @@ import {
   PlateSpectrumGenerator,
   type SimPlateIF,
 } from '@wonderlandlabs/atmo-plates';
+import { EARTH_RADIUS } from '@wonderlandlabs/atmo-utils'; // Use the correct Earth radius in meters
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { ForceVisualizer } from './ForceVisualizer';
-
-// Earth radius in kilometers (not meters like the atmo-utils constant)
-const EARTH_RADIUS = 6371; // km
 
 // Scene setup
 const scene = new THREE.Scene();
@@ -142,7 +140,7 @@ function animate() {
     stepCount < MAX_STEPS &&
     timeSinceLastUpdate > FORCE_UPDATE_INTERVAL
   ) {
-    performForceStep(true);
+    performForceStep(true); // Don't await in animation loop to avoid blocking
     lastForceUpdate = currentTime;
   }
 
@@ -222,7 +220,7 @@ autoToggle.style.width = '100%';
 uiContainer.appendChild(autoToggle);
 
 // Function to perform a force simulation step and update UI
-function performForceStep(isAutomatic = false) {
+async function performForceStep(isAutomatic = false) {
   // Increment step counter
   stepCount++;
   stepCounter.textContent = `Steps: ${stepCount}/${MAX_STEPS}`;
@@ -242,7 +240,7 @@ function performForceStep(isAutomatic = false) {
   }
 
   // Run one simulation step and get the forces
-  const forces = simulation.applyForceLayout();
+  const forces = await simulation.applyForceLayout();
 
   // Calculate force statistics
   let totalMagnitude = 0;
@@ -290,8 +288,8 @@ autoToggle.addEventListener('click', () => {
 });
 
 // Event listener for manual step button
-stepButton.addEventListener('click', () => {
-  performForceStep(false);
+stepButton.addEventListener('click', async () => {
+  await performForceStep(false);
 });
 
 // Start the animation loop after all UI elements are created

@@ -5,7 +5,7 @@ import type { PlateSimulationIF } from '../types.PlateSimulation';
 import { getH0CellForPosition, processH0Cell } from '../utils/plateletUtils';
 
 export class PlateletManager {
-  public static readonly PLATELET_CELL_LEVEL = 3; // Resolution level for platelets
+  public static readonly PLATELET_CELL_LEVEL = 3; // Resolution level for platelets (higher resolution, smaller platelets)
 
   private sim: PlateSimulationIF;
 
@@ -13,9 +13,9 @@ export class PlateletManager {
     this.sim = sim;
   }
 
-  generatePlatelets(plateId: string): Platelet[] {
+  async generatePlatelets(plateId: string): Promise<Platelet[]> {
     // Get the plate data
-    const plate = this.sim.getPlate(plateId);
+    const plate = await this.sim.getPlate(plateId);
     if (!plate) {
       console.warn(
         `Plate ${plateId} not found in simulation. Cannot generate platelets.`,
@@ -24,7 +24,7 @@ export class PlateletManager {
     }
 
     // Get planet radius
-    const planet = this.sim.getPlanet(plate.planetId);
+    const planet = await this.sim.getPlanet(plate.planetId);
     if (!planet)
       throw new Error(`Planet ${plate.planetId} not found in simulation`);
     const planetRadius = planet.radius;
@@ -45,7 +45,7 @@ export class PlateletManager {
     const plateCenterH0Cell = getH0CellForPosition(platePosition, planetRadius);
 
     // Process the plate's H0 cell and its neighbors, adding platelets directly to the collection
-    processH0Cell(
+    await processH0Cell(
       plateCenterH0Cell,
       plate,
       planetRadius,
@@ -56,11 +56,11 @@ export class PlateletManager {
 
     // Return the generated platelets by filtering the collection
     const generatedPlatelets: Platelet[] = [];
-    plateletsCollection.each((platelet: Platelet) => {
+    for await (const [_, platelet] of plateletsCollection.values()) {
       if (platelet.plateId === plateId) {
         generatedPlatelets.push(platelet);
       }
-    });
+    }
 
     return generatedPlatelets;
   }
@@ -68,12 +68,12 @@ export class PlateletManager {
   /**
    * Add a platelet to the simulation's platelet collection, with validation.
    */
-  setPlatelet(platelet: Platelet | null | undefined): void {
+  async setPlatelet(platelet: Platelet | null | undefined): Promise<void> {
     if (!platelet || typeof platelet !== 'object') {
       throw new Error('Attempted to add an empty or invalid platelet');
     }
     const plateletsCollection = this.sim.simUniv.get(COLLECTIONS.PLATELETS);
     if (!plateletsCollection) throw new Error('platelets collection not found');
-    plateletsCollection.set(platelet.id, platelet);
+    await plateletsCollection.set(platelet.id, platelet);
   }
 }

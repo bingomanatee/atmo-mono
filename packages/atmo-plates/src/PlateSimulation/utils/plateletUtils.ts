@@ -5,6 +5,7 @@ import {
   getResolution,
   h3HexRadiusAtResolution,
   latLngToCell,
+  pointToLatLon,
 } from '@wonderlandlabs/atmo-utils';
 import type { CollSyncIF } from '@wonderlandlabs/multiverse/src/types.coll';
 import { gridDisk } from 'h3-js';
@@ -16,27 +17,14 @@ import type { SimPlateIF } from '../types.PlateSimulation';
 declare module '@wonderlandlabs/atmo-utils';
 
 /**
- * Converts a 3D position to latitude and longitude
- */
-export function positionToLatLng(
-  position: Vector3,
-  planetRadius: number,
-): { lat: number; lng: number } {
-  return {
-    lat: Math.asin(position.y / planetRadius),
-    lng: Math.atan2(position.z, position.x),
-  };
-}
-
-/**
  * Gets the H0 cell for a given position
  */
 export function getH0CellForPosition(
   position: Vector3,
   planetRadius: number,
 ): string {
-  const { lat, lng } = positionToLatLng(position, planetRadius);
-  return latLngToCell(lat, lng, 0);
+  const { lat, lon } = pointToLatLon(position, planetRadius);
+  return latLngToCell(lat, lon, 0);
 }
 
 /**
@@ -54,12 +42,30 @@ export function filterCellsByPlateRadius(
   plate: SimPlateIF,
   planetRadius: number,
 ): string[] {
-  return cells.filter((cell) => {
+  // Calculate distances for all cells
+  const cellDistances = cells.map((cell) => {
     const position = cellToVector(cell, planetRadius);
     const distance = position.distanceTo(plate.position);
-    // Only include cells within the plate's true radius
-    return distance <= plate.radius;
+    return { cell, distance };
   });
+
+  // Sort by distance (closest first)
+  cellDistances.sort((a, b) => a.distance - b.distance);
+
+  // Keep at least 88% of cells (remove no more than 12%)
+  const maxRemovalCount = Math.floor(cells.length * 0.12);
+  const minKeepCount = cells.length - maxRemovalCount;
+
+  // Keep the closest cells up to the minimum count
+  const keptCells = cellDistances
+    .slice(0, Math.max(minKeepCount, cells.length))
+    .map((item) => item.cell);
+
+  console.log(
+    `🔍 Plate ${plate.id}: Kept ${keptCells.length}/${cells.length} cells (${((keptCells.length / cells.length) * 100).toFixed(1)}% retention)`,
+  );
+
+  return keptCells;
 }
 
 /**
@@ -136,14 +142,14 @@ export function createPlateletFromCell(
 /**
  * Processes a single H0 cell and its neighbors recursively, adding platelets directly to the collection
  */
-export function processH0Cell(
+export async function processH0Cell(
   h0Cell: string,
   plate: SimPlateIF,
   planetRadius: number,
   resolution: number,
   processedH0Cells: Set<string>,
-  plateletsCollection: CollSyncIF<Platelet, string>,
-): void {
+  plateletsCollection: any, // Changed from CollSyncIF to any since it's async
+): Promise<void> {
   if (processedH0Cells.has(h0Cell)) return;
   processedH0Cells.add(h0Cell);
 
@@ -158,21 +164,21 @@ export function processH0Cell(
   );
 
   // Process valid cells
-  validPlateletCells.forEach((cell) => {
+  for (const cell of validPlateletCells) {
     const platelet = createPlateletFromCell(
       cell,
       plate,
       planetRadius,
       resolution,
     );
-    plateletsCollection.set(platelet.id, platelet);
-  });
+    await plateletsCollection.set(platelet.id, platelet);
+  }
 
   // Process neighboring H0 cells
   const neighborH0Cells = getNeighboringH0Cells(h0Cell);
-  neighborH0Cells.forEach((neighborH0) => {
+  for (const neighborH0 of neighborH0Cells) {
     if (!processedH0Cells.has(neighborH0)) {
-      processH0Cell(
+      await processH0Cell(
         neighborH0,
         plate,
         planetRadius,
@@ -181,7 +187,7 @@ export function processH0Cell(
         plateletsCollection,
       );
     }
-  });
+  }
 }
 
 /**

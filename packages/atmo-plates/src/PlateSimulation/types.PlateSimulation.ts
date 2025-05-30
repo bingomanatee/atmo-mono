@@ -53,12 +53,12 @@ export interface PlateSimulationIF {
   readonly simUniv: Universe;
 
   // Initialization
-  init(): void;
+  init(): Promise<void>;
 
   // Plate management
   plateGenerator(plateCount: number): PlateSpectrumGenerator;
-  addPlate(props: AddPlateProps, simId?: string): string;
-  getPlate(id: string): SimPlateIF;
+  addPlate(props: AddPlateProps, simId?: string): Promise<string>;
+  getPlate(id: string): Promise<import('./Plate').Plate>;
 
   // Simulation management
   addSimulation(props: SimProps): string;
@@ -68,13 +68,13 @@ export interface PlateSimulationIF {
   // Planet management
   planet?: SimPlanetIF;
   makePlanet(radius?: number, name?: string): SimPlanetIF;
-  getPlanet(id: string): Planet;
+  getPlanet(id: string): Promise<Planet>;
 
   // Platelet neighbor management
-  populatePlateletNeighbors(): void;
-  refreshNeighbors(): void;
-  cleanupNeighborLists(): void;
-  createIrregularPlateEdges(): void;
+  populatePlateletNeighbors(): Promise<void>;
+  refreshNeighbors(): Promise<void>;
+  cleanupNeighborLists(): Promise<void>;
+  createIrregularPlateEdges(): Promise<void>;
 }
 
 // Simulation step interface

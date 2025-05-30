@@ -76,7 +76,12 @@ export class CollSync<
     if (typeof this.sun.find !== 'function') {
       throw new Error('Find method not implemented');
     }
-    return this.sun.find(query, value);
+    // Pass arguments correctly to sun's find method which expects spread args
+    if (value !== undefined) {
+      return this.sun.find(query, value);
+    } else {
+      return this.sun.find(query);
+    }
   }
 
   mutate(
@@ -139,6 +144,7 @@ export class CollSync<
   /**
    * Iterate over each record in the collection
    * @param callback - Function to call for each record
+   * @param batchSize - Ignored for sync collections (included for interface compatibility)
    */
   each(
     callback: (
@@ -146,6 +152,7 @@ export class CollSync<
       key: KeyType,
       collection: CollSyncIF<RecordType, KeyType>,
     ) => void,
+    batchSize?: number,
   ): void {
     // If the sun has an each method, use it
     if (typeof this.sun.each === 'function') {
@@ -210,6 +217,18 @@ export class CollSync<
     recordMap.forEach((record, key) => {
       this.set(key, record);
     });
+  }
+
+  deleteMany(keys: KeyType[]): void {
+    // If the sun has a deleteMany method, use it
+    if (typeof this.sun.deleteMany === 'function') {
+      return this.sun.deleteMany(keys);
+    }
+
+    // Fallback implementation using individual deletes
+    for (const key of keys) {
+      this.delete(key);
+    }
   }
 
   sendMany(

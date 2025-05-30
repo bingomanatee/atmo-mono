@@ -157,6 +157,7 @@ export abstract class CollBase<
   /**
    * Iterate over each record in the collection
    * @param callback - Function to call for each record
+   * @param batchSize - Optional batch size for parallel processing (async collections only)
    * @returns void for sync collections, Promise<void> for async collections
    */
   abstract each(
@@ -165,6 +166,7 @@ export abstract class CollBase<
       key: KeyType,
       collection: CollIF<RecordType, KeyType>,
     ) => void | Promise<void>,
+    batchSize?: number,
   ): void | Promise<void>;
 
   /**

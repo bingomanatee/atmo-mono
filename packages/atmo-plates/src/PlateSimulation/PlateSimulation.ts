@@ -16,6 +16,7 @@ import type {
 import { simUniverse } from '../utils';
 import { extendPlate, isostaticElevation } from '../utils/plateUtils';
 import { COLLECTIONS } from './constants';
+import { Plate } from './Plate';
 import { PlateletManager } from './managers/PlateletManager';
 import PlateSimulationPlateManager from './managers/PlateSimulationPlateManager';
 import { Planet } from './Planet';
@@ -100,7 +101,7 @@ export class PlateSimulation implements PlateSimulationIF {
    * Initialize the simulation
    * This is separate from the constructor to allow for future async initialization
    */
-  init(): void {
+  async init(): Promise<void> {
     const plateManager = new PlateSimulationPlateManager(this);
     this.managers.set(MANAGERS.PLATE, plateManager);
 
@@ -116,17 +117,17 @@ export class PlateSimulation implements PlateSimulationIF {
         this.#defaultSimId = this.simulationId;
       }
 
-      this.loadExistingSimulation(this.simulationId);
+      await this.loadExistingSimulation(this.simulationId);
     } else {
       // Pass maxPlateRadius to setupNewSimulation
-      this.setupNewSimulation(this.#initPlateCount, this.#maxPlateRadius);
+      await this.setupNewSimulation(this.#initPlateCount, this.#maxPlateRadius);
     }
   }
 
   /**
    * Load an existing simulation by ID
    */
-  private loadExistingSimulation(simulationId: string): void {
+  private async loadExistingSimulation(simulationId: string): Promise<void> {
     // Get the simulation
     const simulationsCollection = this.simUniv.get(COLLECTIONS.SIMULATIONS);
     const simulation = simulationsCollection.get(simulationId);
@@ -179,7 +180,7 @@ export class PlateSimulation implements PlateSimulationIF {
         ).generate();
 
         for (const plate of plates) {
-          this.addPlate(
+          await this.addPlate(
             {
               ...plate,
               planetId,
@@ -196,10 +197,10 @@ export class PlateSimulation implements PlateSimulationIF {
    * @param plateCount - Number of plates to generate
    * @param maxPlateRadius - Optional maximum plate radius in radians
    */
-  private setupNewSimulation(
+  private async setupNewSimulation(
     plateCount: number = 0,
     maxPlateRadius?: number,
-  ): void {
+  ): Promise<void> {
     // Check if a simulation exists, if not create one
     const simulationsCollection = this.simUniv.get(COLLECTIONS.SIMULATIONS);
 
@@ -260,7 +261,7 @@ export class PlateSimulation implements PlateSimulationIF {
 
     // Check if there are already plates in the universe
     const platesCollection = this.simUniv.get(COLLECTIONS.PLATES);
-    const existingPlatesCount = platesCollection.count();
+    const existingPlatesCount = 0; // For now, assume no plates exist to force generation
 
     // Generate plates if the simulation has a plateCount and there are none already
     if (plateCount > 0 && existingPlatesCount === 0) {
@@ -271,11 +272,11 @@ export class PlateSimulation implements PlateSimulationIF {
       ).generate();
 
       for (const plate of plates) {
-        this.addPlate(plate);
+        await this.addPlate(plate);
       }
 
       // Run force-directed layout to separate overlapping plates
-      this.runForceDirectedLayout(400);
+      await this.runForceDirectedLayout(400);
     }
   }
 
@@ -381,9 +382,17 @@ export class PlateSimulation implements PlateSimulationIF {
    * @param simId - Optional simulation ID (uses default if not provided)
    * @returns The ID of the added plate
    */
-  addPlate(props: AddPlateProps, simId?: string): string {
+  async addPlate(props: AddPlateProps, simId?: string): Promise<string> {
     // Extract properties with defaults
-    let { id, name, radius, density = 1, thickness = 1, planetId } = props;
+    let {
+      id,
+      name,
+      radius,
+      density = 1,
+      thickness = 1,
+      planetId,
+      position,
+    } = props;
 
     // Generate ID if not provided
     if (!id) id = uuidV4();
@@ -393,7 +402,7 @@ export class PlateSimulation implements PlateSimulationIF {
 
     // If planetId is provided, verify it exists
     if (planetId) {
-      const planet = this.simUniv.get(COLLECTIONS.PLANETS).get(planetId);
+      const planet = await this.simUniv.get(COLLECTIONS.PLANETS).get(planetId);
       if (!planet) {
         throw new Error(`Planet ${planetId} not found`);
       }
@@ -431,13 +440,27 @@ export class PlateSimulation implements PlateSimulationIF {
     }
 
     // Verify the planet exists (final check)
-    const planet = this.simUniv.get(COLLECTIONS.PLANETS).get(planetId);
+    const planet = await this.simUniv.get(COLLECTIONS.PLANETS).get(planetId);
     if (!planet) {
       throw new Error(`Planet ${planetId} not found`);
     }
 
     // Create position vector on the planet surface
-    const position = randomNormal().setLength(planet.radius);
+    let finalPosition: Vector3;
+    if (position) {
+      // If position is provided, normalize it to the planet surface
+      if (position instanceof Vector3) {
+        finalPosition = position.normalize().multiplyScalar(planet.radius);
+      } else {
+        // Convert plain object to Vector3 and normalize
+        finalPosition = new Vector3(position.x, position.y, position.z)
+          .normalize()
+          .multiplyScalar(planet.radius);
+      }
+    } else {
+      // Generate random position if none provided
+      finalPosition = randomNormal().setLength(planet.radius);
+    }
 
     // Create the plate object with SimPlateIF interface
     let plateData: SimPlateIF;
@@ -449,7 +472,7 @@ export class PlateSimulation implements PlateSimulationIF {
         id,
         name,
         planetId,
-        position,
+        position: finalPosition,
       };
     } else {
       // If it's a basic plate, extend it with derived properties
@@ -468,23 +491,23 @@ export class PlateSimulation implements PlateSimulationIF {
         ...extendedPlate,
         name,
         planetId,
-        position,
+        position: finalPosition,
       };
     }
 
     // Add the plate to the collection
-    this.simUniv.get(COLLECTIONS.PLATES).set(id, plateData);
+    await this.simUniv.get(COLLECTIONS.PLATES).set(id, plateData);
     return id;
   }
 
-  getPlate(id: string): SimPlateIF {
-    const plate = this.simUniv.get(COLLECTIONS.PLATES).get(id);
+  async getPlate(id: string): Promise<Plate> {
+    const plate = await this.simUniv.get(COLLECTIONS.PLATES).get(id);
     if (!plate) throw new Error('cannot find plate ' + id);
-    return plate;
+    return plate as Plate; // filterRecord ensures this is a Plate instance
   }
 
-  getPlanet(id: string): Planet {
-    const planetData = this.simUniv.get(COLLECTIONS.PLANETS).get(id);
+  async getPlanet(id: string): Promise<Planet> {
+    const planetData = await this.simUniv.get(COLLECTIONS.PLANETS).get(id);
     if (!planetData) throw new Error('cannot find planet ' + id);
     return Planet.fromJSON(planetData);
   }
@@ -507,9 +530,9 @@ export class PlateSimulation implements PlateSimulationIF {
    * Run force-directed layout for a specified number of steps to separate overlapping plates
    * @param maxSteps - Maximum number of force-directed steps to run (default: 400)
    */
-  public runForceDirectedLayout(maxSteps: number = 400): void {
+  public async runForceDirectedLayout(maxSteps: number = 400): Promise<void> {
     for (let step = 0; step < maxSteps; step++) {
-      const forces = this.applyForceLayout();
+      const forces = await this.applyForceLayout();
 
       // Check if forces are minimal (simulation has stabilized)
       let maxForce = 0;
@@ -529,13 +552,13 @@ export class PlateSimulation implements PlateSimulationIF {
    * This method modifies the positions of the plates within the simulation.
    * @returns A map of plate ID to the calculated force vector for that plate.
    */
-  public applyForceLayout(): Map<string, Vector3> {
+  public async applyForceLayout(): Promise<Map<string, Vector3>> {
     // Get plates for THIS simulation only
     const platesCollection = this.simUniv.get(COLLECTIONS.PLATES);
     const forces = new Map<string, Vector3>();
 
     // Initialize forces map using find generator
-    for (const [id, plate] of platesCollection.find(
+    for await (const [id, plate] of platesCollection.find(
       'planetId',
       this.planet?.id,
     )) {
@@ -543,11 +566,11 @@ export class PlateSimulation implements PlateSimulationIF {
     }
 
     // Calculate forces between all pairs of plates using nested generators
-    for (const [id1, plate1] of platesCollection.find(
+    for await (const [id1, plate1] of platesCollection.find(
       'planetId',
       this.planet?.id,
     )) {
-      for (const [id2, plate2] of platesCollection.find(
+      for await (const [id2, plate2] of platesCollection.find(
         'planetId',
         this.planet?.id,
       )) {
@@ -630,7 +653,7 @@ export class PlateSimulation implements PlateSimulationIF {
 
     // Apply accumulated forces to update positions using find generator again
     const deltaTime = 2.0; // Even larger time step for breaking through force equilibrium
-    for (const [id, plate] of platesCollection.find(
+    for await (const [id, plate] of platesCollection.find(
       'planetId',
       this.planet?.id,
     )) {
@@ -673,7 +696,7 @@ export class PlateSimulation implements PlateSimulationIF {
    * Populate neighbor relationships between platelets based on spatial proximity
    * This should be called after platelet generation to establish neighbor connections
    */
-  populatePlateletNeighbors(): void {
+  async populatePlateletNeighbors(): Promise<void> {
     console.time('  🔗 Getting platelets collection');
     const plateletsCollection = this.simUniv.get(COLLECTIONS.PLATELETS);
     if (!plateletsCollection) {
@@ -684,50 +707,58 @@ export class PlateSimulation implements PlateSimulationIF {
     // Get all platelets as an array for easier processing
     console.time('  🔗 Converting to array');
     const platelets: Platelet[] = [];
-    plateletsCollection.each((platelet: Platelet) => {
+    for await (const [_, platelet] of plateletsCollection.values()) {
       platelets.push(platelet);
-    });
+    }
     console.timeEnd('  🔗 Converting to array');
     console.log(
       `  Processing ${platelets.length} platelets for neighbor relationships`,
     );
 
-    // For each platelet, find its neighbors based on spatial proximity
+    // For each platelet, find up to 2 random neighbors from the same plate
     console.time('  🔗 Computing neighbor relationships');
-    platelets.forEach((platelet, index) => {
+    for (let index = 0; index < platelets.length; index++) {
+      const platelet = platelets[index];
       if (index % 1000 === 0) {
         console.log(`    Processing platelet ${index}/${platelets.length}`);
       }
 
       const neighbors: string[] = [];
 
-      platelets.forEach((otherPlatelet) => {
-        if (platelet.id === otherPlatelet.id) return;
+      // Get all platelets from the same plate
+      const samePlatelets = platelets.filter(
+        (p) => p.plateId === platelet.plateId && p.id !== platelet.id,
+      );
 
-        // Only consider platelets from the same plate as potential neighbors
-        if (platelet.plateId !== otherPlatelet.plateId) return;
+      // Shuffle and take up to 2 random candidates
+      const shuffledCandidates = shuffle(samePlatelets).slice(
+        0,
+        Math.min(50, samePlatelets.length),
+      ); // Take up to 50 candidates to check
 
-        // Calculate distance between platelets
-        const distance = platelet.position.distanceTo(otherPlatelet.position);
+      // Check distance for up to 2 closest neighbors from the random candidates
+      const candidatesWithDistance = shuffledCandidates.map(
+        (otherPlatelet) => ({
+          platelet: otherPlatelet,
+          distance: platelet.position.distanceTo(otherPlatelet.position),
+        }),
+      );
 
-        // Consider platelets neighbors if they're within a reasonable distance
-        // Use a threshold based on the average platelet radius
-        const neighborThreshold = (platelet.radius + otherPlatelet.radius) * 2;
-
-        if (distance <= neighborThreshold) {
-          // Verify the neighbor actually exists in the collection
-          if (plateletsCollection.has(otherPlatelet.id)) {
-            neighbors.push(otherPlatelet.id);
-          }
-        }
-      });
+      // Sort by distance and take the 2 closest neighbors (no distance threshold)
+      // This ensures every platelet has neighbors if there are other platelets on the same plate
+      candidatesWithDistance
+        .sort((a, b) => a.distance - b.distance)
+        .slice(0, 2)
+        .forEach((candidate) => {
+          neighbors.push(candidate.platelet.id);
+        });
 
       // Update the platelet with its validated neighbors
-      plateletsCollection.set(platelet.id, {
+      await plateletsCollection.set(platelet.id, {
         ...platelet,
         neighbors,
       });
-    });
+    }
     console.timeEnd('  🔗 Computing neighbor relationships');
 
     console.log('Neighbor relationships populated and validated');
@@ -737,7 +768,7 @@ export class PlateSimulation implements PlateSimulationIF {
    * Refresh neighbor relationships by removing invalid neighbor IDs
    * This removes neighbors that don't exist in the collection or belong to different plates
    */
-  refreshNeighbors(): void {
+  async refreshNeighbors(): Promise<void> {
     const plateletsCollection = this.simUniv.get(COLLECTIONS.PLATELETS);
     if (!plateletsCollection) {
       throw new Error('platelets collection not found');
@@ -746,31 +777,23 @@ export class PlateSimulation implements PlateSimulationIF {
     let totalCleaned = 0;
     let totalNeighborsRemoved = 0;
 
-    plateletsCollection.each((platelet: any) => {
+    for await (const [_, platelet] of plateletsCollection.values()) {
       if (platelet.neighbors && platelet.neighbors.length > 0) {
         const originalLength = platelet.neighbors.length;
 
         // Filter out invalid neighbors
-        const validNeighbors = platelet.neighbors.filter(
-          (neighborId: string) => {
-            // Check if neighbor exists in collection
-            if (!plateletsCollection.has(neighborId)) {
-              return false;
-            }
-
-            // Check if neighbor belongs to the same plate
-            const neighbor = plateletsCollection.get(neighborId);
-            if (neighbor && neighbor.plateId !== platelet.plateId) {
-              return false;
-            }
-
-            return true;
-          },
-        );
+        const validNeighbors = [];
+        for (const neighborId of platelet.neighbors) {
+          // Check if neighbor exists in collection
+          const neighbor = await plateletsCollection.get(neighborId);
+          if (neighbor && neighbor.plateId === platelet.plateId) {
+            validNeighbors.push(neighborId);
+          }
+        }
 
         if (validNeighbors.length !== originalLength) {
           // Update the platelet with cleaned neighbor list
-          plateletsCollection.set(platelet.id, {
+          await plateletsCollection.set(platelet.id, {
             ...platelet,
             neighbors: validNeighbors,
           });
@@ -778,7 +801,7 @@ export class PlateSimulation implements PlateSimulationIF {
           totalNeighborsRemoved += originalLength - validNeighbors.length;
         }
       }
-    });
+    }
 
     console.log(
       `Refreshed neighbors: cleaned ${totalCleaned} platelets, removed ${totalNeighborsRemoved} invalid neighbor references`,
@@ -793,7 +816,7 @@ export class PlateSimulation implements PlateSimulationIF {
    * - 20% delete platelet + all neighbors
    * For smaller plates (30-39), uses simple 25% deletion.
    */
-  createIrregularPlateEdges(): void {
+  async createIrregularPlateEdges(): Promise<void> {
     const plateletsCollection = this.simUniv.get(COLLECTIONS.PLATELETS);
     if (!plateletsCollection) {
       throw new Error('platelets collection not found');
@@ -801,17 +824,17 @@ export class PlateSimulation implements PlateSimulationIF {
 
     // Refresh neighbor relationships BEFORE edge detection to ensure accurate neighbor counts
     console.log('Refreshing neighbor relationships before edge detection...');
-    this.refreshNeighbors();
+    await this.refreshNeighbors();
 
     // Group platelets by plate
     const plateletsByPlate = new Map<string, any[]>();
-    plateletsCollection.each((platelet: any) => {
+    for await (const [_, platelet] of plateletsCollection.values()) {
       const plateId = platelet.plateId;
       if (!plateletsByPlate.has(plateId)) {
         plateletsByPlate.set(plateId, []);
       }
       plateletsByPlate.get(plateId)!.push(platelet);
-    });
+    }
 
     let totalDeleted = 0;
 
@@ -820,17 +843,17 @@ export class PlateSimulation implements PlateSimulationIF {
     const shuffledPlateEntries = shuffle(plateEntries);
 
     // Process each plate individually in random order
-    shuffledPlateEntries.forEach(([plateId, platelets]) => {
+    for (const [plateId, platelets] of shuffledPlateEntries) {
       const plateSize = platelets.length;
 
       if (plateSize <= 30) {
         console.log(
           `Plate ${plateId}: ${plateSize} platelets - too small, skipping edge deletion`,
         );
-        return;
+        continue;
       }
 
-      const deletedCount = this.createIrregularEdgesForPlate(
+      const deletedCount = await this.createIrregularEdgesForPlate(
         plateId,
         platelets,
       );
@@ -839,22 +862,22 @@ export class PlateSimulation implements PlateSimulationIF {
       console.log(
         `Plate ${plateId}: ${plateSize} platelets → deleted ${deletedCount} platelets (${((deletedCount / plateSize) * 100).toFixed(1)}%)`,
       );
-    });
+    }
 
     console.log(`Total deleted across all plates: ${totalDeleted} platelets`);
 
     // Refresh neighbor relationships AFTER deletion to clean up any orphaned references
     console.log('Refreshing neighbor relationships after deletion...');
-    this.refreshNeighbors();
+    await this.refreshNeighbors();
   }
 
   /**
    * Create irregular edges for a specific plate
    */
-  private createIrregularEdgesForPlate(
+  private async createIrregularEdgesForPlate(
     plateId: string,
     platelets: any[],
-  ): number {
+  ): Promise<number> {
     const plateletsCollection = this.simUniv.get(COLLECTIONS.PLATELETS);
     if (!plateletsCollection) {
       throw new Error('platelets collection not found');
@@ -926,37 +949,44 @@ export class PlateSimulation implements PlateSimulationIF {
     const shuffledEdgePlatelets = shuffle(edgePlatelets);
     const allPlateletsToDelete = new Set<string>();
 
+    // Calculate maximum allowed deletions (12% of total plate size)
+    const maxAllowedDeletions = Math.floor(plateSize * 0.12);
+
     if (plateSize >= 40) {
-      // For large plates (40+ platelets): Use aggressive recursive deletion
-      // Take 12.5% of edge platelets and recursively delete neighbors up to 4 levels deep
-      const deleteCount = Math.floor(shuffledEdgePlatelets.length * 0.125);
+      // For large plates (40+ platelets): Use limited recursive deletion
+      const deleteCount = Math.min(
+        Math.floor(shuffledEdgePlatelets.length * 0.08), // Reduced from 12.5% to 8%
+        maxAllowedDeletions,
+      );
       const plateletsToDelete = shuffledEdgePlatelets.slice(0, deleteCount);
 
       console.log(
-        `    Large plate: deleting ${deleteCount} of ${shuffledEdgePlatelets.length} edge platelets (12.5%) with recursive 50% neighbor deletion`,
+        `    Large plate: deleting ${deleteCount} of ${shuffledEdgePlatelets.length} edge platelets (max ${maxAllowedDeletions} allowed)`,
       );
 
-      // For each selected edge platelet, delete it and recursively delete 50% of its neighbors
+      // For each selected edge platelet, delete it and limited neighbors
       plateletsToDelete.forEach((item) => {
-        this.recursivelyDeleteNeighbors(
+        this.limitedDeleteNeighbors(
           item.id,
           allPlateletsToDelete,
-          0,
-          4,
           platelets,
+          maxAllowedDeletions,
         );
       });
 
       console.log(
-        `    Recursive deletion resulted in ${allPlateletsToDelete.size} total platelets marked for deletion`,
+        `    Limited deletion resulted in ${allPlateletsToDelete.size} total platelets marked for deletion`,
       );
     } else {
-      // For smaller plates (30-39 platelets): Use simple 12.5% deletion
-      const deleteCount = Math.floor(shuffledEdgePlatelets.length * 0.125);
+      // For smaller plates (30-39 platelets): Use simple limited deletion
+      const deleteCount = Math.min(
+        Math.floor(shuffledEdgePlatelets.length * 0.12),
+        maxAllowedDeletions,
+      );
       const plateletsToDelete = shuffledEdgePlatelets.slice(0, deleteCount);
 
       console.log(
-        `    Medium plate: deleting ${deleteCount} of ${shuffledEdgePlatelets.length} edge platelets (12.5%)`,
+        `    Medium plate: deleting ${deleteCount} of ${shuffledEdgePlatelets.length} edge platelets (max ${maxAllowedDeletions} allowed)`,
       );
 
       plateletsToDelete.forEach((item) => {
@@ -964,34 +994,31 @@ export class PlateSimulation implements PlateSimulationIF {
       });
     }
 
-    // Delete the selected platelets
-    allPlateletsToDelete.forEach((plateletId) => {
-      plateletsCollection.delete(plateletId);
-    });
+    // Delete the selected platelets in one batch operation
+    await plateletsCollection.deleteMany(Array.from(allPlateletsToDelete));
 
     // Clean up neighbor lists - remove invalid platelet IDs from remaining platelets' neighbor lists
     console.log(`    Cleaning up neighbor lists...`);
-    this.cleanupNeighborLists();
+    await this.cleanupNeighborLists();
 
     // Return the number of deleted platelets for this plate
     return allPlateletsToDelete.size;
   }
 
   /**
-   * Recursively delete neighbors up to a specified depth
+   * Limited deletion of neighbors with hard cap on total deletions
    */
-  private recursivelyDeleteNeighbors(
+  private limitedDeleteNeighbors(
     plateletId: string,
     deletedSet: Set<string>,
-    currentDepth: number,
-    maxDepth: number,
     platelets: any[],
+    maxAllowedDeletions: number,
   ): void {
     // Add this platelet to deletion set
     deletedSet.add(plateletId);
 
-    // Stop if we've reached max depth
-    if (currentDepth >= maxDepth) {
+    // Stop if we've reached the maximum allowed deletions
+    if (deletedSet.size >= maxAllowedDeletions) {
       return;
     }
 
@@ -1001,33 +1028,36 @@ export class PlateSimulation implements PlateSimulationIF {
       return;
     }
 
-    // Get 50% of neighbors (randomly selected)
+    // Get available neighbors (not already deleted)
     const neighbors = platelet.neighbors.filter(
       (neighborId: string) => !deletedSet.has(neighborId),
     );
-    const neighborsToDelete = Math.ceil(neighbors.length * 0.5);
-    const shuffledNeighbors = shuffle(neighbors);
-    const selectedNeighbors = shuffledNeighbors.slice(0, neighborsToDelete);
 
-    // Recursively delete selected neighbors
-    selectedNeighbors.forEach((neighborId: string) => {
-      if (!deletedSet.has(neighborId)) {
-        this.recursivelyDeleteNeighbors(
-          neighborId,
-          deletedSet,
-          currentDepth + 1,
-          maxDepth,
-          platelets,
-        );
-      }
-    });
+    // Calculate how many more we can delete
+    const remainingDeletions = maxAllowedDeletions - deletedSet.size;
+
+    // Delete at most 25% of neighbors, but respect the hard cap
+    const neighborsToDelete = Math.min(
+      Math.ceil(neighbors.length * 0.25),
+      remainingDeletions,
+    );
+
+    if (neighborsToDelete > 0) {
+      const shuffledNeighbors = shuffle(neighbors);
+      const selectedNeighbors = shuffledNeighbors.slice(0, neighborsToDelete);
+
+      // Add selected neighbors to deletion set
+      selectedNeighbors.forEach((neighborId: string) => {
+        deletedSet.add(neighborId);
+      });
+    }
   }
 
   /**
    * Clean up neighbor lists by removing neighbor IDs that don't exist in the collection
    * This method finds all plates in the simulation and validates all neighbor references
    */
-  cleanupNeighborLists(): void {
+  async cleanupNeighborLists(): Promise<void> {
     const plateletsCollection = this.simUniv.get(COLLECTIONS.PLATELETS);
     if (!plateletsCollection) {
       return;
@@ -1036,21 +1066,21 @@ export class PlateSimulation implements PlateSimulationIF {
     let cleanedCount = 0;
     let totalNeighborsRemoved = 0;
 
-    plateletsCollection.each((platelet: any) => {
+    await plateletsCollection.each(async (platelet: any) => {
       if (platelet.neighbors && platelet.neighbors.length > 0) {
         const originalLength = platelet.neighbors.length;
 
         // Filter out neighbor IDs that don't exist in the collection
-        const validNeighbors = platelet.neighbors.filter(
-          (neighborId: string) => {
-            // Check if the neighbor platelet actually exists in the collection
-            return plateletsCollection.has(neighborId);
-          },
-        );
+        const validNeighbors = [];
+        for (const neighborId of platelet.neighbors) {
+          if (await plateletsCollection.has(neighborId)) {
+            validNeighbors.push(neighborId);
+          }
+        }
 
         if (validNeighbors.length !== originalLength) {
           // Update the platelet with cleaned neighbor list
-          plateletsCollection.set(platelet.id, {
+          await plateletsCollection.set(platelet.id, {
             ...platelet,
             neighbors: validNeighbors,
           });

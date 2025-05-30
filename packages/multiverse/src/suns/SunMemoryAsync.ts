@@ -11,7 +11,7 @@ export class SunMemoryAsync<RecordType, KeyType>
   extends SunBase<RecordType, KeyType, CollAsyncIF<RecordType, KeyType>>
   implements SunIfAsync<RecordType, KeyType>
 {
-  #batchSize = 30;
+  #batchSize = 30; // Default batch size for parallel processing
   #data: ExtendedMap<KeyType, RecordType>;
 
   constructor(coll?: CollAsyncIF<RecordType, KeyType>) {
@@ -144,8 +144,9 @@ export class SunMemoryAsync<RecordType, KeyType>
   }
 
   /**
-   * Iterate over each record in the collection
+   * Iterate over each record in the collection using parallel processing with batching
    * @param callback - Function to call for each record
+   * @param batchSize - Optional batch size for parallel processing (defaults to 30)
    * @returns A promise that resolves when all callbacks have been called
    */
   async each(
@@ -153,11 +154,30 @@ export class SunMemoryAsync<RecordType, KeyType>
       record: RecordType,
       key: KeyType,
       collection: CollAsyncIF<RecordType, KeyType>,
-    ) => void,
+    ) => void | Promise<void>,
+    batchSize?: number,
   ): Promise<void> {
-    // Iterate through all records
-    for (const [key, record] of this.#data.entries()) {
-      await Promise.resolve(callback(record, key, this.coll));
+    const entries = Array.from(this.#data.entries());
+    const effectiveBatchSize = batchSize ?? this.#batchSize;
+
+    // For small collections, process all at once
+    if (entries.length <= effectiveBatchSize) {
+      await Promise.all(
+        entries.map(([key, record]) =>
+          Promise.resolve(callback(record, key, this.coll)),
+        ),
+      );
+      return;
+    }
+
+    // For large collections, process in batches to prevent memory overload
+    for (let i = 0; i < entries.length; i += effectiveBatchSize) {
+      const batch = entries.slice(i, i + effectiveBatchSize);
+      await Promise.all(
+        batch.map(([key, record]) =>
+          Promise.resolve(callback(record, key, this.coll)),
+        ),
+      );
     }
   }
 
@@ -293,6 +313,38 @@ export class SunMemoryAsync<RecordType, KeyType>
       }
     }
     return result;
+  }
+
+  /**
+   * Set multiple records from a Map
+   * @param recordMap Map of records to set
+   */
+  async setMany(recordMap: Map<KeyType, RecordType>): Promise<void> {
+    if (this._locked) {
+      throw new Error(
+        'cannot set during locked operations - usually mutations',
+      );
+    }
+
+    for (const [key, record] of recordMap.entries()) {
+      await this.set(key, record);
+    }
+  }
+
+  /**
+   * Delete multiple records by their keys
+   * @param keys Array of record keys to delete
+   */
+  async deleteMany(keys: KeyType[]): Promise<void> {
+    if (this._locked) {
+      throw new Error(
+        'cannot delete during locked operations - usually mutations',
+      );
+    }
+
+    for (const key of keys) {
+      await this.delete(key);
+    }
   }
 
   async *values(): AsyncGenerator<[KeyType, RecordType]> {

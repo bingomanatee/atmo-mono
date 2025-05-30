@@ -84,6 +84,7 @@ export interface CollSyncIF<RecordType = DataRecord, KeyType = DataKey>
   set(key: KeyType, value: RecordType): void;
   setMany(values: Map<KeyType, RecordType>): void;
   delete(key: KeyType): void;
+  deleteMany(keys: KeyType[]): void;
   [Symbol.iterator](): Iterator<Pair<KeyType, RecordType>>;
 }
 
@@ -121,6 +122,7 @@ export interface CollAsyncIF<RecordType = DataRecord, KeyType = DataKey>
   ): TransportResult;
   set(key: KeyType, value: RecordType, skiplValidate?: boolean): Promise<void>;
   setMany(input: Map<KeyType, RecordType>): Promise<void>;
+  deleteMany(keys: KeyType[]): Promise<void>;
   [Symbol.iterator](): Iterator<Pair<KeyType, RecordType>>;
 }
 

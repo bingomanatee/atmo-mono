@@ -1,6 +1,6 @@
 import { EARTH_RADIUS } from '@wonderlandlabs/atmo-utils';
 import {
-  CollSync,
+  CollAsync,
   FIELD_TYPES,
   Multiverse,
   SchemaLocal,
@@ -10,6 +10,8 @@ import type { Vector3Like } from 'three';
 import { Vector3 } from 'three';
 import { COLLECTIONS } from './PlateSimulation/constants';
 import { IndexedSun } from './PlateSimulation/managers/sun/IndexedSun';
+import { Plate } from './PlateSimulation/Plate';
+import { Platelet } from './PlateSimulation/Platelet';
 import {
   SIM_PLANETS_SCHEMA,
   SIM_PLATE_STEPS_SCHEMA,
@@ -39,25 +41,39 @@ export function asCoord(prefix: string, p: Vector3Like = new Vector3()) {
 export function simUniverse(mv: Multiverse) {
   const simUniv = new Universe(UNIVERSES.SIM, mv);
 
-  const platesCollection = new CollSync({
+  const platesCollection = new CollAsync({
     name: COLLECTIONS.PLATES,
     universe: simUniv,
-    schema: new SchemaLocal(COLLECTIONS.PLATES, SIM_PLATES_SCHEMA),
+    schema: new SchemaLocal(
+      COLLECTIONS.PLATES,
+      SIM_PLATES_SCHEMA,
+      ({ inputRecord }) => {
+        // Convert plain objects to Plate instances
+        if (
+          inputRecord &&
+          typeof inputRecord === 'object' &&
+          !(inputRecord instanceof Plate)
+        ) {
+          return Plate.fromJSON(inputRecord as any);
+        }
+        return inputRecord;
+      },
+    ),
   });
 
-  const planetsCollection = new CollSync({
+  const planetsCollection = new CollAsync({
     name: COLLECTIONS.PLANETS,
     universe: simUniv,
     schema: new SchemaLocal(COLLECTIONS.PLANETS, SIM_PLANETS_SCHEMA),
   });
 
-  const simulationsCollection = new CollSync({
+  const simulationsCollection = new CollAsync({
     name: COLLECTIONS.SIMULATIONS,
     universe: simUniv,
     schema: new SchemaLocal(COLLECTIONS.SIMULATIONS, SIM_SIMULATIONS_SCHEMA),
   });
 
-  const plateCollection = new CollSync({
+  const plateCollection = new CollAsync({
     name: COLLECTIONS.STEPS,
     universe: simUniv,
     schema: new SchemaLocal(COLLECTIONS.STEPS, SIM_PLATE_STEPS_SCHEMA),
@@ -72,10 +88,24 @@ export function simUniverse(mv: Multiverse) {
     ),
   });
 
-  const plateletsCollection = new CollSync({
+  const plateletsCollection = new CollAsync({
     name: COLLECTIONS.PLATELETS,
     universe: simUniv,
-    schema: new SchemaLocal(COLLECTIONS.PLATELETS, SIM_PLATELETS_SCHEMA),
+    schema: new SchemaLocal(
+      COLLECTIONS.PLATELETS,
+      SIM_PLATELETS_SCHEMA,
+      ({ inputRecord }) => {
+        // Convert plain objects to Platelet instances
+        if (
+          inputRecord &&
+          typeof inputRecord === 'object' &&
+          !(inputRecord instanceof Platelet)
+        ) {
+          return new Platelet(inputRecord as any);
+        }
+        return inputRecord;
+      },
+    ),
   });
 
   return simUniv;

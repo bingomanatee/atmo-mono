@@ -38,8 +38,8 @@ export class PlateletVisualizer extends PlateVisualizerBase {
     this.orbitalFrame.position.set(0, 0, 0);
     this.orbitalFrame.quaternion.identity();
 
-    // Get existing platelets from the simulation (they should already be generated and processed)
-    this.platelets = this.getExistingPlatelets();
+    // Initialize empty platelets array - will be populated in initializeAsync
+    this.platelets = [];
 
     const fullCylinderGeometry = new THREE.CylinderGeometry(
       1,
@@ -101,12 +101,29 @@ export class PlateletVisualizer extends PlateVisualizerBase {
       shininess: 30,
     });
 
+    // Allocate buffer for maximum expected platelets per plate (estimate: 100)
+    const maxPlatelets = 100;
     this.instancedMesh = new THREE.InstancedMesh(
       geometry,
       material,
-      this.platelets.length,
+      maxPlatelets,
     );
     this.instancedMesh.name = `PlateletMesh_${this.plate.id}`;
+    this.instancedMesh.count = 0; // Start with 0 visible instances
+  }
+
+  /**
+   * Update the instanced mesh with current platelet data
+   */
+  private updateMeshInstances(): void {
+    console.log(
+      `🔧 Updating mesh instances for ${this.platelets.length} platelets`,
+    );
+
+    if (this.platelets.length === 0) {
+      console.warn(`⚠️ No platelets to update mesh for plate ${this.plate.id}`);
+      return;
+    }
 
     const position = new THREE.Vector3();
     const quaternion = new THREE.Quaternion();
@@ -115,6 +132,16 @@ export class PlateletVisualizer extends PlateVisualizerBase {
     const OVERFLOW = 1.05;
 
     this.platelets.forEach((platelet, index) => {
+      if (index < 3) {
+        // Debug first few platelets
+        console.log(`   Platelet ${index}:`, {
+          position: platelet.position,
+          radius: platelet.radius,
+          thickness: platelet.thickness,
+          density: platelet.density,
+        });
+      }
+      // Simple positioning - just use platelet position directly
       position.copy(platelet.position);
       scale.set(
         platelet.radius * OVERFLOW,
@@ -172,11 +199,76 @@ export class PlateletVisualizer extends PlateVisualizerBase {
     if (this.instancedMesh.instanceColor) {
       this.instancedMesh.instanceColor.needsUpdate = true;
     }
+
+    console.log(
+      `✅ Mesh updated: ${this.platelets.length} instances, visible: ${this.instancedMesh.visible}, count: ${this.instancedMesh.count}`,
+    );
+  }
+
+  /**
+   * Initialize platelets asynchronously and set up the mesh
+   */
+  public async initializeAsync(): Promise<void> {
+    // Get existing platelets from the simulation
+    this.platelets = await this.getExistingPlatelets();
+
+    console.log(
+      `🔍 Plate ${this.plate.id}: Found ${this.platelets.length} platelets`,
+    );
+
+    if (this.platelets.length === 0) {
+      console.warn(`⚠️ No platelets found for plate ${this.plate.id}`);
+      return;
+    }
+
+    // Check if we have too many platelets for the allocated buffer
+    const maxCapacity = this.instancedMesh.instanceMatrix.count;
+    if (this.platelets.length > maxCapacity) {
+      console.warn(
+        `⚠️ Plate ${this.plate.id} has ${this.platelets.length} platelets but buffer only supports ${maxCapacity}. Truncating to ${maxCapacity}.`,
+      );
+      this.platelets = this.platelets.slice(0, maxCapacity);
+    }
+
+    // Update the instanced mesh count
+    this.instancedMesh.count = this.platelets.length;
+
+    // Update the mesh with platelet data
+    this.updateMeshInstances();
   }
 
   public visualize(): void {
+    console.log(
+      `🎨 Adding plate ${this.plate.id} to scene with ${this.platelets.length} platelets`,
+    );
     this.addObjectToScene(this.orbitalFrame);
     this.orbitalFrame.add(this.instancedMesh);
+
+    // Add a large red sphere at the plate center for debugging
+    const plateMarkerGeometry = new THREE.SphereGeometry(1000, 8, 6); // 1000km radius sphere
+    const plateMarkerMaterial = new THREE.MeshBasicMaterial({
+      color: 0xff0000, // Bright red color
+      transparent: false, // Make it solid
+      opacity: 1.0,
+    });
+    const plateMarker = new THREE.Mesh(
+      plateMarkerGeometry,
+      plateMarkerMaterial,
+    );
+
+    // Convert global plate position to local coordinates relative to orbital frame
+    const localPosition = this.orbitalFrame.worldToLocal(
+      this.plate.position.clone(),
+    );
+    plateMarker.position.copy(localPosition);
+    plateMarker.name = `PlateMarker_${this.plate.id}`;
+    this.orbitalFrame.add(plateMarker);
+
+    console.log(`   Orbital frame position:`, this.orbitalFrame.position);
+    console.log(`   Plate position:`, this.plate.position);
+    console.log(
+      `   Mesh visible: ${this.instancedMesh.visible}, count: ${this.instancedMesh.count}`,
+    );
   }
 
   public update(): void {
@@ -192,17 +284,19 @@ export class PlateletVisualizer extends PlateVisualizerBase {
   /**
    * Get existing platelets for this plate from the simulation
    */
-  private getExistingPlatelets(): any[] {
+  private async getExistingPlatelets(): Promise<any[]> {
     const platelets: any[] = [];
     const plateletsCollection =
       this.plateletManager['sim'].simUniv.get('platelets');
 
     if (plateletsCollection) {
-      plateletsCollection.each((platelet: any) => {
-        if (platelet.plateId === this.plate.id) {
-          platelets.push(platelet);
-        }
-      });
+      // Use the find method to get platelets for this specific plate
+      for await (const [id, platelet] of plateletsCollection.find(
+        'plateId',
+        this.plate.id,
+      )) {
+        platelets.push(platelet);
+      }
     }
 
     return platelets;

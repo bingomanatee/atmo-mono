@@ -74,7 +74,12 @@ export class CollAsync<
     if (typeof this.sun.find !== 'function') {
       throw new Error('Find method not implemented');
     }
-    return this.sun.find(query, value);
+    // Pass arguments correctly to sun's find method which expects spread args
+    if (value !== undefined) {
+      return this.sun.find(query, value);
+    } else {
+      return this.sun.find(query);
+    }
   }
 
   async mutate(
@@ -87,6 +92,7 @@ export class CollAsync<
   /**
    * Iterate over each record in the collection
    * @param callback - Function to call for each record
+   * @param batchSize - Optional batch size for parallel processing
    * @returns A promise that resolves when all callbacks have been called
    */
   async each(
@@ -95,11 +101,13 @@ export class CollAsync<
       key: KeyType,
       collection: CollAsyncIF<RecordType, KeyType>,
     ) => void | Promise<void>,
+    batchSize?: number,
   ): Promise<void> {
     // If the sun has an each method, use it
     if (typeof this.sun.each === 'function') {
-      await this.sun.each((record: RecordType, key: KeyType) =>
-        callback(record, key, this),
+      await this.sun.each(
+        (record: RecordType, key: KeyType) => callback(record, key, this),
+        batchSize,
       );
       return;
     }
@@ -226,6 +234,18 @@ export class CollAsync<
     // Fallback implementation using individual sets
     for (const [key, record] of recordMap) {
       await this.set(key, record);
+    }
+  }
+
+  async deleteMany(keys: KeyType[]): Promise<void> {
+    // If the sun has a deleteMany method, use it
+    if (typeof this.sun.deleteMany === 'function') {
+      return this.sun.deleteMany(keys);
+    }
+
+    // Fallback implementation using individual deletes
+    for (const key of keys) {
+      await this.delete(key);
     }
   }
 
