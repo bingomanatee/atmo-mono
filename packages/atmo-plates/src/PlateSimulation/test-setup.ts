@@ -1,34 +1,32 @@
+import { EARTH_RADIUS } from '@wonderlandlabs/atmo-utils';
 import { COLLECTIONS } from './constants';
 import { PlateletManager } from './managers/PlateletManager';
 import { PlateSimulation } from './PlateSimulation';
 
-export const EARTH_RADIUS = 6371000; // meters
-
-export function setupTestSimulation() {
+export async function setupTestSimulation() {
   const sim = new PlateSimulation({});
-  sim.init();
+  await sim.init();
 
-  // Create Earth planet
+  // Create Earth planet using the simulation's makePlanet method
+  // This automatically adds it to the planets collection
   const earthPlanet = sim.makePlanet(EARTH_RADIUS, 'earth');
 
-  // Add the planet to the simulation
-  const planetsCollection = sim.simUniv.get(COLLECTIONS.PLANETS);
-  planetsCollection.set(earthPlanet.id, earthPlanet);
-
-  // Register the PlateletManager
-  const plateletManager = new PlateletManager(sim);
-  // sim.managers.set(COLLECTIONS.PLATELETS, plateletManager); // Removed as it's now handled in init()
+  // The managers are already initialized in sim.init(), no need to manually create them
+  // The collections are already created by simUniverse() in sim.init()
 
   return { sim, earthPlanet };
 }
 
-export function createTestPlate(sim: PlateSimulation, earthPlanetId: string) {
-  return sim.addPlate({
+export async function createTestPlate(
+  sim: PlateSimulation,
+  earthPlanetId: string,
+) {
+  return await sim.addPlate({
     id: 'test_plate',
     name: 'Test Plate',
-    radius: 5000000, // 5000 km - make sure this matches the test expectations
+    radius: 5000 / EARTH_RADIUS, // Convert 5000 km to radians
     density: 2800,
-    thickness: 100000, // 100 km
+    thickness: 100, // 100 km
     planetId: earthPlanetId,
   });
 }

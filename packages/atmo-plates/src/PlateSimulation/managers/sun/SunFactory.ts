@@ -3,6 +3,7 @@ import {
   memoryAsyncSunF,
   SchemaLocalIF,
 } from '@wonderlandlabs/multiverse';
+import { log } from '../../../utils/utils';
 import { DexieSun } from './DexieSun';
 
 interface SunFactoryOptions {
@@ -21,7 +22,7 @@ export async function createAsyncSun<T extends Record<string, any>>(
   const { dbName, tableName, schema } = options;
 
   // TEMPORARILY FORCE MEMORY STORAGE TO TEST PERFORMANCE
-  console.log(
+  log(
     `🧠 FORCING memory AsyncSun for ${tableName} (Dexie disabled for testing)`,
   );
   return memoryAsyncSunF({ schema });

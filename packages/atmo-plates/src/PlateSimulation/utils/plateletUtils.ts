@@ -44,7 +44,8 @@ export function filterCellsByPlateRadius(
        Plate center: (${plate.position.x.toFixed(1)}, ${plate.position.y.toFixed(1)}, ${plate.position.z.toFixed(1)})
     Plate radius: ${plate.radius}km
     Planet radius: ${planetRadius}km
-    `);
+    `,
+  );
 
   // Calculate distances for all cells
   // Both plate position and cell positions are in kilometers
@@ -69,7 +70,7 @@ export function filterCellsByPlateRadius(
     .filter((item) => item.distance <= plateRadiusKm)
     .map((item) => item.cell);
 
-  log
+  log(
     `�� Plate ${plate.id}: Initially filtered ${keptCells.length}/${cells.length} cells within ${plate.radius}km radius`,
   );
 
@@ -146,6 +147,11 @@ export function createPlateletFromCell(
   resolution: number,
 ): Platelet {
   const position = cellToVector(cell, planetRadius);
+
+  // Ensure position is valid
+  if (!position) {
+    throw new Error(`Failed to get position for H3 cell ${cell}`);
+  }
 
   const neighborCellIds = gridDisk(cell, 1).filter(
     (neighbor) => neighbor !== cell,
