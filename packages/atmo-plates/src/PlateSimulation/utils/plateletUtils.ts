@@ -13,6 +13,7 @@ import { Vector3 } from 'three';
 import { floatElevation } from '../../utils/plateUtils';
 import type { Platelet } from '../schemas/platelet';
 import type { SimPlateIF } from '../types.PlateSimulation';
+import { H0_CELLS } from './h0Cells';
 
 declare module '@wonderlandlabs/atmo-utils';
 
@@ -42,28 +43,53 @@ export function filterCellsByPlateRadius(
   plate: SimPlateIF,
   planetRadius: number,
 ): string[] {
+  console.log(
+    `🔍🔍🔍🔍 FILTER DEBUG: Checking ${cells.length} cells for plate ${plate.id}`,
+  );
+  console.log(
+    `   Plate center: (${plate.position.x.toFixed(1)}, ${plate.position.y.toFixed(1)}, ${plate.position.z.toFixed(1)})`,
+  );
+  console.log(`
+    Plate radius: ${plate.radius}km
+    Planet radius: ${planetRadius}km
+    `);
+
   // Calculate distances for all cells
-  const cellDistances = cells.map((cell) => {
-    const position = cellToVector(cell, planetRadius);
-    const distance = position.distanceTo(plate.position);
-    return { cell, distance };
-  });
+  // Both plate position and cell positions are in kilometers
+  const platePositionKm = new Vector3().copy(plate.position);
+
+  const cellDistances = cells
+    .map((cell) => {
+      const position = cellToVector(cell, planetRadius);
+      const distanceKm = position.distanceTo(platePositionKm); // Both in km now
+
+      return { cell, distance: distanceKm }; // Store distance in kilometers
+    })
+    .filter(Boolean);
 
   // Sort by distance (closest first)
   cellDistances.sort((a, b) => a.distance - b.distance);
 
-  // Keep at least 88% of cells (remove no more than 12%)
-  const maxRemovalCount = Math.floor(cells.length * 0.12);
-  const minKeepCount = cells.length - maxRemovalCount;
-
-  // Keep the closest cells up to the minimum count
+  // Filter to only keep cells within the plate's radius for circular shape
+  // Everything in kilometers - no meter conversions!
+  const plateRadiusKm = plate.radius; // plate.radius is already in km
   const keptCells = cellDistances
-    .slice(0, Math.max(minKeepCount, cells.length))
+    .filter((item) => item.distance <= plateRadiusKm)
     .map((item) => item.cell);
 
   console.log(
-    `🔍 Plate ${plate.id}: Kept ${keptCells.length}/${cells.length} cells (${((keptCells.length / cells.length) * 100).toFixed(1)}% retention)`,
+    `�� Plate ${plate.id}: Initially filtered ${keptCells.length}/${cells.length} cells within ${plate.radius}km radius`,
   );
+
+  if (keptCells.length === 0 && cells.length > 0) {
+    const closest = cellDistances[0];
+    console.log(
+      `❌ NO CELLS KEPT by radius filter! Closest cell was ${cellDistances[0]?.distance.toFixed(2)}km away, but plate radius is ${plateRadiusKm}km`,
+    );
+    console.log(
+      `   This suggests a unit mismatch or a very small plate/large H0 cell. Nearest cell fallback will be used if no platelets are ultimately generated.`,
+    );
+  }
 
   return keptCells;
 }
@@ -73,6 +99,59 @@ export function filterCellsByPlateRadius(
  */
 export function getNeighboringH0Cells(h0Cell: string): string[] {
   return gridDisk(h0Cell, 1);
+}
+
+/**
+ * Creates a fallback platelet at the plate center position
+ */
+export function createCenterPlatelet(
+  plate: SimPlateIF,
+  planetRadius: number,
+  resolution: number,
+): Platelet {
+  // Create a unique ID for the center platelet
+  const plateletId = `${plate.id}-fallback-center`; // Changed ID to avoid potential conflicts
+
+  // Find the H3 cell closest to the plate center to use for the fallback
+  const { lat: plateLat, lon: plateLon } = pointToLatLon(
+    plate.position,
+    planetRadius,
+  );
+  const nearestH3Cell = latLngToCell(plateLat, plateLon, resolution);
+  console.log(
+    `🎯 Creating fallback platelet for plate ${plate.id} at nearest H3 cell: ${nearestH3Cell}`,
+  );
+
+  // Use the position of the nearest H3 cell for consistency
+  const position = cellToVector(nearestH3Cell, planetRadius);
+
+  // Calculate a reasonable radius for the fallback platelet (same as other platelets at this resolution)
+  const calculatedRadius = h3HexRadiusAtResolution(planetRadius, resolution);
+
+  // Calculate elevation (same as normal platelets)
+  const elevation = floatElevation(plate.thickness, plate.density);
+
+  return {
+    id: plateletId,
+    plateId: plate.id,
+    h3Cell: nearestH3Cell, // Use the actual H3 cell index
+    position: position,
+    radius: calculatedRadius,
+    thickness: plate.thickness,
+    density: plate.density,
+    isActive: true,
+    neighbors: [], // Neighbors will be added later if needed
+    connections: {},
+    neighborCellIds: gridDisk(nearestH3Cell, 1).filter(
+      (cell) => cell !== nearestH3Cell,
+    ), // Get neighbor cell IDs
+    elevation: elevation,
+    mass:
+      plate.thickness * plate.density * Math.PI * Math.pow(calculatedRadius, 2),
+    elasticity: 0.5,
+    velocity: new Vector3(),
+    averageNeighborDistance: calculatedRadius * 2, // Reasonable default
+  };
 }
 
 /**
@@ -111,19 +190,16 @@ export function createPlateletFromCell(
   const averageNeighborDistance =
     validNeighborCount > 0 ? totalNeighborDistance / validNeighborCount : 0; // Default to 0 if no valid neighbors
 
-  // Calculate radius based on average neighbor distance (half the average distance)
-  // Use H3 radius as a fallback if no valid neighbors are found.
-  const calculatedRadius =
-    averageNeighborDistance > 0
-      ? averageNeighborDistance / 2
-      : h3HexRadiusAtResolution(planetRadius, resolution);
+  // Use H3 cell radius directly for consistent, appropriate platelet sizes
+  // This ensures platelets are sized correctly for their H3 resolution level
+  const calculatedRadius = h3HexRadiusAtResolution(planetRadius, resolution);
 
   return {
     id: `${plate.id}-${cell}`,
     plateId: plate.id,
     h3Cell: cell,
     position,
-    radius: calculatedRadius, // Set radius based on calculated average neighbor distance
+    radius: calculatedRadius,
     thickness: plate.thickness,
     density: plate.density,
     isActive: true,
@@ -132,136 +208,204 @@ export function createPlateletFromCell(
     neighborCellIds,
     elevation: floatElevation(plate.thickness, plate.density),
     mass:
-      plate.thickness * plate.density * Math.PI * Math.pow(calculatedRadius, 2), // Use calculated radius for mass
+      plate.thickness * plate.density * Math.PI * Math.pow(calculatedRadius, 2),
     elasticity: 0.5,
     velocity: new Vector3(),
-    averageNeighborDistance: averageNeighborDistance, // Store the calculated average distance
+    averageNeighborDistance: averageNeighborDistance,
   };
 }
 
 /**
- * Processes a single H0 cell and its neighbors recursively, adding platelets directly to the collection
+ * Processes H0 cells within a threshold distance and generates platelets with neighbor expansion.
  */
 export async function processH0Cell(
   h0Cell: string,
   plate: SimPlateIF,
   planetRadius: number,
   resolution: number,
-  processedH0Cells: Set<string>,
-  plateletsCollection: any, // Changed from CollSyncIF to any since it's async
-): Promise<void> {
-  if (processedH0Cells.has(h0Cell)) return;
-  processedH0Cells.add(h0Cell);
+  plateletsCollection: any,
+): Promise<string[]> {
+  // Return the list of H3 cells found in this H0 cell
+  console.log(
+    `🔍============================= Getting H3 cells from H0 cell ${h0Cell} for plate ${plate.id}`,
+  );
 
   // Get all cells at the specified resolution within this H0 cell
   const plateletCells = getCellsInH0Cell(h0Cell, resolution);
+  console.log(
+    `   Found ${plateletCells.length} resolution-${resolution} cells in H0 cell ${h0Cell}
+      h0 center: ${cellToVector(h0Cell, planetRadius).round().toArray().join(',')}
+    `,
+  );
 
-  // Filter cells within radius of the plate
-  const validPlateletCells = filterCellsByPlateRadius(
-    plateletCells,
+  return plateletCells; // Just return the cells, filtering and processing happens in generateCircularPlatelets
+}
+
+/**
+ * Generate platelets in a perfect circular pattern around the plate center using neighbor expansion
+ */
+export async function generateCircularPlatelets(
+  plate: SimPlateIF,
+  planetRadius: number,
+  resolution: number,
+  plateletsCollection: any,
+): Promise<void> {
+  console.log(`🔧 GENERATING CIRCULAR PLATELETS for plate ${plate.id}:`);
+  console.log(`   Plate radius: ${plate.radius}km`);
+  console.log(`   Planet radius: ${planetRadius}km`);
+  console.log(`   Resolution: ${resolution}`);
+
+  const plateRadiusKm = plate.radius;
+  const plateCenter = new Vector3(
+    plate.position.x,
+    plate.position.y,
+    plate.position.z,
+  );
+
+  // Calculate the radius of an H0 cell at the planet's radius
+  const h0CellRadiusKm = h3HexRadiusAtResolution(planetRadius, 0);
+
+  // Define the distance threshold for including H0 cells (plate radius + 2 H0 radii buffer)
+  const distanceThreshold = plateRadiusKm + 2 * h0CellRadiusKm;
+  console.log(
+    `   Distance threshold for including H0 cells: ${distanceThreshold.toFixed(2)}km`,
+  );
+
+  const potentialCandidateCells = new Set<string>();
+  let relevantH0CellsCount = 0;
+
+  // Collect all H3 cells from relevant H0 cells
+  console.log(`   Collecting H3 cells from H0 cells within threshold...`);
+  for (const h0Cell of H0_CELLS) {
+    const h0CellPosition = cellToVector(h0Cell, planetRadius);
+    const distanceToPlate = h0CellPosition.distanceTo(plateCenter);
+
+    if (distanceToPlate <= distanceThreshold) {
+      relevantH0CellsCount++;
+      const h3CellsInH0 = getCellsInH0Cell(h0Cell, resolution);
+      h3CellsInH0.forEach((cell) => potentialCandidateCells.add(cell));
+    } else {
+      // console.log(`     H0 cell ${h0Cell} is outside the threshold - skipping.`,); // Too much logging
+    }
+  }
+
+  console.log(
+    `   Collected ${potentialCandidateCells.size} potential candidate H3 cells from ${relevantH0CellsCount} H0 cells.`,
+  );
+
+  const processedPlateletCells = new Set<string>();
+  const cellsToProcess: string[] = []; // Use an array as a simple queue
+  const createdPlateletIds: string[] = []; // To track if any platelets were created
+
+  // Initial filtering: Add cells whose centers are within the plate radius to the queue
+  console.log(
+    `   Performing initial distance-based filtering and queuing valid cells...`,
+  );
+  const initiallyValidCells = filterCellsByPlateRadius(
+    Array.from(potentialCandidateCells),
     plate,
     planetRadius,
   );
+  initiallyValidCells.forEach((cell) => {
+    if (!processedPlateletCells.has(cell)) {
+      cellsToProcess.push(cell);
+      processedPlateletCells.add(cell); // Mark as processed when added to queue to avoid duplicates
+    }
+  });
 
-  // Process valid cells
-  for (const cell of validPlateletCells) {
+  console.log(
+    `   Initially queued ${cellsToProcess.length} cells for processing.`,
+  );
+
+  // Neighbor expansion process
+  console.log(`   Starting neighbor expansion...`);
+  let cellsProcessedCount = 0;
+  while (cellsToProcess.length > 0) {
+    const currentCell = cellsToProcess.shift()!; // Dequeue cell
+    cellsProcessedCount++;
+
+    // Create platelet for the current cell
     const platelet = createPlateletFromCell(
-      cell,
+      currentCell,
       plate,
       planetRadius,
       resolution,
     );
     await plateletsCollection.set(platelet.id, platelet);
-  }
+    createdPlateletIds.push(platelet.id);
 
-  // Process neighboring H0 cells
-  const neighborH0Cells = getNeighboringH0Cells(h0Cell);
-  for (const neighborH0 of neighborH0Cells) {
-    if (!processedH0Cells.has(neighborH0)) {
-      await processH0Cell(
-        neighborH0,
-        plate,
-        planetRadius,
-        resolution,
-        processedH0Cells,
-        plateletsCollection,
-      );
-    }
-  }
-}
-
-/**
- * Get all H3 cells at a given resolution level that cover a sphere
- * @param resolution The H3 resolution level
- * @param radius The radius of the sphere
- * @returns Array of H3 cell indices
- */
-export function getAllH3CellsAtLevel(
-  resolution: number,
-  radius: number,
-): string[] {
-  // Start with a base cell at the north pole
-  const baseCell = latLngToCell(90, 0, resolution);
-  const cells = new Set<string>();
-  const queue = [baseCell];
-
-  // Use a breadth-first search to find all cells
-  while (queue.length > 0) {
-    const currentCell = queue.shift()!;
-    if (cells.has(currentCell)) continue;
-
-    // Get the center point of the cell
-    const { lat, lng } = cellToLatLng(currentCell);
-    // Convert lat/lng to radians
-    const latRad = (lat * Math.PI) / 180;
-    const lngRad = (lng * Math.PI) / 180;
-    // Calculate position on sphere
-    const pos = new Vector3(
-      radius * Math.cos(latRad) * Math.cos(lngRad),
-      radius * Math.sin(latRad),
-      radius * Math.cos(latRad) * Math.sin(lngRad),
+    // Get neighbors and enqueue if valid and not processed
+    const neighbors = gridDisk(currentCell, 1).filter(
+      (cell) => cell !== currentCell,
     );
+    for (const neighbor of neighbors) {
+      if (!processedPlateletCells.has(neighbor)) {
+        // Check if neighbor's center is within plate radius
+        try {
+          const neighborPosition = cellToVector(neighbor, planetRadius);
+          const distanceToPlate = neighborPosition.distanceTo(plateCenter);
 
-    // Only add cells that are on the sphere (with a small tolerance)
-    const distanceFromCenter = pos.length();
-    if (Math.abs(distanceFromCenter - radius) < 1e-6) {
-      cells.add(currentCell);
-
-      // Get neighboring cells and add them to the queue
-      const neighbors = getNeighbors(currentCell);
-      for (const neighbor of neighbors) {
-        if (!cells.has(neighbor)) {
-          queue.push(neighbor);
+          if (distanceToPlate <= plateRadiusKm) {
+            cellsToProcess.push(neighbor);
+            processedPlateletCells.add(neighbor); // Mark as processed when added to queue
+          }
+        } catch (error) {
+          console.warn(`❌ Skipping invalid neighbor cell ${neighbor}:`, error);
         }
       }
     }
   }
 
-  return Array.from(cells);
+  console.log(
+    `   Neighbor expansion complete. Processed ${cellsProcessedCount} cells.`,
+  );
+
+  // Fallback: If no platelets were created, add one for the nearest H3 cell
+  if (createdPlateletIds.length === 0) {
+    console.warn(
+      `⚠️ No platelets generated for plate ${plate.id}. Creating fallback platelet.`,
+    );
+    const centerPlatelet = createCenterPlatelet(
+      plate,
+      planetRadius,
+      resolution,
+    );
+    await plateletsCollection.set(centerPlatelet.id, centerPlatelet);
+    createdPlateletIds.push(centerPlatelet.id); // Add fallback platelet ID
+  }
+
+  console.log(
+    `✅ Finished generating ${createdPlateletIds.length} platelets for plate ${plate.id}.`,
+  );
 }
 
 /**
- * Get all neighboring cells for a given H3 cell
- * @param cell The H3 cell index
- * @returns Array of neighboring cell indices
+ * Calculate the great circle distance between two points on a sphere
+ * Returns distance in degrees
  */
-function getNeighbors(cell: string): string[] {
-  const { lat, lng } = cellToLatLng(cell);
-  const resolution = getResolution(cell);
+function calculateDistance(
+  lat1: number,
+  lon1: number,
+  lat2: number,
+  lon2: number,
+): number {
+  const R = 1; // Unit sphere
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(toRad(lat1)) *
+      Math.cos(toRad(lat2)) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return toDeg(c);
+}
 
-  // Get cells in a small grid around the current cell
-  const neighbors: string[] = [];
-  const step = 0.1; // Small step in degrees
+function toRad(degrees: number): number {
+  return degrees * (Math.PI / 180);
+}
 
-  for (let dlat = -step; dlat <= step; dlat += step) {
-    for (let dlng = -step; dlng <= step; dlng += step) {
-      if (dlat === 0 && dlng === 0) continue;
-      const neighbor = latLngToCell(lat + dlat, lng + dlng, resolution);
-      if (neighbor !== cell) {
-        neighbors.push(neighbor);
-      }
-    }
-  }
-
-  return neighbors;
+function toDeg(radians: number): number {
+  return radians * (180 / Math.PI);
 }

@@ -85,9 +85,9 @@ simulation.init();
 const initialPlatesCount = simulation.simUniv.get('plates').count();
 
 // --- Add Large Plates as well ---
-// Generate large plates for better visualization
+// Generate large plates for better visualization using the simulation's planet radius
 const largePlates = PlateSpectrumGenerator.generateLargePlates({
-  planetRadius: EARTH_RADIUS,
+  planetRadius: simulation.planetRadius / 1000, // Get from simulation and convert meters to kilometers
   count: 12, // 12 large plates
   minRadius: Math.PI / 8, // Larger minimum size
   maxRadius: Math.PI / 4, // Larger maximum size

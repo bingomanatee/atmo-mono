@@ -18,7 +18,8 @@ import { PlateSimulation } from './PlateSimulation';
 import type { SimPlateIF } from './types.PlateSimulation';
 
 const DEFAULT_PLANET_RADIUS = 1000000;
-const DEFAULT_PLATE_RADIUS = 1000;
+const DEFAULT_PLATE_RADIUS = Math.PI / 32; // ~0.098 radians = ~625 km when converted
+const CUSTOM_PLATE_RADIUS = Math.PI / 16; // ~0.196 radians = ~1250 km when converted
 const DEFAULT_PLATE_COUNT = 10;
 
 describe('PlateSimulation:class', () => {
@@ -50,9 +51,12 @@ describe('PlateSimulation:class', () => {
       radius: DEFAULT_PLATE_RADIUS,
     });
 
+    // Calculate expected radius in km (radians * planet radius)
+    const expectedRadiusKm = DEFAULT_PLATE_RADIUS * sim.planetRadius;
+
     // Retrieve the plate using the shared collection
     const retrievedPlate = await platesCollection.get(plateId);
-    expect(retrievedPlate.radius).toEqual(DEFAULT_PLATE_RADIUS);
+    expect(retrievedPlate.radius).toEqual(expectedRadiusKm);
   });
 
   it('should update a plate', async () => {
@@ -97,23 +101,26 @@ describe('PlateSimulation:class', () => {
   it('should get a plate by ID using getPlate method', async () => {
     // Add a plate with custom properties
     const customName = 'Test Plate';
-    const customRadius = 2000;
+    const customRadiusRadians = CUSTOM_PLATE_RADIUS;
     const customDensity = 2.5;
 
     const plateId = await sim.addPlate({
       name: customName,
-      radius: customRadius,
+      radius: customRadiusRadians,
       density: customDensity,
     });
 
     // Retrieve the plate using the getPlate method
     const retrievedPlate = await sim.getPlate(plateId);
 
+    // Calculate expected radius in km (radians * planet radius)
+    const expectedRadiusKm = customRadiusRadians * sim.planetRadius;
+
     // Verify the plate was retrieved correctly
     expect(retrievedPlate).toBeDefined();
     expect(retrievedPlate?.id).toEqual(plateId);
     expect(retrievedPlate?.name).toEqual(customName);
-    expect(retrievedPlate?.radius).toEqual(customRadius);
+    expect(retrievedPlate?.radius).toEqual(expectedRadiusKm);
     expect(retrievedPlate?.density).toEqual(customDensity);
   });
 
@@ -192,7 +199,7 @@ describe('PlateSimulation:class', () => {
   it('should use an injected multiverse with pre-populated data', async () => {
     // Create a pre-populated multiverse with an empty schema (will be populated by simUniverse)
     const mv = new Multiverse(new Map());
-    simUniverse(mv);
+    await simUniverse(mv);
 
     // Add a planet to the multiverse
     const simUniv = mv.get(UNIVERSES.SIM);
@@ -249,13 +256,17 @@ describe('PlateSimulation:class', () => {
       planetId,
     });
 
+    // Calculate expected radius in km (radians * planet radius)
+    const expectedRadiusKm =
+      DEFAULT_PLATE_RADIUS * simWithInjectedMv.planetRadius;
+
     // Verify that the plate was added to the pre-existing multiverse
     const plate = await mv
       .get(UNIVERSES.SIM)
       .get(COLLECTIONS.PLATES)
       .get(plateId);
     expect(plate).toBeDefined();
-    expect(plate.radius).toBe(DEFAULT_PLATE_RADIUS);
+    expect(plate.radius).toBe(expectedRadiusKm);
     expect(plate.planetId).toBe(planetId);
   });
 

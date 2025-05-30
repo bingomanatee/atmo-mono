@@ -10,6 +10,10 @@ import type { Vector3Like } from 'three';
 import { Vector3 } from 'three';
 import { COLLECTIONS } from './PlateSimulation/constants';
 import { IndexedSun } from './PlateSimulation/managers/sun/IndexedSun';
+import {
+  createAsyncSun,
+  getStorageCapabilities,
+} from './PlateSimulation/managers/sun';
 import { Plate } from './PlateSimulation/Plate';
 import { Platelet } from './PlateSimulation/Platelet';
 import {
@@ -38,74 +42,140 @@ export function asCoord(prefix: string, p: Vector3Like = new Vector3()) {
   };
 }
 
-export function simUniverse(mv: Multiverse) {
+export async function simUniverse(mv: Multiverse): Promise<Universe> {
   const simUniv = new Universe(UNIVERSES.SIM, mv);
 
+  // Log storage capabilities
+  const capabilities = getStorageCapabilities();
+  console.log('🔧 Storage capabilities:', capabilities);
+
+  // Create schemas
+  const platesSchema = new SchemaLocal(
+    COLLECTIONS.PLATES,
+    SIM_PLATES_SCHEMA,
+    ({ inputRecord }) => {
+      // Convert plain objects to Plate instances
+      if (
+        inputRecord &&
+        typeof inputRecord === 'object' &&
+        !(inputRecord instanceof Plate)
+      ) {
+        return Plate.fromJSON(inputRecord as any);
+      }
+      return inputRecord;
+    },
+  );
+
+  const planetsSchema = new SchemaLocal(
+    COLLECTIONS.PLANETS,
+    SIM_PLANETS_SCHEMA,
+  );
+  const simulationsSchema = new SchemaLocal(
+    COLLECTIONS.SIMULATIONS,
+    SIM_SIMULATIONS_SCHEMA,
+  );
+  const plateStepsSchema = new SchemaLocal(
+    COLLECTIONS.STEPS,
+    SIM_PLATE_STEPS_SCHEMA,
+  );
+  const plateletStepsSchema = new SchemaLocal(
+    COLLECTIONS.PLATELET_STEPS,
+    SIM_PLATELET_STEPS_SCHEMA,
+  );
+  const plateletsSchema = new SchemaLocal(
+    COLLECTIONS.PLATELETS,
+    SIM_PLATELETS_SCHEMA,
+    ({ inputRecord }) => {
+      // Convert plain objects to Platelet instances
+      if (
+        inputRecord &&
+        typeof inputRecord === 'object' &&
+        !(inputRecord instanceof Platelet)
+      ) {
+        return new Platelet(inputRecord as any);
+      }
+      return inputRecord;
+    },
+  );
+
+  // Create adaptive suns using factory
+  const platesSun = await createAsyncSun({
+    dbName: 'atmo-plates',
+    tableName: COLLECTIONS.PLATES,
+    schema: platesSchema,
+  });
+
+  const planetsSun = await createAsyncSun({
+    dbName: 'atmo-plates',
+    tableName: COLLECTIONS.PLANETS,
+    schema: planetsSchema,
+  });
+
+  const simulationsSun = await createAsyncSun({
+    dbName: 'atmo-plates',
+    tableName: COLLECTIONS.SIMULATIONS,
+    schema: simulationsSchema,
+  });
+
+  const plateStepsSun = await createAsyncSun({
+    dbName: 'atmo-plates',
+    tableName: COLLECTIONS.STEPS,
+    schema: plateStepsSchema,
+  });
+
+  const plateletStepsSun = await createAsyncSun({
+    dbName: 'atmo-plates',
+    tableName: COLLECTIONS.PLATELET_STEPS,
+    schema: plateletStepsSchema,
+  });
+
+  const plateletsSun = await createAsyncSun({
+    dbName: 'atmo-plates',
+    tableName: COLLECTIONS.PLATELETS,
+    schema: plateletsSchema,
+  });
+
+  // Create collections with adaptive suns
   const platesCollection = new CollAsync({
     name: COLLECTIONS.PLATES,
     universe: simUniv,
-    schema: new SchemaLocal(
-      COLLECTIONS.PLATES,
-      SIM_PLATES_SCHEMA,
-      ({ inputRecord }) => {
-        // Convert plain objects to Plate instances
-        if (
-          inputRecord &&
-          typeof inputRecord === 'object' &&
-          !(inputRecord instanceof Plate)
-        ) {
-          return Plate.fromJSON(inputRecord as any);
-        }
-        return inputRecord;
-      },
-    ),
+    schema: platesSchema,
+    sun: platesSun,
   });
 
   const planetsCollection = new CollAsync({
     name: COLLECTIONS.PLANETS,
     universe: simUniv,
-    schema: new SchemaLocal(COLLECTIONS.PLANETS, SIM_PLANETS_SCHEMA),
+    schema: planetsSchema,
+    sun: planetsSun,
   });
 
   const simulationsCollection = new CollAsync({
     name: COLLECTIONS.SIMULATIONS,
     universe: simUniv,
-    schema: new SchemaLocal(COLLECTIONS.SIMULATIONS, SIM_SIMULATIONS_SCHEMA),
+    schema: simulationsSchema,
+    sun: simulationsSun,
   });
 
   const plateCollection = new CollAsync({
     name: COLLECTIONS.STEPS,
     universe: simUniv,
-    schema: new SchemaLocal(COLLECTIONS.STEPS, SIM_PLATE_STEPS_SCHEMA),
+    schema: plateStepsSchema,
+    sun: plateStepsSun,
   });
 
-  const plateletStepsCollection = new IndexedSun({
+  const plateletStepsCollection = new CollAsync({
     name: COLLECTIONS.PLATELET_STEPS,
     universe: simUniv,
-    schema: new SchemaLocal(
-      COLLECTIONS.PLATELET_STEPS,
-      SIM_PLATELET_STEPS_SCHEMA,
-    ),
+    schema: plateletStepsSchema,
+    sun: plateletStepsSun,
   });
 
   const plateletsCollection = new CollAsync({
     name: COLLECTIONS.PLATELETS,
     universe: simUniv,
-    schema: new SchemaLocal(
-      COLLECTIONS.PLATELETS,
-      SIM_PLATELETS_SCHEMA,
-      ({ inputRecord }) => {
-        // Convert plain objects to Platelet instances
-        if (
-          inputRecord &&
-          typeof inputRecord === 'object' &&
-          !(inputRecord instanceof Platelet)
-        ) {
-          return new Platelet(inputRecord as any);
-        }
-        return inputRecord;
-      },
-    ),
+    schema: plateletsSchema,
+    sun: plateletsSun,
   });
 
   return simUniv;

@@ -156,11 +156,7 @@ const material = new THREE.MeshPhongMaterial({
   vertexColors: true, // Enable vertex colors for instancing
 });
 
-const instancedMesh = new THREE.InstancedMesh(
-  geometry,
-  material,
-  platelets.length,
-);
+const instancedMesh = new THREE.InstancedMesh(geometry, material, 10000);
 testPlate.add(instancedMesh); // Add to orbital frame
 
 // Create matrices for each instance

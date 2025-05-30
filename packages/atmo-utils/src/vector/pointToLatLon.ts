@@ -15,6 +15,7 @@ export function pointToLatLon(
   if (typeof radius === 'number' && Math.abs(point.length() - radius) > 1e-6) {
     p = point.clone().setLength(radius);
   }
+  // Standard spherical coordinates: lat from y, lon from z and x
   const lat = (Math.asin(p.y / r) * 180) / Math.PI;
   const lon = (Math.atan2(p.z, p.x) * 180) / Math.PI;
   return { lat, lon };

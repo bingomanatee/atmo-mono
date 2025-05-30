@@ -82,9 +82,9 @@ const sim = new PlateSimulation({
 sim.init();
 
 // --- Add 20 Large Plates ---
-// Generate 20 large plates
+// Generate 20 large plates using the simulation's planet radius
 const largePlates = PlateSpectrumGenerator.generateLargePlates({
-  planetRadius: EARTH_RADIUS,
+  planetRadius: sim.planetRadius / 1000, // Get from simulation and convert meters to kilometers
   count: 20,
   minRadius: Math.PI / 12, // Reduced size by 1/3
   maxRadius: Math.PI / 6, // Reduced size by 1/3

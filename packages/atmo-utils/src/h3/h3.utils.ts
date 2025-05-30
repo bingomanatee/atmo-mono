@@ -10,8 +10,8 @@ import * as h3 from 'h3-js';
 import { EARTH_RADIUS } from './constants.ts';
 
 // Constants
-const res0CellRadiusOnEarth = 1077580; // Half of the center-to-center distance at res 0
-const A0 = 4.25e8; // Base area of H3 cell at resolution 0 (425,000,000 m²)
+const res0CellRadiusOnEarth = 1077.58; // Half of the center-to-center distance at res 0 in km (was 1077580 m)
+const A0 = 425000; // Base area of H3 cell at resolution 0 (425,000 km²) (was 425,000,000 m²)
 
 // Cache for radius calculations
 const radiusCache = new Map<string, number>();
@@ -19,9 +19,9 @@ const radiusCache = new Map<string, number>();
 /**
  * Calculate the radius of an H3 cell at a specific resolution for a planet
  *
- * @param planetRadius - The radius of the planet in meters
+ * @param planetRadius - The radius of the planet in kilometers
  * @param resolution - The H3 resolution (0-15)
- * @returns The radius of the cell in meters
+ * @returns The radius of the cell in kilometers
  */
 export function h3HexRadiusAtResolution(
   planetRadius: number,
@@ -37,14 +37,24 @@ export function h3HexRadiusAtResolution(
     return radiusCache.get(cacheKey)!;
   }
 
-  // meters
+  // Calculate in kilometers (everything is already in km)
   const baseCellRadius = (planetRadius / EARTH_RADIUS) * res0CellRadiusOnEarth;
 
   // H3 scales by ~2.64 per resolution increase (√7), not 0.5
   const scalingFactor = Math.pow(1 / 2.64, resolution);
 
-  // Compute the cell radius at the target resolution
+  // Compute the cell radius at the target resolution in kilometers
   const radius = baseCellRadius * scalingFactor;
+
+  // Add detailed logging for debugging
+  console.log(`
+    🔍 H3 Cell Radius Calculation:
+    Planet radius: ${planetRadius}km
+    Resolution: ${resolution}
+    Base cell radius: ${baseCellRadius.toFixed(2)}km
+    Scaling factor: ${scalingFactor.toFixed(4)}
+    Final radius: ${radius.toFixed(2)}km
+  `);
 
   radiusCache.set(cacheKey, radius);
   return radius;
@@ -54,8 +64,8 @@ export function h3HexRadiusAtResolution(
  * Calculate the area of an H3 cell at a specific resolution for a planet
  *
  * @param resolution - The H3 resolution (0-15)
- * @param planetRadius - The radius of the planet in meters
- * @returns The area of the cell in square meters
+ * @param planetRadius - The radius of the planet in kilometers
+ * @returns The area of the cell in square kilometers
  */
 export function h3HexArea(resolution: number, planetRadius: number): number {
   if (resolution < 0 || resolution > 15) {

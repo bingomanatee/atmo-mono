@@ -122,35 +122,39 @@ export class PlateSpectrumGenerator {
   }
 
   private generatePlates(): PlateExtendedIF[] {
-    const {
-      plateCount,
-      targetCoverage,
-      powerLawExponent,
-      minDensity,
-      maxDensity,
-      minThickness,
-      maxThickness,
-    } = this.config;
+    const { plateCount, minDensity, maxDensity, minThickness, maxThickness } =
+      this.config;
 
-    // Calculate maximum allowed radius in km
-    const maxAllowedLinearRadius =
-      (this.config.maxPlateRadius ?? Math.PI / 6) * this.config.planetRadius;
-    const maxAllowedArea =
-      Math.PI * maxAllowedLinearRadius * maxAllowedLinearRadius;
+    // Use radius-driven approach like generateLargePlates
+    const maxRadiusRadians = this.config.maxPlateRadius ?? Math.PI / 6; // Default to π/6 radians
+    const minRadiusRadians = maxRadiusRadians / 10; // Minimum is 1/10th of maximum
 
-    const targetArea = this.planetSurfaceArea * targetCoverage;
-    const plateAreas = this.generateConstrainedPowerLawSizes(
-      plateCount,
-      powerLawExponent,
-      maxAllowedArea,
-      targetArea,
+    console.log(
+      `🔧 Generating ${plateCount} plates with radius range: ${minRadiusRadians.toFixed(3)} - ${maxRadiusRadians.toFixed(3)} radians`,
     );
 
-    return plateAreas.map((area, index) => {
+    // Generate power law distribution of radii in radians
+    const plateRadiiRadians = this.generateConstrainedPowerLawRadii(
+      plateCount,
+      this.config.powerLawExponent ?? 3.0,
+      minRadiusRadians,
+      maxRadiusRadians,
+    );
+
+    return plateRadiiRadians.map((radiusRadians, index) => {
       const rank = index + 1;
 
-      // Calculate radius: A = πr², so r = √(A/π)
-      const radius = Math.sqrt(area / Math.PI);
+      // Convert radius from radians to kilometers (same as generateLargePlates)
+      const radius = this.config.planetRadius * radiusRadians;
+      console.log(
+        radius,
+        '= radians',
+        radiusRadians,
+        '* planetRadius: ',
+        this.config.planetRadius,
+      );
+      // Calculate area from radius: A = πr²
+      const area = Math.PI * radius * radius;
 
       // Calculate normalized rank (0-1) for property interpolation
       const normalizedRank = (rank - 1) / (plateCount - 1);
@@ -199,7 +203,43 @@ export class PlateSpectrumGenerator {
   }
 
   /**
-   * Generate constrained power law distribution values that respect maximum area limits
+   * Generate constrained power law distribution of radii in radians
+   *
+   * @param count - Number of values to generate
+   * @param exponent - Power law exponent (higher = more skewed)
+   * @param minRadiusRadians - Minimum radius in radians
+   * @param maxRadiusRadians - Maximum radius in radians
+   * @returns Array of radius values in radians following a power law distribution
+   */
+  private generateConstrainedPowerLawRadii(
+    count: number,
+    exponent: number,
+    minRadiusRadians: number,
+    maxRadiusRadians: number,
+  ): number[] {
+    // Generate initial power law distribution (largest first)
+    const rawSizes = Array.from({ length: count }, (_, i) =>
+      Math.pow(i + 1, -exponent),
+    );
+
+    // Normalize to range [0, 1]
+    const maxRaw = Math.max(...rawSizes);
+    const minRaw = Math.min(...rawSizes);
+    const normalizedSizes = rawSizes.map(
+      (size) => (size - minRaw) / (maxRaw - minRaw),
+    );
+
+    // Scale to radius range [minRadiusRadians, maxRadiusRadians]
+    const radiusRange = maxRadiusRadians - minRadiusRadians;
+    const radii = normalizedSizes.map(
+      (normalized) => minRadiusRadians + normalized * radiusRange,
+    );
+
+    return radii;
+  }
+
+  /**
+   * Generate constrained power law distribution values that respect maximum area limits (DEPRECATED)
    *
    * @param count - Number of values to generate
    * @param exponent - Power law exponent (higher = more skewed)
@@ -218,6 +258,7 @@ export class PlateSpectrumGenerator {
       Math.pow(i + 1, -exponent),
     );
 
+    console.log('raw sizes are', rawSizes);
     // Normalize to target total area
     const rawSum = rawSizes.reduce((a, b) => a + b, 0);
     let areas = rawSizes.map((size) => (size / rawSum) * targetTotalArea);
@@ -354,7 +395,7 @@ export class PlateSpectrumGenerator {
       const radius = options.planetRadius * radiusInRadians;
 
       // Generate random density between 2.5 and 3.5 g/cm³ (geological range)
-      const density = 2.5 + Math.random() * 1.0; // 2.5-3.5 g/cm³
+      const density = 2.5 + Math.random(); // 2.5-3.5 g/cm³
 
       // Generate random thickness between 7 and 35 km for large plates (geological range)
       const thickness = 7 + Math.random() * 28; // 7-35 km
@@ -439,7 +480,7 @@ export class PlateSpectrumGenerator {
       // Generate a new batch of plates (same count as original)
       const newBatch = this.generatePlates();
 
-      // Apply radius capping to new batch
+      /*   // Apply radius capping to new batch
       const maxAllowedLinearRadius =
         (this.config.maxPlateRadius ?? Math.PI / 6) * this.config.planetRadius;
 
@@ -450,7 +491,7 @@ export class PlateSpectrumGenerator {
           const volume = calculatePlateVolume(plate.area, plate.thickness);
           plate.mass = calculateMass(volume, plate.density);
         }
-      });
+      });*/
 
       // Sort by area (largest first) and take the biggest 25%
       newBatch.sort((a, b) => b.area - a.area);

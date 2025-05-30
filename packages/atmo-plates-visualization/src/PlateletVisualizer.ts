@@ -140,6 +140,9 @@ export class PlateletVisualizer extends PlateVisualizerBase {
           thickness: platelet.thickness,
           density: platelet.density,
         });
+        console.log(
+          `   Scale will be: (${platelet.radius * OVERFLOW}, ${platelet.thickness}, ${platelet.radius * OVERFLOW})`,
+        );
       }
       // Simple positioning - just use platelet position directly
       position.copy(platelet.position);
@@ -244,8 +247,8 @@ export class PlateletVisualizer extends PlateVisualizerBase {
     this.addObjectToScene(this.orbitalFrame);
     this.orbitalFrame.add(this.instancedMesh);
 
-    // Add a large red sphere at the plate center for debugging
-    const plateMarkerGeometry = new THREE.SphereGeometry(1000, 8, 6); // 1000km radius sphere
+    // Add a red sphere at the plate center for debugging (1/10th the size)
+    const plateMarkerGeometry = new THREE.SphereGeometry(25, 8, 6); // 100km radius sphere (was 1000km)
     const plateMarkerMaterial = new THREE.MeshBasicMaterial({
       color: 0xff0000, // Bright red color
       transparent: false, // Make it solid

@@ -50,8 +50,8 @@ export const SIM_PLATES_SCHEMA = {
 
 export const SIM_PLATELETS_SCHEMA = new SchemaLocal<Platelet>('platelets', {
   id: { type: FIELD_TYPES.string, meta: { required: true } },
-  plateId: { type: FIELD_TYPES.string, meta: { required: true } },
-  planetId: { type: FIELD_TYPES.string, meta: { required: true } },
+  plateId: { type: FIELD_TYPES.string, meta: { required: true, index: true } },
+  planetId: { type: FIELD_TYPES.string, meta: { required: true, index: true } },
   position: {
     type: FIELD_TYPES.object,
     isLocal: true,

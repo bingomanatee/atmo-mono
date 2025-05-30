@@ -12,7 +12,8 @@ import { EARTH_RADIUS } from '@wonderlandlabs/atmo-utils'; // Use the correct Ea
 import { PlateletVisualizer } from './PlateletVisualizer'; // Corrected import path
 
 console.log('🚀 Platelet visualization script starting...');
-console.log('📏 EARTH_RADIUS:', EARTH_RADIUS);
+console.log('📏 EARTH_RADIUS:', EARTH_RADIUS, 'km (updated from meters)');
+console.log('📏 EARTH_RADIUS value:', EARTH_RADIUS, 'km');
 console.log('🌍 THREE.js version:', THREE.REVISION);
 
 // Scene setup
@@ -93,9 +94,9 @@ async function generateAndVisualizePlatelets() {
   await sim.init();
 
   // --- Add 20 Large Plates ---
-  // Generate 20 large plates
+  // Generate 20 large plates using the simulation's planet radius
   const largePlates = PlateSpectrumGenerator.generateLargePlates({
-    planetRadius: EARTH_RADIUS,
+    planetRadius: sim.planetRadius, // sim.planetRadius is already in km
     count: 20,
     minRadius: Math.PI / 12, // Reduced size by 1/3
     maxRadius: Math.PI / 6, // Reduced size by 1/3
@@ -119,6 +120,29 @@ async function generateAndVisualizePlatelets() {
       // Only log first 5 to avoid spam
       console.log(
         `   Found plate ${allPlates.length}: ${plate.id}, radius: ${plate.radius}`,
+      );
+      console.log('     Plate position:', plate.position);
+
+      // Check if position is on Earth's surface
+      const positionVector = new THREE.Vector3(
+        plate.position.x,
+        plate.position.y,
+        plate.position.z,
+      );
+      const distanceFromCenter = positionVector.length();
+      console.log(
+        '     Distance from center:',
+        distanceFromCenter.toFixed(1),
+        'km',
+      );
+      console.log(
+        '     Expected Earth surface:',
+        EARTH_RADIUS.toFixed(1),
+        'km',
+      );
+      console.log(
+        '     Position ratio to Earth radius:',
+        (distanceFromCenter / EARTH_RADIUS).toFixed(3),
       );
     }
   }
@@ -174,21 +198,6 @@ async function generateAndVisualizePlatelets() {
   const axesHelper = new THREE.AxesHelper(EARTH_RADIUS * 0.5); // Make axes helper relative to Earth radius
   scene.add(axesHelper);
 
-  // Add a large test sphere to make sure we can see SOMETHING
-  const testSphereGeometry = new THREE.SphereGeometry(2000, 16, 12); // 2000km radius - very large!
-  const testSphereMaterial = new THREE.MeshBasicMaterial({
-    color: 0x00ff00, // Bright green
-    wireframe: true,
-    transparent: true,
-    opacity: 0.5,
-  });
-  const testSphere = new THREE.Mesh(testSphereGeometry, testSphereMaterial);
-  testSphere.position.set(EARTH_RADIUS * 1.5, 0, 0); // Position it to the side of Earth
-  scene.add(testSphere);
-  console.log(
-    '🟢 Added large green test sphere at position:',
-    testSphere.position,
-  );
   console.log('📷 Camera position:', camera.position);
   console.log('📷 Camera is looking at:', controls.target);
   console.log('🌍 Earth radius:', EARTH_RADIUS);
