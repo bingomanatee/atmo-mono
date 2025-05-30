@@ -8,6 +8,7 @@ import {
 import { gridDisk } from 'h3-js';
 import { Vector3 } from 'three';
 import { floatElevation } from '../../utils/plateUtils';
+import { log } from '../../utils/utils';
 import type { Platelet } from '../schemas/platelet';
 import type { SimPlateIF } from '../types.PlateSimulation';
 import { H0_CELLS } from './h0Cells';
@@ -38,13 +39,9 @@ export function filterCellsByPlateRadius(
   plate: SimPlateIF,
   planetRadius: number,
 ): string[] {
-  console.log(
-    `🔍🔍🔍🔍 FILTER DEBUG: Checking ${cells.length} cells for plate ${plate.id}`,
-  );
-  console.log(
-    `   Plate center: (${plate.position.x.toFixed(1)}, ${plate.position.y.toFixed(1)}, ${plate.position.z.toFixed(1)})`,
-  );
-  console.log(`
+  log(
+    `🔍🔍🔍🔍 FILTER DEBUG: Checking ${cells.length} cells for plate ${plate.id}
+       Plate center: (${plate.position.x.toFixed(1)}, ${plate.position.y.toFixed(1)}, ${plate.position.z.toFixed(1)})
     Plate radius: ${plate.radius}km
     Planet radius: ${planetRadius}km
     `);
@@ -72,17 +69,15 @@ export function filterCellsByPlateRadius(
     .filter((item) => item.distance <= plateRadiusKm)
     .map((item) => item.cell);
 
-  console.log(
+  log
     `�� Plate ${plate.id}: Initially filtered ${keptCells.length}/${cells.length} cells within ${plate.radius}km radius`,
   );
 
   if (keptCells.length === 0 && cells.length > 0) {
     const closest = cellDistances[0];
-    console.log(
-      `❌ NO CELLS KEPT by radius filter! Closest cell was ${cellDistances[0]?.distance.toFixed(2)}km away, but plate radius is ${plateRadiusKm}km`,
-    );
-    console.log(
-      `   This suggests a unit mismatch or a very small plate/large H0 cell. Nearest cell fallback will be used if no platelets are ultimately generated.`,
+    log(
+      `❌ NO CELLS KEPT by radius filter! Closest cell was ${cellDistances[0]?.distance.toFixed(2)}km away, but plate radius is ${plateRadiusKm}km
+        This suggests a unit mismatch or a very small plate/large H0 cell. Nearest cell fallback will be used if no platelets are ultimately generated.`,
     );
   }
 
@@ -97,7 +92,7 @@ export function getNeighboringH0Cells(h0Cell: string): string[] {
 }
 
 /**
- * Creates a fallback platelet at the plate center position
+ * Creates a simple fallback platelet at the plate center position
  */
 export function createCenterPlatelet(
   plate: SimPlateIF,
@@ -105,22 +100,16 @@ export function createCenterPlatelet(
   resolution: number,
 ): Platelet {
   // Create a unique ID for the center platelet
-  const plateletId = `${plate.id}-fallback-center`; // Changed ID to avoid potential conflicts
+  const plateletId = `${plate.id}-center`;
 
-  // Find the H3 cell closest to the plate center to use for the fallback
-  const { lat: plateLat, lon: plateLon } = pointToLatLon(
-    plate.position,
-    planetRadius,
-  );
-  const nearestH3Cell = latLngToCell(plateLat, plateLon, resolution);
-  console.log(
-    `🎯 Creating fallback platelet for plate ${plate.id} at nearest H3 cell: ${nearestH3Cell}`,
+  log(
+    `🎯 Creating simple center platelet for plate ${plate.id} at plate position`,
   );
 
-  // Use the position of the nearest H3 cell for consistency
-  const position = cellToVector(nearestH3Cell, planetRadius);
+  // Use the plate's actual position directly - no grid snapping needed
+  const position = new Vector3().copy(plate.position);
 
-  // Calculate a reasonable radius for the fallback platelet (same as other platelets at this resolution)
+  // Calculate a reasonable radius for the platelet (same as other platelets at this resolution)
   const calculatedRadius = h3HexRadiusAtResolution(planetRadius, resolution);
 
   // Calculate elevation (same as normal platelets)
@@ -129,7 +118,7 @@ export function createCenterPlatelet(
   return {
     id: plateletId,
     plateId: plate.id,
-    h3Cell: nearestH3Cell, // Use the actual H3 cell index
+    h3Cell: 'center', // Not tied to H3 grid - just a simple center platelet
     position: position,
     radius: calculatedRadius,
     thickness: plate.thickness,
@@ -137,9 +126,7 @@ export function createCenterPlatelet(
     isActive: true,
     neighbors: [], // Neighbors will be added later if needed
     connections: {},
-    neighborCellIds: gridDisk(nearestH3Cell, 1).filter(
-      (cell) => cell !== nearestH3Cell,
-    ), // Get neighbor cell IDs
+    neighborCellIds: [], // No H3 neighbors since this isn't on the grid
     elevation: elevation,
     mass:
       plate.thickness * plate.density * Math.PI * Math.pow(calculatedRadius, 2),

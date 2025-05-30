@@ -3,7 +3,8 @@ import { Vector3 } from 'three';
 import { ThreeOrbitalFrame } from '@wonderlandlabs/atmo-three-orbit';
 import { PlateletManager, type SimPlateIF } from '@wonderlandlabs/atmo-plates';
 import { EARTH_RADIUS, varyP } from '@wonderlandlabs/atmo-utils';
-import { PlateVisualizerBase } from './PlateVisualizerBase'; // Import the base class
+import { PlateVisualizerBase } from './PlateVisualizerBase';
+import { log } from './utils'; // Import the base class
 
 // Define the density range and corresponding hue/lightness ranges
 const MIN_DENSITY = 2.5; // g/cm³ (typical continental crust)
@@ -16,7 +17,7 @@ const MAX_LIGHTNESS = 0.5; // Adjusted upper lightness bound
 export class PlateletVisualizer extends PlateVisualizerBase {
   // Inherit from PlateVisualizerBase
   public readonly orbitalFrame: ThreeOrbitalFrame;
-  private readonly instancedMesh: THREE.InstancedMesh;
+  private instancedMesh: THREE.InstancedMesh | null = null; // Will be created in initializeAsync
   private readonly platelets: any[]; // Using 'any' for now
   private readonly plateletManager: PlateletManager;
 
@@ -41,6 +42,16 @@ export class PlateletVisualizer extends PlateVisualizerBase {
     // Initialize empty platelets array - will be populated in initializeAsync
     this.platelets = [];
 
+    // Note: InstancedMesh will be created in initializeAsync after we know the platelet count
+  }
+
+  /**
+   * Create the geometry and material for platelet instances
+   */
+  private createGeometryAndMaterial(): {
+    geometry: THREE.BufferGeometry;
+    material: THREE.MeshPhongMaterial;
+  } {
     const fullCylinderGeometry = new THREE.CylinderGeometry(
       1,
       1,
@@ -101,27 +112,24 @@ export class PlateletVisualizer extends PlateVisualizerBase {
       shininess: 30,
     });
 
-    // Allocate buffer for maximum expected platelets per plate (estimate: 100)
-    const maxPlatelets = 100;
-    this.instancedMesh = new THREE.InstancedMesh(
-      geometry,
-      material,
-      maxPlatelets,
-    );
-    this.instancedMesh.name = `PlateletMesh_${this.plate.id}`;
-    this.instancedMesh.count = 0; // Start with 0 visible instances
+    return { geometry, material };
   }
 
   /**
    * Update the instanced mesh with current platelet data
    */
   private updateMeshInstances(): void {
-    console.log(
-      `🔧 Updating mesh instances for ${this.platelets.length} platelets`,
-    );
+    log(`🔧 Updating mesh instances for ${this.platelets.length} platelets`);
 
     if (this.platelets.length === 0) {
       console.warn(`⚠️ No platelets to update mesh for plate ${this.plate.id}`);
+      return;
+    }
+
+    if (!this.instancedMesh) {
+      console.error(
+        `⚠️ InstancedMesh not created yet for plate ${this.plate.id}`,
+      );
       return;
     }
 
@@ -134,13 +142,13 @@ export class PlateletVisualizer extends PlateVisualizerBase {
     this.platelets.forEach((platelet, index) => {
       if (index < 3) {
         // Debug first few platelets
-        console.log(`   Platelet ${index}:`, {
+        log(`   Platelet ${index}:`, {
           position: platelet.position,
           radius: platelet.radius,
           thickness: platelet.thickness,
           density: platelet.density,
         });
-        console.log(
+        log(
           `   Scale will be: (${platelet.radius * OVERFLOW}, ${platelet.thickness}, ${platelet.radius * OVERFLOW})`,
         );
       }
@@ -203,7 +211,7 @@ export class PlateletVisualizer extends PlateVisualizerBase {
       this.instancedMesh.instanceColor.needsUpdate = true;
     }
 
-    console.log(
+    log(
       `✅ Mesh updated: ${this.platelets.length} instances, visible: ${this.instancedMesh.visible}, count: ${this.instancedMesh.count}`,
     );
   }
@@ -215,37 +223,43 @@ export class PlateletVisualizer extends PlateVisualizerBase {
     // Get existing platelets from the simulation
     this.platelets = await this.getExistingPlatelets();
 
-    console.log(
-      `🔍 Plate ${this.plate.id}: Found ${this.platelets.length} platelets`,
-    );
+    log(`🔍 Plate ${this.plate.id}: Found ${this.platelets.length} platelets`);
 
     if (this.platelets.length === 0) {
       console.warn(`⚠️ No platelets found for plate ${this.plate.id}`);
       return;
     }
 
-    // Check if we have too many platelets for the allocated buffer
-    const maxCapacity = this.instancedMesh.instanceMatrix.count;
-    if (this.platelets.length > maxCapacity) {
-      console.warn(
-        `⚠️ Plate ${this.plate.id} has ${this.platelets.length} platelets but buffer only supports ${maxCapacity}. Truncating to ${maxCapacity}.`,
-      );
-      this.platelets = this.platelets.slice(0, maxCapacity);
-    }
+    // Create geometry and material
+    const { geometry, material } = this.createGeometryAndMaterial();
 
-    // Update the instanced mesh count
+    // Create InstancedMesh with the actual platelet count (no more overflow!)
+    this.instancedMesh = new THREE.InstancedMesh(
+      geometry,
+      material,
+      this.platelets.length, // Use actual count instead of hardcoded 100
+    );
+    this.instancedMesh.name = `PlateletMesh_${this.plate.id}`;
     this.instancedMesh.count = this.platelets.length;
+
+    log(
+      `✅ Created InstancedMesh with ${this.platelets.length} instances (no overflow!)`,
+    );
 
     // Update the mesh with platelet data
     this.updateMeshInstances();
   }
 
   public visualize(): void {
-    console.log(
+    log(
       `🎨 Adding plate ${this.plate.id} to scene with ${this.platelets.length} platelets`,
     );
     this.addObjectToScene(this.orbitalFrame);
-    this.orbitalFrame.add(this.instancedMesh);
+
+    // Only add the mesh if it has been created (after initializeAsync)
+    if (this.instancedMesh) {
+      this.orbitalFrame.add(this.instancedMesh);
+    }
 
     // Add a red sphere at the plate center for debugging (1/10th the size)
     const plateMarkerGeometry = new THREE.SphereGeometry(25, 8, 6); // 100km radius sphere (was 1000km)
@@ -267,11 +281,15 @@ export class PlateletVisualizer extends PlateVisualizerBase {
     plateMarker.name = `PlateMarker_${this.plate.id}`;
     this.orbitalFrame.add(plateMarker);
 
-    console.log(`   Orbital frame position:`, this.orbitalFrame.position);
-    console.log(`   Plate position:`, this.plate.position);
-    console.log(
-      `   Mesh visible: ${this.instancedMesh.visible}, count: ${this.instancedMesh.count}`,
-    );
+    log(`   Orbital frame position:`, this.orbitalFrame.position);
+    log(`   Plate position:`, this.plate.position);
+    if (this.instancedMesh) {
+      log(
+        `   Mesh visible: ${this.instancedMesh.visible}, count: ${this.instancedMesh.count}`,
+      );
+    } else {
+      log(`   Mesh not yet created`);
+    }
   }
 
   public update(): void {
@@ -280,8 +298,12 @@ export class PlateletVisualizer extends PlateVisualizerBase {
 
   public clear(): void {
     this.removeObjectFromScene(this.orbitalFrame);
-    this.instancedMesh.geometry.dispose();
-    (this.instancedMesh.material as THREE.Material).dispose();
+
+    // Only dispose if the mesh exists
+    if (this.instancedMesh) {
+      this.instancedMesh.geometry.dispose();
+      (this.instancedMesh.material as THREE.Material).dispose();
+    }
   }
 
   /**
