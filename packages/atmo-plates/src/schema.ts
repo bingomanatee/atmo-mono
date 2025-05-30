@@ -4,7 +4,6 @@ import {
   SchemaLocal,
   SchemaUniversal,
 } from '@wonderlandlabs/multiverse';
-import { Vector3 } from 'three';
 import { COLLECTIONS } from './PlateSimulation/constants';
 import { Platelet } from './PlateSimulation/Platelet';
 import type { Plate } from './PlateSimulation/PlateSimulation';

@@ -9,7 +9,6 @@ import {
 import type { Vector3Like } from 'three';
 import { Vector3 } from 'three';
 import { COLLECTIONS } from './PlateSimulation/constants';
-import { IndexedSun } from './PlateSimulation/managers/sun/IndexedSun';
 import {
   createAsyncSun,
   getStorageCapabilities,

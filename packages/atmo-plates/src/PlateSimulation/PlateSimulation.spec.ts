@@ -11,7 +11,6 @@ import { Vector3 } from 'three';
 import { v4 as uuidV4 } from 'uuid';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { UNIVERSES } from '../schema';
-import type { PlateIF } from '../types.atmo-plates';
 import { simUniverse } from '../utils';
 import { COLLECTIONS } from './constants';
 import { PlateSimulation } from './PlateSimulation';

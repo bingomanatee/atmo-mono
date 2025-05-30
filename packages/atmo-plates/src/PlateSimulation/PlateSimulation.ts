@@ -16,10 +16,10 @@ import type {
 import { simUniverse } from '../utils';
 import { extendPlate, isostaticElevation } from '../utils/plateUtils';
 import { COLLECTIONS } from './constants';
-import { Plate } from './Plate';
 import { PlateletManager } from './managers/PlateletManager';
 import PlateSimulationPlateManager from './managers/PlateSimulationPlateManager';
 import { Planet } from './Planet';
+import { Plate } from './Plate';
 import type { Platelet } from './schemas/platelet';
 import type {
   AddPlateProps,

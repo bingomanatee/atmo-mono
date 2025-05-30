@@ -1,21 +1,16 @@
 import {
   cellToChildren,
-  cellToLatLng,
   cellToVector,
-  getResolution,
   h3HexRadiusAtResolution,
   latLngToCell,
   pointToLatLon,
 } from '@wonderlandlabs/atmo-utils';
-import type { CollSyncIF } from '@wonderlandlabs/multiverse/src/types.coll';
 import { gridDisk } from 'h3-js';
 import { Vector3 } from 'three';
 import { floatElevation } from '../../utils/plateUtils';
 import type { Platelet } from '../schemas/platelet';
 import type { SimPlateIF } from '../types.PlateSimulation';
 import { H0_CELLS } from './h0Cells';
-
-declare module '@wonderlandlabs/atmo-utils';
 
 /**
  * Gets the H0 cell for a given position

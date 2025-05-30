@@ -1,7 +1,7 @@
 import {
   AsyncSunIF,
-  SchemaLocalIF,
   memoryAsyncSunF,
+  SchemaLocalIF,
 } from '@wonderlandlabs/multiverse';
 import { DexieSun } from './DexieSun';
 
