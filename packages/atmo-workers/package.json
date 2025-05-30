@@ -1,0 +1,61 @@
+{
+  "name": "@wonderlandlabs/atmo-workers",
+  "version": "1.0.0",
+  "description": "Advanced worker management system with manifest-driven configuration",
+  "main": "dist/index.js",
+  "module": "dist/index.esm.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "test": "vitest",
+    "test:run": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "lint": "eslint src --ext .ts,.tsx",
+    "lint:fix": "eslint src --ext .ts,.tsx --fix",
+    "type-check": "tsc --noEmit"
+  },
+  "keywords": [
+    "workers",
+    "web-workers",
+    "node-workers",
+    "worker-management",
+    "manifest",
+    "load-balancing",
+    "typescript"
+  ],
+  "author": "Wonderland Labs",
+  "license": "MIT",
+  "dependencies": {
+    "events": "^3.3.0",
+    "rxjs": "^7.8.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@typescript-eslint/eslint-plugin": "^6.0.0",
+    "@typescript-eslint/parser": "^6.0.0",
+    "eslint": "^8.0.0",
+    "tsup": "^7.0.0",
+    "typescript": "^5.0.0",
+    "vitest": "^0.34.0",
+    "@vitest/coverage-v8": "^0.34.0"
+  },
+  "peerDependencies": {
+    "typescript": ">=4.5.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/wonderlandlabs/atmo-mono.git",
+    "directory": "packages/atmo-workers"
+  },
+  "bugs": {
+    "url": "https://github.com/wonderlandlabs/atmo-mono/issues"
+  },
+  "homepage": "https://github.com/wonderlandlabs/atmo-mono/tree/main/packages/atmo-workers#readme",
+  "publishConfig": {
+    "access": "public"
+  }
+}
