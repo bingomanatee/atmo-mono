@@ -1,68 +1,170 @@
-# @wonderlandlabs/atmo-workers
+# Atmo Workers - Minimal POC
 
-Advanced worker management system with manifest-driven configuration, comprehensive request lifecycle tracking, intelligent load balancing, and multi-environment support.
+A lightweight, minimal proof-of-concept worker management system implementing a clean MVC pattern for request-response processing.
 
-## Features
+## 🏗️ System Architecture
 
-🚀 **Manifest-Driven Configuration** - Define worker capabilities with structured manifests  
-📊 **Complete Request Lifecycle Tracking** - Track every request from submission to completion  
-⚖️ **Intelligent Load Balancing** - Automatic worker selection based on load and proficiency  
-🔄 **Automatic Retry Logic** - Configurable retry policies with exponential backoff  
-🌐 **Multi-Environment Support** - Works in browsers, Node.js, and testing environments  
-🤖 **Mock Worker Support** - Built-in testing infrastructure  
-📈 **Real-time Analytics** - Comprehensive metrics and monitoring  
-🎯 **Type-Safe** - Full TypeScript support with detailed type definitions  
+### Overview
 
-## Installation
+This POC demonstrates a simple yet effective worker management system that can process requests asynchronously using a clean separation of concerns.
 
-```bash
-npm install @wonderlandlabs/atmo-workers
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    Atmo Workers POC                         │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐     │
+│  │   Client    │───▶│ RequestMgr  │───▶│   Storage   │     │
+│  │ (Controller)│    │   (Model)   │    │   (Maps)    │     │
+│  └─────────────┘    └─────────────┘    └─────────────┘     │
+│                                                             │
+│  ┌─────────────┐    ┌─────────────┐                        │
+│  │ Data Models │    │ Test Mode   │                        │
+│  │   (View)    │    │ Processor   │                        │
+│  └─────────────┘    └─────────────┘                        │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
 ```
 
-## Quick Start
+### Core Components
+
+#### 1. **RequestManager (Model)**
+
+- **Purpose**: Core business logic and request lifecycle management
+- **Responsibilities**:
+  - Accept and queue requests
+  - Process requests using configurable reducers
+  - Manage request state transitions
+  - Provide system metrics
+- **Storage**: Simple in-memory Maps for POC simplicity
+
+#### 2. **Data Models (View Contracts)**
+
+- **Purpose**: Define clean interfaces and data structures
+- **Key Models**:
+  - `Request`: Core request entity with embedded results
+  - `Bank`: Worker pool representation
+  - `Task`: Task definition
+  - `SystemMetrics`: System health and performance data
+
+#### 3. **Client Interface (Controller)**
+
+- **Purpose**: Simple API for external interaction
+- **Methods**:
+  - `submitRequest()`: Submit new requests
+  - `getRequest()`: Query request status
+  - `getResult()`: Retrieve request results
+  - `getSystemMetrics()`: System health data
+
+## 🎯 Design Principles
+
+### 1. **Minimal Viable Product**
+
+- Only essential features for POC validation
+- No over-engineering or premature optimization
+- Clean, readable code over complex abstractions
+
+### 2. **Single Responsibility**
+
+- Each component has one clear purpose
+- Request processing separated from storage
+- Business logic isolated from data models
+
+### 3. **Mutation Over Creation**
+
+- Direct field updates instead of object recreation
+- Efficient memory usage
+- Simpler state management
+
+### 4. **Test-First Design**
+
+- Built with testing in mind
+- Test mode with configurable request reducers
+- Easy to mock and validate
+
+## 📊 Data Flow
+
+```
+1. Client submits request
+   ↓
+2. RequestManager creates Request object
+   ↓
+3. Request stored in Map with 'pending' status
+   ↓
+4. In test mode: immediate processing
+   ↓
+5. Request status mutated to 'processing'
+   ↓
+6. RequestReducer processes parameters
+   ↓
+7. Request mutated with result/error
+   ↓
+8. Request status mutated to 'completed'/'failed'
+   ↓
+9. Client queries result via getResult()
+```
+
+## 🚀 Usage Example
 
 ```typescript
-import { createWorkerManager, COMPUTATION_WORKER_MANIFEST } from '@wonderlandlabs/atmo-workers';
+import { RequestManager } from '@wonderlandlabs/atmo-workers';
 
-// Create worker manager
-const workerManager = createWorkerManager();
-
-// Initialize a worker bank
-await workerManager.initializeWorkerBank({
-  bankId: 'computation-bank',
-  manifest: COMPUTATION_WORKER_MANIFEST,
-  workerCount: 4,
+// Create manager with test mode
+const manager = new RequestManager({
+  name: 'math-processor',
+  testMode: true,
+  requestReducer: (taskId, params) => {
+    if (taskId === 'add-numbers') {
+      return { result: params.a + params.b };
+    }
+    throw new Error(`Unknown task: ${taskId}`);
+  },
 });
 
-// Submit a request
-const requestId = await workerManager.submitRequest('MATRIX_MULTIPLY', {
-  matrixA: [[1, 2], [3, 4]],
-  matrixB: [[5, 6], [7, 8]],
-}, {
-  clientId: 'my-app',
-  priority: 8,
+// Register a bank and task
+await manager.registerBank({
+  bankId: 'math-bank',
+  name: 'Math Operations',
+  status: 'active',
 });
 
-// Track request progress
-const lifecycle = workerManager.getRequestLifecycle(requestId);
-console.log('Request status:', lifecycle?.request.status);
+await manager.registerTask({
+  taskId: 'add-numbers',
+  name: 'Add Two Numbers',
+});
+
+// Submit request
+const requestId = await manager.submitRequest(
+  'add-numbers',
+  { a: 5, b: 3 },
+  { clientId: 'client-1' },
+);
+
+// Wait for processing
+await new Promise((resolve) => setTimeout(resolve, 50));
+
+// Get result
+const result = await manager.getResult(requestId);
+console.log(result.payload); // { result: 8 }
 ```
 
 ## Core Concepts
 
 ### Worker Banks
+
 Worker banks are groups of workers that share the same capabilities defined by a manifest:
 
 ```typescript
 interface IInitWorkerBank {
-  bankId: string;           // Unique identifier
+  bankId: string; // Unique identifier
   manifest: WorkerManifest; // Capabilities definition
-  workerCount: number;      // Number of workers to create
+  workerCount: number; // Number of workers to create
   config?: Record<string, any>; // Runtime configuration
 }
 ```
 
 ### Request Lifecycle
+
 Every request goes through a complete tracked lifecycle:
 
 1. **Pending** - Request submitted, waiting for assignment
@@ -72,6 +174,7 @@ Every request goes through a complete tracked lifecycle:
 5. **Failed** - Failed (with retry logic if applicable)
 
 ### Manifests
+
 Manifests define what actions workers can perform:
 
 ```typescript
@@ -134,9 +237,9 @@ const customManifest: WorkerManifest = {
 const requests = workerManager.queryRequests({
   status: ['pending', 'processing'],
   priorityRange: { min: 7, max: 10 },
-  dateRange: { 
-    from: new Date('2024-01-01'), 
-    to: new Date() 
+  dateRange: {
+    from: new Date('2024-01-01'),
+    to: new Date(),
   },
   pagination: {
     offset: 0,
@@ -178,12 +281,15 @@ workerManager.on('request-failed', ({ requestId, error }) => {
 ## Environment Support
 
 ### Browser
+
 Uses Web Workers with full IndexedDB support for persistence.
 
 ### Node.js
+
 Falls back to main thread processing or uses Worker Threads when available.
 
 ### Testing
+
 Automatically uses mock workers for consistent test results.
 
 ```typescript
