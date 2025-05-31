@@ -341,6 +341,200 @@ Tracks worker activity and provides load balancing recommendations.
 - `getNextWorker(bankId?)` - Get recommended worker for next task
 - `getLoadBalancingReport()` - Get load balancing analysis
 
+## Platform-Specific Documentation
+
+Atmo Workers provides different approaches optimized for different environments:
+
+| Environment | Approach                             | Use Cases                                                         | Documentation                                 |
+| ----------- | ------------------------------------ | ----------------------------------------------------------------- | --------------------------------------------- |
+| **Browser** | Web Workers with `BrowserWorker`     | Client-side multiprocessing, image processing, heavy calculations | **[📖 Browser Guide →](./README.browser.md)** |
+| **Node.js** | Task handlers with `WorkerResponder` | Server APIs, background jobs, microservices                       | **[📖 Node.js Guide →](./README.node.md)**    |
+
+### 🌐 Browser Workers
+
+For detailed browser-specific documentation including Web Workers, client-side multiprocessing, and worker script examples:
+
+**[📖 Browser Workers Guide →](./README.browser.md)**
+
+Key features:
+
+- True multiprocessing with Web Workers
+- Automatic load balancing across workers
+- Worker script templates for common tasks
+- Real-time worker status monitoring
+
+### 🖥️ Node.js Workers
+
+For server-side task processing, Express.js integration, background jobs, and production deployment:
+
+**[📖 Node.js Workers Guide →](./README.node.md)**
+
+Key features:
+
+- Injectable utilities for databases, HTTP, file system
+- Express.js and microservice integration
+- Background job processing with cron
+- Production-ready error handling and monitoring
+
+## Browser Web Workers (Client-side Multiprocessing)
+
+The `BrowserWorker` class provides specialized support for managing multiple web workers in browser environments, enabling true client-side multiprocessing.
+
+### Quick Start
+
+```typescript
+import { createBrowserWorkerManager } from '@wonderlandlabs/atmo-workers';
+
+// Create a browser worker manager with multiple web workers
+const { taskManager, browserWorker } = createBrowserWorkerManager({
+  name: 'my-browser-app',
+  window: window, // Inject the browser window
+  workerManifests: [
+    {
+      name: 'math-worker',
+      scriptUrl: '/workers/math-worker.js',
+      tasks: ['add', 'multiply', 'calculate'],
+    },
+    {
+      name: 'data-worker',
+      scriptUrl: '/workers/data-worker.js',
+      tasks: ['fetch', 'transform', 'validate'],
+    },
+    {
+      name: 'image-worker',
+      scriptUrl: '/workers/image-worker.js',
+      tasks: ['resize', 'filter', 'compress'],
+    },
+  ],
+  maxConcurrentTasks: 4,
+  workerTimeout: 30000, // 30 seconds
+});
+
+// Submit tasks that will be distributed across workers
+const mathResult$ = taskManager.submitRequest(
+  'add',
+  { a: 5, b: 3 },
+  { clientId: 'math-client' },
+);
+
+const dataResult$ = taskManager.submitRequest(
+  'fetch',
+  { url: 'https://api.example.com/data' },
+  { clientId: 'data-client' },
+);
+
+// All tasks run concurrently on different workers
+Promise.all([mathResult$.toPromise(), dataResult$.toPromise()]).then(
+  (results) => {
+    console.log('All tasks completed:', results);
+  },
+);
+
+// Monitor worker status
+console.log('Worker status:', browserWorker.getWorkerStatus());
+
+// Clean up when done
+browserWorker.terminate();
+```
+
+### Worker Script Template
+
+Create worker scripts using the provided template (`worker-template.js`):
+
+```javascript
+// /workers/math-worker.js
+const taskHandlers = {
+  add: (parameters) => {
+    const { a, b } = parameters;
+    return { result: a + b, operation: 'addition' };
+  },
+
+  multiply: (parameters) => {
+    const { a, b } = parameters;
+    return { result: a * b, operation: 'multiplication' };
+  },
+
+  calculate: (parameters) => {
+    const { expression } = parameters;
+    // Use a proper expression parser in production
+    const result = eval(expression);
+    return { result, expression };
+  },
+};
+
+// Worker message handler
+self.addEventListener('message', async (event) => {
+  const { type, taskId, parameters, requestId, timestamp } = event.data;
+
+  if (type === 'execute-task') {
+    try {
+      const handler = taskHandlers[taskId];
+      if (!handler) {
+        throw new Error(`Unknown task: ${taskId}`);
+      }
+
+      const result = await handler(parameters);
+
+      self.postMessage({
+        type: 'task-complete',
+        taskId,
+        requestId,
+        success: true,
+        result,
+        executionTime: Date.now() - timestamp,
+      });
+    } catch (error) {
+      self.postMessage({
+        type: 'task-complete',
+        taskId,
+        requestId,
+        success: false,
+        error: error.message,
+        executionTime: Date.now() - timestamp,
+      });
+    }
+  }
+});
+```
+
+### Features
+
+- **Automatic Load Balancing**: Tasks are automatically distributed to available workers
+- **Concurrent Processing**: Multiple tasks can run simultaneously on different workers
+- **Worker Status Monitoring**: Real-time status of all workers
+- **Timeout Handling**: Configurable timeouts for worker responses
+- **Error Recovery**: Automatic cleanup and error handling
+- **Task Routing**: Tasks are routed to appropriate workers based on manifests
+
+### Worker Manifests
+
+Worker manifests define which tasks each worker can handle:
+
+```typescript
+interface WorkerManifest {
+  name: string; // Human-readable worker name
+  scriptUrl: string; // Path to the worker script
+  tasks: string[]; // Array of task names this worker can handle
+}
+```
+
+### Monitoring and Management
+
+```typescript
+// Get detailed worker status
+const status = browserWorker.getWorkerStatus();
+status.forEach((worker) => {
+  console.log(`Worker: ${worker.name}`);
+  console.log(`  Busy: ${worker.busy}`);
+  console.log(`  Tasks completed: ${worker.tasksCompleted}`);
+  console.log(`  Current task: ${worker.currentTask || 'none'}`);
+  console.log(`  Handles: ${worker.tasks.join(', ')}`);
+});
+
+// Terminate all workers when done
+browserWorker.terminate();
+```
+
 ## License
 
 MIT
