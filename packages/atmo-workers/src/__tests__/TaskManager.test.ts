@@ -44,9 +44,7 @@ describe('TaskManager - Observable Pattern with MockResponder', () => {
     const submittedEvent = events.find(
       (e) => e.type === TASK_MANAGER_EVENTS.REQUEST_SUBMITTED,
     );
-    const readyEvent = events.find(
-      (e) => e.type === TASK_MANAGER_EVENTS.REQUEST_READY,
-    );
+
     const claimedEvent = events.find(
       (e) => e.type === TASK_MANAGER_EVENTS.REQUEST_CLAIMED,
     );
@@ -58,7 +56,6 @@ describe('TaskManager - Observable Pattern with MockResponder', () => {
     );
 
     expect(submittedEvent).toBeDefined();
-    expect(readyEvent).toBeDefined();
     expect(claimedEvent).toBeDefined();
     expect(claimedEvent.responderId).toBeDefined(); // Should be unique ID, not name
     expect(confirmedEvent).toBeDefined();

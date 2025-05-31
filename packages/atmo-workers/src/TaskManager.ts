@@ -12,7 +12,6 @@ export interface TaskManagerConfig {
 
 export const TASK_MANAGER_EVENTS = {
   REQUEST_SUBMITTED: 'request-submitted',
-  REQUEST_READY: 'request-ready',
   REQUEST_CLAIMED: 'request-claimed',
   REQUEST_CLAIM_CONFIRMED: 'request-claim-confirmed',
   REQUEST_COMPLETED: 'request-completed',
@@ -57,48 +56,69 @@ export class TaskManager {
     const requestId = uuid();
     const maxTime = options.maxTime || 30000;
 
-    // Create result observable before emitting events
-    const result$ = this.events$.pipe(
-      filter(
-        (event) =>
-          (event.type === TASK_MANAGER_EVENTS.REQUEST_COMPLETED ||
-            event.type === TASK_MANAGER_EVENTS.REQUEST_FAILED ||
-            event.type === TASK_MANAGER_EVENTS.REQUEST_TIMEOUT) &&
-          event.requestId === requestId,
-      ),
-      map((event) => {
-        if (event.type === TASK_MANAGER_EVENTS.REQUEST_COMPLETED) {
-          return event.payload; // Return the actual result
-        } else if (event.type === TASK_MANAGER_EVENTS.REQUEST_TIMEOUT) {
-          throw new Error('Request timed out');
-        } else {
-          throw new Error(event.payload?.error || 'Request failed');
-        }
-      }),
-      take(1),
-    );
+    // Create result observable and set up subscription BEFORE emitting any events
+    const result$ = new Observable((subscriber) => {
+      console.log(`🎯 Setting up Observable for request ${requestId}`);
 
-    // Emit request-submitted event
-    this.events$.next({
-      type: TASK_MANAGER_EVENTS.REQUEST_SUBMITTED,
-      requestId,
-      taskId,
-      clientId: options.clientId,
-      maxTime,
-      payload: parameters,
-    });
+      // Set up event listener FIRST
+      const subscription = this.events$
+        .pipe(
+          filter((event) => {
+            const isMatch =
+              (event.type === TASK_MANAGER_EVENTS.REQUEST_COMPLETED ||
+                event.type === TASK_MANAGER_EVENTS.REQUEST_FAILED ||
+                event.type === TASK_MANAGER_EVENTS.REQUEST_TIMEOUT) &&
+              event.requestId === requestId;
 
-    // Emit request-ready event
-    setTimeout(() => {
+            if (isMatch) {
+              console.log(
+                `🎯 Observable for ${requestId} received matching event:`,
+                event.type,
+              );
+            }
+
+            return isMatch;
+          }),
+          take(1),
+        )
+        .subscribe({
+          next: (event) => {
+            console.log(
+              `🎯 Observable for ${requestId} processing event:`,
+              event.type,
+              event.payload,
+            );
+            if (event.type === TASK_MANAGER_EVENTS.REQUEST_COMPLETED) {
+              subscriber.next(event.payload);
+              subscriber.complete();
+            } else if (event.type === TASK_MANAGER_EVENTS.REQUEST_TIMEOUT) {
+              subscriber.error(new Error('Request timed out'));
+            } else {
+              subscriber.error(
+                new Error(event.payload?.error || 'Request failed'),
+              );
+            }
+          },
+          error: (error) => subscriber.error(error),
+        });
+
+      // NOW emit the request-submitted event after observer is set up
+      console.log(`🎯 Emitting REQUEST_SUBMITTED for ${requestId}`);
       this.events$.next({
-        type: TASK_MANAGER_EVENTS.REQUEST_READY,
+        type: TASK_MANAGER_EVENTS.REQUEST_SUBMITTED,
         requestId,
         taskId,
         clientId: options.clientId,
         maxTime,
         payload: parameters,
       });
-    }, 10);
+
+      // Return cleanup function
+      return () => {
+        console.log(`🎯 Cleaning up Observable for ${requestId}`);
+        subscription.unsubscribe();
+      };
+    });
 
     return result$;
   }
@@ -106,6 +126,10 @@ export class TaskManager {
   // ─── Event-Only State Management ──────────────────────────────────
 
   completeRequest(requestId: string, result: any): void {
+    console.log(
+      `🎯 TaskManager completing request ${requestId} with result:`,
+      result,
+    );
     this.events$.next({
       type: TASK_MANAGER_EVENTS.REQUEST_COMPLETED,
       requestId,

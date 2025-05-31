@@ -71,11 +71,17 @@ export class MockResponder implements Responder {
   private setupEventListeners(): void {
     if (!this.requestManager) return;
 
-    // Subscribe to REQUEST_READY events to send claims
+    // Subscribe to REQUEST_SUBMITTED events to send claims
     this.requestManager
-      .pipe(filter((event) => event.type === TASK_MANAGER_EVENTS.REQUEST_READY))
+      .pipe(
+        filter((event) => event.type === TASK_MANAGER_EVENTS.REQUEST_SUBMITTED),
+      )
       .subscribe((event) => {
-        this.handleRequestReady(event.requestId, event.taskId, event.payload);
+        this.handleRequestSubmitted(
+          event.requestId,
+          event.taskId,
+          event.payload,
+        );
       });
 
     // Subscribe to ALL REQUEST_CLAIM_CONFIRMED events (not filtered by responder ID)
@@ -93,7 +99,7 @@ export class MockResponder implements Responder {
 
   // ─── Claim Protocol Handlers ───────────────────────────────────────
 
-  private handleRequestReady(
+  private handleRequestSubmitted(
     requestId: string,
     taskId?: string,
     parameters?: any,
@@ -185,6 +191,10 @@ export class MockResponder implements Responder {
         `🔄 MockResponder '${this.name}' (${this.id}) confirmed and processing task: ${taskId}`,
       );
       const result = reducer(parameters || {});
+      console.log(
+        `✅ MockResponder '${this.name}' (${this.id}) completed task: ${taskId} with result:`,
+        result,
+      );
       this.requestManager.completeRequest(requestId, result);
     } catch (error) {
       this.requestManager.failRequest(
