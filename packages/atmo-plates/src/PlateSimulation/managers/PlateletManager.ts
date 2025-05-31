@@ -269,15 +269,17 @@ export class PlateletManager {
     const searchRadius = plate.radius * 1.33;
 
     // Calculate how many H3 cell "rings" we need to cover the search radius
-    // Each ring is approximately one H3 cell radius away from the previous ring
+    // Each ring isok  approximately one H3 cell radius away from the previous ring
     const ringsNeeded = Math.ceil(searchRadius / h3CellRadius);
 
-    // Cap the rings to prevent performance issues - gridDisk grows exponentially
-    // Each ring adds ~6*ring cells, so 20 rings = ~1260 cells
-    const gridDiskRings = Math.min(ringsNeeded, 20);
+    // Use the full rings needed for circular boundary (no artificial cap)
+    // Let gridDisk expand to the actual circular boundary
+    const gridDiskRings = ringsNeeded;
 
     log(`   Search radius (133% of plate): ${searchRadius.toFixed(2)}km`);
-    log(`   Rings needed: ${ringsNeeded}, capped to: ${gridDiskRings} rings`);
+    log(
+      `   Rings needed: ${ringsNeeded}, using: ${gridDiskRings} rings (no cap)`,
+    );
 
     // Get all cells within the gridDisk rings using atmo-utils helper
     const candidateCells = getCellsInRange(centralCell, gridDiskRings);
