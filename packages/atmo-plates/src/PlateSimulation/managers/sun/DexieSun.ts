@@ -6,6 +6,7 @@ interface DexieSunOptions {
   dbName: string;
   tableName: string;
   schema: SchemaLocalIF<any>;
+  dontClear?: boolean; // Prevent clearing data on initialization
 }
 
 interface SerializableVector3 {
@@ -27,6 +28,7 @@ export class DexieSun<T extends Record<string, any>> implements AsyncSunIF<T> {
   private indexes: string[];
   private fallbackData: Map<string, T> = new Map();
   private isIndexedDBAvailable: boolean = false;
+  private dontClear: boolean = false;
 
   readonly isAsync = true;
 
@@ -34,6 +36,7 @@ export class DexieSun<T extends Record<string, any>> implements AsyncSunIF<T> {
     this.tableName = options.tableName;
     this.dbName = options.dbName;
     this.schema = options.schema;
+    this.dontClear = options.dontClear || false;
 
     // Extract indexed fields from schema
     this.indexes = this.extractIndexedFields();
@@ -125,8 +128,17 @@ export class DexieSun<T extends Record<string, any>> implements AsyncSunIF<T> {
         return;
       }
 
-      // Destroy existing database to ensure clean schema/index setup
-      await this.destroyExistingDatabase();
+      // Only destroy existing database if dontClear is false
+      if (!this.dontClear) {
+        console.log(
+          '🔧 DexieSun: Destroying existing database (dontClear=false)',
+        );
+        await this.destroyExistingDatabase();
+      } else {
+        console.log(
+          '🔒 DexieSun: Preserving existing database (dontClear=true)',
+        );
+      }
 
       // Initialize Dexie database
       this.db = new Dexie(this.dbName);

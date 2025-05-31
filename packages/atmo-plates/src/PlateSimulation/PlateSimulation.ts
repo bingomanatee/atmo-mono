@@ -88,7 +88,7 @@ export class PlateSimulation implements PlateSimulationIF {
     // Initialize managers
     this.managers = new Map<string, any>();
     this.managers.set(MANAGERS.PLATE, new PlateSimulationPlateManager(this));
-    this.managers.set(MANAGERS.PLATELET, new PlateletManager(this));
+    this.managers.set(MANAGERS.PLATELET, new PlateletManager(this, false)); // Workers disabled by default
 
     // Store maxPlateRadius
     this.#maxPlateRadius = maxPlateRadius;
@@ -107,7 +107,7 @@ export class PlateSimulation implements PlateSimulationIF {
     const plateManager = new PlateSimulationPlateManager(this);
     this.managers.set(MANAGERS.PLATE, plateManager);
 
-    const plateletManager = new PlateletManager(this);
+    const plateletManager = new PlateletManager(this, false); // Workers disabled by default
     this.managers.set(MANAGERS.PLATELET, plateletManager);
 
     // The basic properties are already initialized in the constructor

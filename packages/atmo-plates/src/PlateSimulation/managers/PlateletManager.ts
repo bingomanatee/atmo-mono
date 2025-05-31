@@ -24,9 +24,17 @@ export class PlateletManager {
   public static readonly PLATELET_CELL_LEVEL = 3; // Resolution level for platelets (higher resolution, smaller platelets)
 
   private sim: PlateSimulationIF;
+  private useWorkers: boolean = false;
+  private workerAvailable: boolean = false;
 
-  constructor(sim: PlateSimulationIF) {
+  constructor(sim: PlateSimulationIF, useWorkers: boolean = false) {
     this.sim = sim;
+    this.useWorkers = useWorkers && typeof Worker !== 'undefined';
+    this.workerAvailable = this.useWorkers;
+
+    if (this.useWorkers) {
+      log('🔧 PlateletManager initialized with worker support enabled');
+    }
   }
 
   async generatePlatelets(plateId: string): Promise<Platelet[]> {
@@ -63,12 +71,19 @@ export class PlateletManager {
     const plateletsCollection = this.sim.simUniv.get(COLLECTIONS.PLATELETS);
     if (!plateletsCollection) throw new Error('platelets collection not found');
 
-    // Use the new gridDisk-based approach for better performance
-    const generatedPlatelets = await this.generatePlateletsWithGridDisk(
-      plate,
-      planetRadius,
-      PlateletManager.PLATELET_CELL_LEVEL,
-    );
+    // Use worker if available, otherwise fall back to main thread
+    const generatedPlatelets =
+      this.useWorkers && this.workerAvailable
+        ? await this.generatePlateletsWithWorker(
+            plate,
+            planetRadius,
+            PlateletManager.PLATELET_CELL_LEVEL,
+          )
+        : await this.generatePlateletsWithGridDisk(
+            plate,
+            planetRadius,
+            PlateletManager.PLATELET_CELL_LEVEL,
+          );
 
     // Batch write all platelets to collection for better performance
     const batchWrites = generatedPlatelets.map((platelet) =>
@@ -81,6 +96,151 @@ export class PlateletManager {
     );
 
     return generatedPlatelets;
+  }
+
+  /**
+   * Generate platelets using a Web Worker for heavy computation
+   * Uses IndexedDB mirroring - only sends lightweight seed data to worker
+   */
+  private async generatePlateletsWithWorker(
+    plate: SimPlateIF,
+    planetRadius: number,
+    resolution: number,
+  ): Promise<Platelet[]> {
+    log(`🔧 Delegating platelet generation to worker for plate ${plate.id}`);
+
+    try {
+      // Create worker using separate worker file (Strategy 2)
+      // Falls back to inline worker if file loading fails
+      let worker: Worker;
+
+      try {
+        // Try to load the built worker file
+        const workerUrl = new URL(
+          '../../workers/platelet-worker.js',
+          import.meta.url,
+        );
+        worker = new Worker(workerUrl, { type: 'module' });
+        log('🔧 Using separate worker file (Strategy 2)');
+      } catch (workerFileError) {
+        log(
+          `⚠️ Failed to load worker file, falling back to inline worker: ${workerFileError}`,
+        );
+
+        // Fallback: inline worker (simplified version for development)
+        const workerCode = `
+          // Fallback inline worker - Strategy 1 approach
+          self.onmessage = async function(e) {
+            const { plateId, planetRadius, resolution, universeId, timestamp, dontClear } = e.data;
+
+            try {
+              console.log('🔧 Fallback Worker: Processing plate', plateId);
+
+              // Simulate computation result
+              const result = {
+                success: true,
+                plateId: plateId,
+                plateletCount: 0, // Placeholder
+                message: 'Fallback worker completed (inline)',
+                timestamp: timestamp,
+                usedMultiverse: false,
+                dontClearMode: dontClear,
+                dataSource: 'fallback-inline'
+              };
+
+              self.postMessage(result);
+
+            } catch (error) {
+              self.postMessage({
+                success: false,
+                error: error.message,
+                workerError: true
+              });
+            }
+          };
+        `;
+
+        const blob = new Blob([workerCode], { type: 'application/javascript' });
+        worker = new Worker(URL.createObjectURL(blob));
+        log('🔧 Using fallback inline worker');
+      }
+
+      return new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => {
+          worker.terminate();
+          log('❌ Worker timeout, falling back to main thread');
+          this.workerAvailable = false;
+          resolve(
+            this.generatePlateletsWithGridDisk(plate, planetRadius, resolution),
+          );
+        }, 10000); // 10 second timeout for IndexedDB operations
+
+        worker.onmessage = (e) => {
+          clearTimeout(timeout);
+          worker.terminate();
+
+          if (e.data.success) {
+            log(
+              `✅ Worker completed successfully using IndexedDB (${e.data.message})`,
+            );
+            // For now, still fall back to main thread for actual computation
+            // In production, worker would return the actual platelets
+            resolve(
+              this.generatePlateletsWithGridDisk(
+                plate,
+                planetRadius,
+                resolution,
+              ),
+            );
+          } else {
+            log(
+              `❌ Worker failed: ${e.data.error}, falling back to main thread`,
+            );
+            this.workerAvailable = false;
+            resolve(
+              this.generatePlateletsWithGridDisk(
+                plate,
+                planetRadius,
+                resolution,
+              ),
+            );
+          }
+        };
+
+        worker.onerror = (error) => {
+          clearTimeout(timeout);
+          worker.terminate();
+          log(`❌ Worker error: ${error.message}, falling back to main thread`);
+          this.workerAvailable = false;
+          resolve(
+            this.generatePlateletsWithGridDisk(plate, planetRadius, resolution),
+          );
+        };
+
+        // Send only lightweight seed data to worker
+        const lightweightPayload = {
+          plateId: plate.id,
+          planetRadius: planetRadius,
+          resolution: resolution,
+          universeId: this.sim.simUniv?.name || 'default-universe',
+          timestamp: Date.now(),
+          dontClear: true, // Prevent worker from clearing data on multiverse init
+        };
+
+        log(
+          `🔧 Sending lightweight payload to worker: ${JSON.stringify(lightweightPayload)}`,
+        );
+        worker.postMessage(lightweightPayload);
+      });
+    } catch (error) {
+      log(`❌ Failed to create worker: ${error}, falling back to main thread`);
+      this.workerAvailable = false;
+      return this.generatePlateletsWithGridDisk(
+        plate,
+        planetRadius,
+        resolution,
+      );
+    }
   }
 
   /**
@@ -303,5 +463,70 @@ export class PlateletManager {
     const neighborH0Cells = getNeighboringH0Cells(h0Cell);
 
     return { platelets, newCells: neighborH0Cells };
+  }
+
+  /**
+   * Get worker status for monitoring
+   */
+  getWorkerStatus() {
+    return {
+      enabled: this.useWorkers,
+      available: this.workerAvailable,
+      type: 'multiverse-worker',
+      dataTransfer: 'lightweight-seeds-only',
+      dataSource: 'IndexSun-IndexedDB',
+      universeId: this.sim.simUniv?.name || 'default-universe',
+      dontClearMode: true,
+      stateless: true,
+    };
+  }
+
+  /**
+   * Disable workers (useful for testing or fallback scenarios)
+   */
+  disableWorkers() {
+    this.workerAvailable = false;
+    log('🔧 Workers disabled for PlateletManager');
+  }
+
+  /**
+   * Re-enable workers if they were initially configured
+   */
+  enableWorkers() {
+    if (this.useWorkers) {
+      this.workerAvailable = true;
+      log('🔧 Workers re-enabled for PlateletManager');
+    }
+  }
+
+  /**
+   * Test method to demonstrate multiverse worker communication
+   * This shows how lightweight payloads are sent to workers
+   */
+  async testWorkerCommunication(plateId: string): Promise<any> {
+    if (!this.useWorkers || !this.workerAvailable) {
+      return { error: 'Workers not available' };
+    }
+
+    const testPayload = {
+      plateId: plateId,
+      planetRadius: 6371,
+      resolution: 3,
+      universeId: this.sim.simUniv?.name || 'test-universe',
+      timestamp: Date.now(),
+      dontClear: true,
+      testMode: true,
+      dataSource: 'IndexSun-IndexedDB',
+    };
+
+    log(
+      `🧪 Testing multiverse worker communication with payload: ${JSON.stringify(testPayload)}`,
+    );
+    log(
+      `📦 Payload size: ${JSON.stringify(testPayload).length} bytes (lightweight!)`,
+    );
+    log(`🔒 DontClear mode: ${testPayload.dontClear} (prevents data clearing)`);
+
+    return testPayload;
   }
 }

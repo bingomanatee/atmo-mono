@@ -6,16 +6,25 @@
   "module": "dist/index.js",
   "types": "dist/types/index.d.ts",
   "type": "module",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/types/index.d.ts"
+    },
+    "./workers/*": "./dist/workers/*"
+  },
   "files": [
-    "dist"
+    "dist",
+    "dist/workers"
   ],
   "scripts": {
     "build": "vite build",
+    "build:workers": "vite build --config vite.config.worker.js",
+    "build:all": "yarn build && yarn build:workers && yarn build:types",
     "test": "vitest run",
     "test:watch": "vitest --watch",
     "test:ui": "vitest --ui",
     "build:types": "node scripts/generate-dts.js",
-    "build:all": "yarn build && yarn build:types",
     "prepublishOnly": "yarn build:all"
   },
   "devDependencies": {
