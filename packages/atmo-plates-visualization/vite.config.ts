@@ -9,8 +9,25 @@ export default defineConfig({
         main: './index.html',
         fd: './src/fd.html',
         platelet: './src/platelet.html',
+        'platelet-worker': './src/platelet-worker.ts',
       },
+
       output: {
+        // Custom filename for the worker to avoid hashing and put in root
+        entryFileNames: (chunkInfo) => {
+          if (chunkInfo.name === 'platelet-worker') {
+            return 'platelet-worker.js';
+          }
+          return 'assets/[name]-[hash].js';
+        },
+        // Custom chunk filename to avoid hashing for atmo-libs (needed by worker)
+        chunkFileNames: (chunkInfo) => {
+          if (chunkInfo.name === 'atmo-libs') {
+            return 'assets/atmo-libs.js';
+          }
+          return 'assets/[name]-[hash].js';
+        },
+
         manualChunks: {
           // Separate Three.js into its own chunk
           three: ['three'],

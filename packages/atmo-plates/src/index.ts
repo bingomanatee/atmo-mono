@@ -17,8 +17,9 @@ export {
   createDexieSun,
   createMemoryAsyncSun,
   getStorageCapabilities,
-} from './PlateSimulation/managers/sun';
+} from './PlateSimulation/sun';
 
 // Export types
 export type { Plate } from './PlateSimulation/PlateSimulation';
 export type { SimPlateIF } from './PlateSimulation/types.PlateSimulation';
+export * from './workers/platelet-worker';

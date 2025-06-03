@@ -22,6 +22,16 @@
 </head>
 <body>
     <h1 id="viz-title">Platelet Visualization Demo</h1>
+    <div id="storage-info" style="position: absolute; top: 40px; left: 10px; color: white; font-size: 14px; z-index: 1; font-family: sans-serif; background-color: rgba(0,0,0,0.5); padding: 5px; border-radius: 3px;">
+        Storage: <span id="storage-type">Initializing...</span>
+    </div>
+    <div id="worker-info" style="position: absolute; top: 70px; left: 10px; color: white; font-size: 14px; z-index: 1; font-family: sans-serif; background-color: rgba(0,0,0,0.5); padding: 5px; border-radius: 3px;">
+        Workers: <span id="worker-status">Initializing...</span>
+    </div>
+    <div id="performance-info" style="position: absolute; top: 100px; left: 10px; color: white; font-size: 14px; z-index: 1; font-family: sans-serif; background-color: rgba(0,0,0,0.5); padding: 5px; border-radius: 3px;">
+        <div>Generation Time: <span id="generation-time">Pending...</span></div>
+        <div>Platelets: <span id="platelet-count">0</span></div>
+    </div>
     <script type="module" src="/src/platelet.ts"></script>
 </body>
 </html>

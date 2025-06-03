@@ -39,6 +39,7 @@ export interface PlateSimulationProps {
   universeName?: string;
   simulationId?: string;
   maxPlateRadius?: number;
+  useSharedStorage?: boolean; // Enable shared IndexedDB for master/worker scenarios
 }
 
 export interface PlateSimulationIF {

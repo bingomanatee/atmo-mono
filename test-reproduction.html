@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reproduction Simulation - Master/Worker Dexie Test</title>
+    <script src="https://unpkg.com/dexie@3.2.4/dist/dexie.min.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .controls { margin: 20px 0; }
+        button { margin: 5px; padding: 10px; }
+        .results { margin-top: 20px; }
+        .person {
+            border: 1px solid #ccc;
+            margin: 5px;
+            padding: 10px;
+            display: inline-block;
+            background: #f9f9f9;
+        }
+        .male { background: #e6f3ff; }
+        .female { background: #ffe6f3; }
+        .married { border-color: #ff6b6b; border-width: 2px; }
+        .single { border-color: #4ecdc4; }
+    </style>
+</head>
+<body>
+    <h1>🧬 Reproduction Simulation</h1>
+    <div id="status">Initializing Master...</div>
+
+    <div style="background: #f0f8ff; padding: 15px; margin: 10px 0; border-radius: 5px; border-left: 4px solid #007acc;">
+        <h3>🧪 Testing Master/Worker Dexie Data Sharing</h3>
+        <p><strong>Goal:</strong> Prove that master and worker can share the same IndexedDB without schema conflicts</p>
+        <ol>
+            <li><strong>Wait for "Master: Population ready! 🧬"</strong> - Master creates database</li>
+            <li><strong>Click "Start Worker"</strong> - Worker connects to same database</li>
+            <li><strong>Watch console</strong> - Look for worker connection messages</li>
+            <li><strong>Click "Worker Breed"</strong> - Worker adds data to shared database</li>
+            <li><strong>Click "Show Population"</strong> - Master should see worker's changes!</li>
+        </ol>
+        <p><em>Success = No schema conflicts + Both can read/write same data</em></p>
+    </div>
+
+    <div class="controls">
+        <button id="addPerson">👤 Add Random Person</button>
+        <button id="hitchUp">💕 Hitch Up Singles</button>
+        <button id="reproduce">👶 Force Reproduction</button>
+        <button id="listAll">📊 Show Population</button>
+        <br><br>
+        <strong>🧪 Core Test Buttons:</strong><br>
+        <button id="startWorker" style="background: #4CAF50; color: white; font-weight: bold;">🤖 STEP 2: Start Worker</button>
+        <button id="workerBreed" style="background: #FF9800; color: white; font-weight: bold;">🤖 STEP 4: Worker Breed</button>
+    </div>
+
+    <div id="results" class="results"></div>
+
+    <script>
+        // Reproduction simulation schemas
+        const schemas = {
+            people: {
+                fields: {
+                    id: { type: 'string' },
+                    name: { type: 'string', meta: { index: true } },
+                    gender: { type: 'string', meta: { index: true } },
+                    age: { type: 'number', meta: { index: true } },
+                    marriedTo: { type: 'string' }, // spouse ID
+                    parentA: { type: 'string' }, // parent A ID
+                    parentB: { type: 'string' }, // parent B ID
+                    generation: { type: 'number', meta: { index: true } },
+                    birthTime: { type: 'number' },
+                    isAlive: { type: 'boolean', meta: { index: true } }
+                }
+            },
+            relationships: {
+                fields: {
+                    id: { type: 'string' },
+                    personA: { type: 'string', meta: { index: true } },
+                    personB: { type: 'string', meta: { index: true } },
+                    type: { type: 'string', meta: { index: true } }, // 'marriage', 'parent-child'
+                    startTime: { type: 'number' },
+                    isActive: { type: 'boolean', meta: { index: true } }
+                }
+            }
+        };
+
+        class SharedDexieManager {
+            constructor(dbName, schemas, dontClear = false) {
+                this.dbName = dbName;
+                this.schemas = schemas;
+                this.dontClear = dontClear;
+                this.db = null;
+                this.isInitialized = false;
+            }
+
+            async initialize() {
+                if (this.isInitialized) return;
+
+                try {
+                    if (!this.dontClear) {
+                        console.log('🔧 Master: Destroying existing population');
+                        await this.destroyDatabase();
+                    }
+
+                    this.db = new Dexie(this.dbName);
+
+                    const stores = {};
+                    for (const [tableName, schema] of Object.entries(this.schemas)) {
+                        const indexes = this.extractIndexes(schema);
+                        const indexString = ['id', ...indexes].join(',');
+                        stores[tableName] = indexString;
+                        console.log(`🔧 Creating ${tableName} table with indexes: ${indexString}`);
+                    }
+
+                    this.db.version(1).stores(stores);
+                    await this.db.open();
+
+                    this.isInitialized = true;
+                    console.log(`✅ Population database initialized: ${this.dbName}`);
+                } catch (error) {
+                    console.error('❌ Population database failed:', error);
+                    throw error;
+                }
+            }
+
+            extractIndexes(schema) {
+                const indexes = [];
+                for (const [fieldName, field] of Object.entries(schema.fields)) {
+                    if (field.meta?.index === true) {
+                        indexes.push(fieldName);
+                    }
+                }
+                return indexes;
+            }
+
+            async destroyDatabase() {
+                try {
+                    const databases = await indexedDB.databases();
+                    const existingDb = databases.find(db => db.name === this.dbName);
+
+                    if (existingDb) {
+                        await new Promise((resolve, reject) => {
+                            const deleteRequest = indexedDB.deleteDatabase(this.dbName);
+                            deleteRequest.onsuccess = () => resolve();
+                            deleteRequest.onerror = () => reject(deleteRequest.error);
+                            deleteRequest.onblocked = () => {
+                                console.warn('⚠️ Database deletion blocked');
+                                resolve();
+                            };
+                        });
+                        console.log(`✅ Population wiped clean: ${this.dbName}`);
+                    }
+                } catch (error) {
+                    console.warn('⚠️ Failed to wipe population:', error);
+                }
+            }
+
+            getTable(tableName) {
+                if (!this.isInitialized || !this.db) {
+                    throw new Error(`Database not ready for ${tableName}`);
+                }
+                return this.db.table(tableName);
+            }
+        }
+
+        // Master simulation
+        let manager;
+        let worker;
+        const names = ['Alex', 'Jordan', 'Casey', 'Riley', 'Morgan', 'Avery', 'Quinn', 'Sage', 'River', 'Phoenix'];
+
+        async function initMaster() {
+            try {
+                document.getElementById('status').textContent = 'Master: Creating population...';
+
+                manager = new SharedDexieManager('reproduction-sim', schemas, false);
+                await manager.initialize();
+
+                // Create initial population
+                await createInitialPopulation();
+
+                document.getElementById('status').textContent = 'Master: Population ready! 🧬';
+                await updateDisplay();
+            } catch (error) {
+                document.getElementById('status').textContent = `Master: Error - ${error.message}`;
+                console.error('❌ Master failed:', error);
+            }
+        }
+
+        async function createInitialPopulation() {
+            const peopleTable = manager.getTable('people');
+
+            for (let i = 0; i < 6; i++) {
+                const person = {
+                    id: `person_${Date.now()}_${i}`,
+                    name: names[i % names.length] + ` ${i + 1}`,
+                    gender: Math.random() > 0.5 ? 'male' : 'female',
+                    age: 18 + Math.floor(Math.random() * 12), // 18-30 years old
+                    marriedTo: '',
+                    parentA: '',
+                    parentB: '',
+                    generation: 0,
+                    birthTime: Date.now() - (Math.random() * 365 * 24 * 60 * 60 * 1000), // Born within last year
+                    isAlive: true
+                };
+                await peopleTable.put(person);
+            }
+            console.log('👥 Initial population created');
+        }
+
+        async function addRandomPerson() {
+            const peopleTable = manager.getTable('people');
+            const person = {
+                id: `person_${Date.now()}`,
+                name: names[Math.floor(Math.random() * names.length)] + ` ${Math.floor(Math.random() * 100)}`,
+                gender: Math.random() > 0.5 ? 'male' : 'female',
+                age: 18 + Math.floor(Math.random() * 12),
+                marriedTo: '',
+                parentA: '',
+                parentB: '',
+                generation: 0,
+                birthTime: Date.now(),
+                isAlive: true
+            };
+            await peopleTable.put(person);
+            console.log('👤 Added person:', person.name);
+            await updateDisplay();
+        }
+
+        async function hitchUpSingles() {
+            const peopleTable = manager.getTable('people');
+            const relationshipsTable = manager.getTable('relationships');
+
+            const allPeople = await peopleTable.toArray();
+            const singles = allPeople.filter(p => p.isAlive && (!p.marriedTo || p.marriedTo === ''));
+            const males = singles.filter(p => p.gender === 'male');
+            const females = singles.filter(p => p.gender === 'female');
+
+            const couples = Math.min(males.length, females.length);
+
+            for (let i = 0; i < couples; i++) {
+                const male = males[i];
+                const female = females[i];
+
+                // Create marriage
+                male.marriedTo = female.id;
+                female.marriedTo = male.id;
+
+                await peopleTable.put(male);
+                await peopleTable.put(female);
+
+                // Create relationship record
+                const relationship = {
+                    id: `marriage_${Date.now()}_${i}`,
+                    personA: male.id,
+                    personB: female.id,
+                    type: 'marriage',
+                    startTime: Date.now(),
+                    isActive: true
+                };
+                await relationshipsTable.put(relationship);
+
+                console.log(`💕 Married ${male.name} to ${female.name}`);
+            }
+
+            await updateDisplay();
+        }
+
+        async function forceReproduction() {
+            const peopleTable = manager.getTable('people');
+            const relationshipsTable = manager.getTable('relationships');
+
+            const marriages = await relationshipsTable.where('type').equals('marriage').and(r => r.isActive).toArray();
+
+            for (const marriage of marriages) {
+                const parentA = await peopleTable.get(marriage.personA);
+                const parentB = await peopleTable.get(marriage.personB);
+
+                if (parentA && parentB && parentA.isAlive && parentB.isAlive) {
+                    // Create offspring
+                    const child = {
+                        id: `child_${Date.now()}_${Math.random()}`,
+                        name: `${parentA.name.split(' ')[0]}-${parentB.name.split(' ')[0]} Jr`,
+                        gender: Math.random() > 0.5 ? 'male' : 'female',
+                        age: 0,
+                        marriedTo: '',
+                        parentA: parentA.id,
+                        parentB: parentB.id,
+                        generation: Math.max(parentA.generation, parentB.generation) + 1,
+                        birthTime: Date.now(),
+                        isAlive: true
+                    };
+
+                    await peopleTable.put(child);
+
+                    // Create parent-child relationships
+                    await relationshipsTable.put({
+                        id: `parent_${Date.now()}_A`,
+                        personA: parentA.id,
+                        personB: child.id,
+                        type: 'parent-child',
+                        startTime: Date.now(),
+                        isActive: true
+                    });
+
+                    await relationshipsTable.put({
+                        id: `parent_${Date.now()}_B`,
+                        personA: parentB.id,
+                        personB: child.id,
+                        type: 'parent-child',
+                        startTime: Date.now(),
+                        isActive: true
+                    });
+
+                    console.log(`👶 ${parentA.name} and ${parentB.name} had ${child.name}!`);
+                }
+            }
+
+            await updateDisplay();
+        }
+
+        async function updateDisplay() {
+            const peopleTable = manager.getTable('people');
+            const people = await peopleTable.toArray(); // Get all people, filter in JS
+            const alivePeople = people.filter(p => p.isAlive === true);
+
+            const resultsDiv = document.getElementById('results');
+            let html = `<h3>👥 Population: ${alivePeople.length}</h3>`;
+
+            // Group by generation
+            const generations = {};
+            alivePeople.forEach(person => {
+                if (!generations[person.generation]) generations[person.generation] = [];
+                generations[person.generation].push(person);
+            });
+
+            for (const [gen, genPeople] of Object.entries(generations)) {
+                html += `<h4>Generation ${gen} (${genPeople.length} people)</h4>`;
+                genPeople.forEach(person => {
+                    const marriedStatus = person.marriedTo && person.marriedTo !== '' ? 'married' : 'single';
+                    const genderClass = person.gender;
+
+                    // Find spouse, mother, father by ID
+                    const spouse = person.marriedTo && person.marriedTo !== '' ?
+                        alivePeople.find(p => p.id === person.marriedTo) : null;
+                    const mother = person.parentA && person.parentA !== '' ?
+                        alivePeople.find(p => p.id === person.parentA) : null;
+                    const father = person.parentB && person.parentB !== '' ?
+                        alivePeople.find(p => p.id === person.parentB) : null;
+
+                    html += `
+                        <div class="person ${genderClass} ${marriedStatus}">
+                            <strong>${person.name}</strong><br>
+                            ${person.gender}, age ${person.age}<br>
+                            ${spouse ? `💕 Married to: ${spouse.name}` : '💔 Single'}<br>
+                            ${mother ? `👩 Mother: ${mother.name}` : ''}${mother && father ? '<br>' : ''}
+                            ${father ? `👨 Father: ${father.name}` : ''}
+                            ${!mother && !father ? '🌱 Original (no parents)' : ''}
+                        </div>
+                    `;
+                });
+            }
+
+            resultsDiv.innerHTML = html;
+        }
+
+        // Event handlers
+        document.getElementById('addPerson').addEventListener('click', addRandomPerson);
+        document.getElementById('hitchUp').addEventListener('click', hitchUpSingles);
+        document.getElementById('reproduce').addEventListener('click', forceReproduction);
+        document.getElementById('listAll').addEventListener('click', updateDisplay);
+
+        document.getElementById('startWorker').addEventListener('click', () => {
+            worker = new Worker('test-reproduction-worker.js');
+
+            worker.onmessage = (e) => {
+                console.log('📨 Worker:', e.data);
+                if (e.data.type === 'status') {
+                    document.getElementById('status').textContent += ` | Worker: ${e.data.message}`;
+                }
+                if (e.data.type === 'population-changed') {
+                    updateDisplay();
+                }
+            };
+
+            worker.postMessage({ command: 'init', schemas });
+        });
+
+        document.getElementById('workerBreed').addEventListener('click', () => {
+            if (worker) {
+                worker.postMessage({ command: 'breed' });
+            }
+        });
+
+        // Initialize
+        initMaster();
+    </script>
+</body>
+</html>

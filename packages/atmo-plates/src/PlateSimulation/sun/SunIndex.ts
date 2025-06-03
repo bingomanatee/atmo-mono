@@ -1,4 +1,4 @@
-import type { CollSyncIF } from '@wonderlandlabs/multiverse/src/types.coll';
+import type { CollSyncIF } from 'packages/multiverse/src/types.coll';
 
 // Simple isObj implementation to avoid external dependency
 const isObj = (value: unknown): value is Record<string, any> => {

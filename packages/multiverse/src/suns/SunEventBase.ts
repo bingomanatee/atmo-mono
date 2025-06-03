@@ -1,7 +1,7 @@
-import { SunBase } from './SunFBase';
 import { Subject } from 'rxjs';
-import type { CollIF } from '../types.coll';
 import { isColl } from '../typeguards.multiverse';
+import type { CollIF } from '../types.coll';
+import { SunBase } from './SunFBase';
 
 /**
  * Base class for Sun implementations that use an event system

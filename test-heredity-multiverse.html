@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Heredity Simulation - Multiverse + IDBSun Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .controls { margin: 20px 0; }
+        button { margin: 5px; padding: 10px; }
+        .results { margin-top: 20px; }
+        .person {
+            border: 1px solid #ccc;
+            margin: 5px;
+            padding: 10px;
+            display: inline-block;
+            background: #f9f9f9;
+        }
+        .male { background: #e6f3ff; }
+        .female { background: #ffe6f3; }
+        .married { border-color: #ff6b6b; border-width: 2px; }
+        .single { border-color: #4ecdc4; }
+    </style>
+</head>
+<body>
+    <h1>🧬 Heredity Simulation - Multiverse + IDBSun</h1>
+    <div id="status">Initializing Master Multiverse...</div>
+
+    <div style="background: #f0f8ff; padding: 15px; margin: 10px 0; border-radius: 5px; border-left: 4px solid #007acc;">
+        <h3>🧪 Testing Multiverse + IDBSun Master/Worker</h3>
+        <p><strong>Goal:</strong> Use actual multiverse with IDBSun for master/worker genetic simulation</p>
+        <ol>
+            <li><strong>Wait for "Master: Multiverse ready! 🧬"</strong> - Master creates multiverse</li>
+            <li><strong>Click "Start Worker"</strong> - Worker creates its own multiverse instance</li>
+            <li><strong>Watch console</strong> - Both should share same IndexedDB via IDBSun</li>
+            <li><strong>Click "Worker Breed"</strong> - Worker adds offspring via multiverse</li>
+            <li><strong>Click "Show Population"</strong> - Master should see worker's genetic changes!</li>
+        </ol>
+        <p><em>Success = Multiverse instances sharing genetic data without conflicts</em></p>
+    </div>
+
+    <div class="controls">
+        <button id="addPerson">👤 Add Random Person (Master)</button>
+        <button id="hitchUp">💕 Hitch Up Singles (Master)</button>
+        <button id="reproduce">👶 Force Reproduction (Master)</button>
+        <button id="listAll">📊 Show Population</button>
+        <br><br>
+        <strong>🧪 Core Test Buttons:</strong><br>
+        <button id="startWorker" style="background: #4CAF50; color: white; font-weight: bold;">🤖 STEP 2: Start Worker</button>
+        <button id="workerBreed" style="background: #FF9800; color: white; font-weight: bold;">🤖 STEP 4: Worker Breed</button>
+    </div>
+
+    <div id="results" class="results"></div>
+
+    <script type="module">
+        // Import multiverse and IDBSun
+        import { Multiverse, CollAsync, SchemaLocal, FIELD_TYPES } from './packages/multiverse/dist/index.js';
+        import { createIDBSun } from './packages/atmo-plates/dist/index.js';
+
+        // Multiverse-compatible schemas
+        const peopleSchema = new SchemaLocal('people', {
+            id: FIELD_TYPES.string,
+            name: { ...FIELD_TYPES.string, meta: { index: true } },
+            gender: { ...FIELD_TYPES.string, meta: { index: true } },
+            age: { ...FIELD_TYPES.number, meta: { index: true } },
+            marriedTo: FIELD_TYPES.string,
+            parentA: FIELD_TYPES.string,
+            parentB: FIELD_TYPES.string,
+            generation: { ...FIELD_TYPES.number, meta: { index: true } },
+            birthTime: FIELD_TYPES.number,
+            isAlive: { ...FIELD_TYPES.boolean, meta: { index: true } },
+            genetics: FIELD_TYPES.object // DNA traits
+        });
+
+        const relationshipsSchema = new SchemaLocal('relationships', {
+            id: FIELD_TYPES.string,
+            personA: { ...FIELD_TYPES.string, meta: { index: true } },
+            personB: { ...FIELD_TYPES.string, meta: { index: true } },
+            type: { ...FIELD_TYPES.string, meta: { index: true } },
+            startTime: FIELD_TYPES.number,
+            isActive: { ...FIELD_TYPES.boolean, meta: { index: true } }
+        });
+
+        // Master multiverse setup
+        let masterMultiverse;
+        let masterPeopleCollection;
+        let masterRelationshipsCollection;
+        let worker;
+
+        const names = ['Alex', 'Jordan', 'Casey', 'Riley', 'Morgan', 'Avery', 'Quinn', 'Sage', 'River', 'Phoenix'];
+
+        async function initMaster() {
+            try {
+                document.getElementById('status').textContent = 'Master: Creating multiverse...';
+
+                // Create multiverse
+                masterMultiverse = new Multiverse();
+
+                // Create IDBSun instances for master
+                const peopleSun = await createIDBSun({
+                    dbName: 'heredity-multiverse',
+                    tableName: 'people',
+                    schema: peopleSchema,
+                    isMaster: true // Master creates schema
+                });
+
+                const relationshipsSun = await createIDBSun({
+                    dbName: 'heredity-multiverse',
+                    tableName: 'relationships',
+                    schema: relationshipsSchema,
+                    isMaster: true // Master creates schema
+                });
+
+                // Create universe and collections
+                const universe = masterMultiverse.add({ name: 'heredity' });
+
+                masterPeopleCollection = new CollAsync({
+                    name: 'people',
+                    universe,
+                    schema: peopleSchema,
+                    sun: peopleSun
+                });
+
+                masterRelationshipsCollection = new CollAsync({
+                    name: 'relationships',
+                    universe,
+                    schema: relationshipsSchema,
+                    sun: relationshipsSun
+                });
+
+                // Add collections to universe
+                universe.add(masterPeopleCollection);
+                universe.add(masterRelationshipsCollection);
+
+                // Create initial population with genetics
+                await createInitialPopulation();
+
+                document.getElementById('status').textContent = 'Master: Multiverse ready! 🧬';
+                await updateDisplay();
+            } catch (error) {
+                document.getElementById('status').textContent = `Master: Error - ${error.message}`;
+                console.error('❌ Master multiverse failed:', error);
+            }
+        }
+
+        function generateGenetics() {
+            return {
+                eyeColor: Math.random() > 0.5 ? 'brown' : 'blue',
+                hairColor: Math.random() > 0.5 ? 'dark' : 'light',
+                height: 150 + Math.random() * 40, // 150-190cm
+                intelligence: Math.random() * 100,
+                strength: Math.random() * 100
+            };
+        }
+
+        function inheritGenetics(parentA, parentB) {
+            const genetics = {};
+
+            // Simple Mendelian inheritance
+            genetics.eyeColor = Math.random() > 0.5 ? parentA.genetics.eyeColor : parentB.genetics.eyeColor;
+            genetics.hairColor = Math.random() > 0.5 ? parentA.genetics.hairColor : parentB.genetics.hairColor;
+
+            // Blended traits with some variation
+            genetics.height = (parentA.genetics.height + parentB.genetics.height) / 2 + (Math.random() - 0.5) * 10;
+            genetics.intelligence = (parentA.genetics.intelligence + parentB.genetics.intelligence) / 2 + (Math.random() - 0.5) * 20;
+            genetics.strength = (parentA.genetics.strength + parentB.genetics.strength) / 2 + (Math.random() - 0.5) * 20;
+
+            return genetics;
+        }
+
+        async function createInitialPopulation() {
+            for (let i = 0; i < 6; i++) {
+                const person = {
+                    id: `person_${Date.now()}_${i}`,
+                    name: names[i % names.length] + ` ${i + 1}`,
+                    gender: Math.random() > 0.5 ? 'male' : 'female',
+                    age: 18 + Math.floor(Math.random() * 12),
+                    marriedTo: '',
+                    parentA: '',
+                    parentB: '',
+                    generation: 0,
+                    birthTime: Date.now() - (Math.random() * 365 * 24 * 60 * 60 * 1000),
+                    isAlive: true,
+                    genetics: generateGenetics()
+                };
+                await masterPeopleCollection.set(person.id, person);
+            }
+            console.log('👥 Master: Initial population with genetics created');
+        }
+
+        async function addRandomPerson() {
+            const person = {
+                id: `person_${Date.now()}`,
+                name: names[Math.floor(Math.random() * names.length)] + ` ${Math.floor(Math.random() * 100)}`,
+                gender: Math.random() > 0.5 ? 'male' : 'female',
+                age: 18 + Math.floor(Math.random() * 12),
+                marriedTo: '',
+                parentA: '',
+                parentB: '',
+                generation: 0,
+                birthTime: Date.now(),
+                isAlive: true,
+                genetics: generateGenetics()
+            };
+            await masterPeopleCollection.set(person.id, person);
+            console.log('👤 Master: Added person via multiverse:', person.name);
+            await updateDisplay();
+        }
+
+        async function hitchUpSingles() {
+            const allPeople = [];
+            for await (const person of masterPeopleCollection.find({ isAlive: true })) {
+                allPeople.push(person);
+            }
+
+            const singles = allPeople.filter(p => !p.marriedTo || p.marriedTo === '');
+            const males = singles.filter(p => p.gender === 'male');
+            const females = singles.filter(p => p.gender === 'female');
+
+            const couples = Math.min(males.length, females.length);
+
+            for (let i = 0; i < couples; i++) {
+                const male = males[i];
+                const female = females[i];
+
+                // Create marriage
+                male.marriedTo = female.id;
+                female.marriedTo = male.id;
+
+                await masterPeopleCollection.set(male.id, male);
+                await masterPeopleCollection.set(female.id, female);
+
+                // Create relationship record
+                const relationship = {
+                    id: `marriage_${Date.now()}_${i}`,
+                    personA: male.id,
+                    personB: female.id,
+                    type: 'marriage',
+                    startTime: Date.now(),
+                    isActive: true
+                };
+                await masterRelationshipsCollection.set(relationship.id, relationship);
+
+                console.log(`💕 Master: Married ${male.name} to ${female.name} via multiverse`);
+            }
+
+            await updateDisplay();
+        }
+
+        async function forceReproduction() {
+            const marriages = [];
+            for await (const rel of masterRelationshipsCollection.find({ type: 'marriage', isActive: true })) {
+                marriages.push(rel);
+            }
+
+            for (const marriage of marriages) {
+                const parentA = await masterPeopleCollection.get(marriage.personA);
+                const parentB = await masterPeopleCollection.get(marriage.personB);
+
+                if (parentA && parentB && parentA.isAlive && parentB.isAlive) {
+                    // Create offspring with inherited genetics
+                    const child = {
+                        id: `child_${Date.now()}_${Math.random()}`,
+                        name: `${parentA.name.split(' ')[0]}-${parentB.name.split(' ')[0]} Jr`,
+                        gender: Math.random() > 0.5 ? 'male' : 'female',
+                        age: 0,
+                        marriedTo: '',
+                        parentA: parentA.id,
+                        parentB: parentB.id,
+                        generation: Math.max(parentA.generation, parentB.generation) + 1,
+                        birthTime: Date.now(),
+                        isAlive: true,
+                        genetics: inheritGenetics(parentA, parentB)
+                    };
+
+                    await masterPeopleCollection.set(child.id, child);
+
+                    console.log(`👶 Master: ${parentA.name} and ${parentB.name} had ${child.name} via multiverse!`);
+                    console.log(`🧬 Child genetics:`, child.genetics);
+                }
+            }
+
+            await updateDisplay();
+        }
+
+        async function updateDisplay() {
+            const people = [];
+            for await (const person of masterPeopleCollection.find({ isAlive: true })) {
+                people.push(person);
+            }
+
+            const resultsDiv = document.getElementById('results');
+            let html = `<h3>👥 Multiverse Population: ${people.length}</h3>`;
+
+            // Group by generation
+            const generations = {};
+            people.forEach(person => {
+                if (!generations[person.generation]) generations[person.generation] = [];
+                generations[person.generation].push(person);
+            });
+
+            for (const [gen, genPeople] of Object.entries(generations)) {
+                html += `<h4>Generation ${gen} (${genPeople.length} people)</h4>`;
+                genPeople.forEach(person => {
+                    const marriedStatus = person.marriedTo && person.marriedTo !== '' ? 'married' : 'single';
+                    const genderClass = person.gender;
+
+                    const spouse = person.marriedTo && person.marriedTo !== '' ?
+                        people.find(p => p.id === person.marriedTo) : null;
+
+                    html += `
+                        <div class="person ${genderClass} ${marriedStatus}">
+                            <strong>${person.name}</strong><br>
+                            ${person.gender}, age ${person.age}<br>
+                            ${spouse ? `💕 Married to: ${spouse.name}` : '💔 Single'}<br>
+                            🧬 Eyes: ${person.genetics.eyeColor}, Hair: ${person.genetics.hairColor}<br>
+                            📏 Height: ${Math.round(person.genetics.height)}cm, IQ: ${Math.round(person.genetics.intelligence)}
+                        </div>
+                    `;
+                });
+            }
+
+            resultsDiv.innerHTML = html;
+        }
+
+        // Event handlers
+        document.getElementById('addPerson').addEventListener('click', addRandomPerson);
+        document.getElementById('hitchUp').addEventListener('click', hitchUpSingles);
+        document.getElementById('reproduce').addEventListener('click', forceReproduction);
+        document.getElementById('listAll').addEventListener('click', updateDisplay);
+
+        document.getElementById('startWorker').addEventListener('click', () => {
+            worker = new Worker('test-heredity-multiverse-worker.js', { type: 'module' });
+
+            worker.onmessage = (e) => {
+                console.log('📨 Worker:', e.data);
+                if (e.data.type === 'status') {
+                    document.getElementById('status').textContent += ` | Worker: ${e.data.message}`;
+                }
+                if (e.data.type === 'population-changed') {
+                    updateDisplay();
+                }
+            };
+
+            worker.postMessage({ command: 'init' });
+        });
+
+        document.getElementById('workerBreed').addEventListener('click', () => {
+            if (worker) {
+                worker.postMessage({ command: 'breed' });
+            }
+        });
+
+        // Initialize
+        initMaster();
+    </script>
+</body>
+</html>

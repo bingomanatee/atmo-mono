@@ -18,6 +18,8 @@ export class SunMemory<RecordType, KeyType>
   readonly isAsync = false;
   #data: ExtendedMap<KeyType, RecordType>;
 
+  sunType = 'SunMemory(sync)';
+
   constructor(props: {
     schema: SchemaLocalIF<RecordType>;
     coll?: CollSyncIF<RecordType, KeyType>;

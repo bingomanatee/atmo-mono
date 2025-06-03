@@ -743,6 +743,9 @@ export class PlateSimulation implements PlateSimulationIF {
     while (result.value) {
       const [platelet] = result.value;
       platelets.push(platelet);
+      if (platelets.length < 4) {
+        console.log('ppn: got platelet', platelet);
+      }
       result = await gen.next();
     }
 

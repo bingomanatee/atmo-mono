@@ -1,9 +1,8 @@
 import { ExtendedMap } from '@wonderlandlabs/atmo-utils';
-import { MUTATION_ACTIONS, STREAM_ACTIONS } from '../constants';
-import { isMutatorAction, isObj, isColl } from '../typeguards.multiverse';
+import { MUTATION_ACTIONS } from '../constants';
+import { isMutatorAction, isObj } from '../typeguards.multiverse';
 import type { CollAsyncIF } from '../types.coll';
-import type { MutationAction, SunIF, SunIfAsync } from '../types.multiverse';
-import { matchesQuery } from '../utils.sun';
+import type { MutationAction, SunIfAsync } from '../types.multiverse';
 import { applyFieldFilters } from './applyFieldFilters';
 import { SunBase } from './SunFBase';
 
@@ -13,6 +12,7 @@ export class SunMemoryAsync<RecordType, KeyType>
 {
   #batchSize = 30; // Default batch size for parallel processing
   #data: ExtendedMap<KeyType, RecordType>;
+  sunType = 'SunMemoryAsync';
 
   constructor(coll?: CollAsyncIF<RecordType, KeyType>) {
     super();

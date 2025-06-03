@@ -23,14 +23,14 @@ export interface PlanetLocal {
 
 // ─── ✅ Simulation-Specific Schemas (Nested) ─────────────────────
 export const SIM_PLANETS_SCHEMA = {
-  id: FIELD_TYPES.string,
-  name: { type: FIELD_TYPES.string, meta: { optional: true } },
+  id: { type: FIELD_TYPES.string, meta: { index: true } },
+  name: { type: FIELD_TYPES.string, meta: { optional: true, index: true } },
   radius: FIELD_TYPES.number,
 };
 
 export const SIM_PLATES_SCHEMA = {
-  id: { type: FIELD_TYPES.string, meta: { required: true } },
-  name: { type: FIELD_TYPES.string, meta: { optional: true } },
+  id: { type: FIELD_TYPES.string, meta: { required: true, index: true } },
+  name: { type: FIELD_TYPES.string, meta: { optional: true, index: true } },
   radius: { type: FIELD_TYPES.number, meta: { required: true } },
   density: { type: FIELD_TYPES.number, meta: { required: true } },
   thickness: { type: FIELD_TYPES.number, meta: { required: true } },
@@ -44,11 +44,11 @@ export const SIM_PLATES_SCHEMA = {
       z: 'z',
     },
   },
-  planetId: { type: FIELD_TYPES.string, meta: { required: true } },
+  planetId: { type: FIELD_TYPES.string, meta: { required: true, index: true } },
 };
 
 export const SIM_PLATELETS_SCHEMA = new SchemaLocal<Platelet>('platelets', {
-  id: { type: FIELD_TYPES.string, meta: { required: true } },
+  id: { type: FIELD_TYPES.string, meta: { required: true, index: true } },
   plateId: { type: FIELD_TYPES.string, meta: { required: true, index: true } },
   planetId: { type: FIELD_TYPES.string, meta: { required: true, index: true } },
   position: {
@@ -66,9 +66,9 @@ export const SIM_PLATELETS_SCHEMA = new SchemaLocal<Platelet>('platelets', {
 });
 
 export const SIM_SIMULATIONS_SCHEMA = {
-  id: FIELD_TYPES.string,
-  name: FIELD_TYPES.string,
-  planetId: FIELD_TYPES.string,
+  id: { type: FIELD_TYPES.string, meta: { index: true } },
+  name: { type: FIELD_TYPES.string, meta: { index: true } },
+  planetId: { type: FIELD_TYPES.string, meta: { index: true } },
   plateCount: FIELD_TYPES.number,
   maxPlateRadius: {
     type: FIELD_TYPES.number,
@@ -77,10 +77,10 @@ export const SIM_SIMULATIONS_SCHEMA = {
 };
 
 export const SIM_PLATE_STEPS_SCHEMA = {
-  id: FIELD_TYPES.string,
-  plateId: FIELD_TYPES.string,
-  plateletId: FIELD_TYPES.string,
-  step: FIELD_TYPES.number,
+  id: { type: FIELD_TYPES.string, meta: { index: true } },
+  plateId: { type: FIELD_TYPES.string, meta: { index: true } },
+  plateletId: { type: FIELD_TYPES.string, meta: { index: true } },
+  step: { type: FIELD_TYPES.number, meta: { index: true } },
   velocity: {
     type: FIELD_TYPES.object,
     isLocal: true,
@@ -111,9 +111,9 @@ export const SIM_PLATE_STEPS_SCHEMA = {
 };
 
 export const SIM_PLATELET_STEPS_SCHEMA = {
-  id: FIELD_TYPES.string,
-  plateletId: FIELD_TYPES.string,
-  step: FIELD_TYPES.number,
+  id: { type: FIELD_TYPES.string, meta: { index: true } },
+  plateletId: { type: FIELD_TYPES.string, meta: { index: true } },
+  step: { type: FIELD_TYPES.number, meta: { index: true } },
   position: {
     type: FIELD_TYPES.object,
     meta: {

@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shared Dexie Test - Master/Worker</title>
+    <script src="https://unpkg.com/dexie@3.2.4/dist/dexie.min.js"></script>
+</head>
+<body>
+    <h1>Shared Dexie Test</h1>
+    <div id="status">Initializing...</div>
+    <div id="results"></div>
+    <button id="addFoo">Add Foo</button>
+    <button id="addBar">Add Bar</button>
+    <button id="listAll">List All</button>
+    <button id="startWorker">Start Worker</button>
+
+    <script>
+        // Simple foo/bar schema
+        const schemas = {
+            foo: {
+                fields: {
+                    id: { type: 'string' },
+                    name: { type: 'string', meta: { index: true } },
+                    value: { type: 'number' },
+                    timestamp: { type: 'number', meta: { index: true } }
+                }
+            },
+            bar: {
+                fields: {
+                    id: { type: 'string' },
+                    title: { type: 'string', meta: { index: true } },
+                    count: { type: 'number' },
+                    active: { type: 'boolean' }
+                }
+            }
+        };
+
+        class SharedDexieManager {
+            constructor(dbName, schemas, dontClear = false) {
+                this.dbName = dbName;
+                this.schemas = schemas;
+                this.dontClear = dontClear;
+                this.db = null;
+                this.isInitialized = false;
+            }
+
+            async initialize() {
+                if (this.isInitialized) return;
+
+                try {
+                    // Clear database if requested
+                    if (!this.dontClear) {
+                        console.log('🔧 Master: Destroying existing database');
+                        await this.destroyDatabase();
+                    }
+
+                    // Initialize Dexie
+                    this.db = new Dexie(this.dbName);
+
+                    // Create stores for all schemas
+                    const stores = {};
+                    for (const [tableName, schema] of Object.entries(this.schemas)) {
+                        const indexes = this.extractIndexes(schema);
+                        const indexString = ['id', ...indexes].join(',');
+                        stores[tableName] = indexString;
+                        console.log(`🔧 Adding table ${tableName} with indexes: ${indexString}`);
+                    }
+
+                    // Set up all stores in a single version
+                    this.db.version(1).stores(stores);
+                    await this.db.open();
+
+                    this.isInitialized = true;
+                    console.log(`✅ SharedDexieManager initialized: ${this.dbName}`);
+                    console.log(`📊 Tables: ${Object.keys(stores).join(', ')}`);
+                } catch (error) {
+                    console.error('❌ SharedDexieManager initialization failed:', error);
+                    throw error;
+                }
+            }
+
+            extractIndexes(schema) {
+                const indexes = [];
+                for (const [fieldName, field] of Object.entries(schema.fields)) {
+                    if (field.meta?.index === true) {
+                        indexes.push(fieldName);
+                    }
+                }
+                return indexes;
+            }
+
+            async destroyDatabase() {
+                try {
+                    const databases = await indexedDB.databases();
+                    const existingDb = databases.find(db => db.name === this.dbName);
+                    
+                    if (existingDb) {
+                        await new Promise((resolve, reject) => {
+                            const deleteRequest = indexedDB.deleteDatabase(this.dbName);
+                            deleteRequest.onsuccess = () => resolve();
+                            deleteRequest.onerror = () => reject(deleteRequest.error);
+                            deleteRequest.onblocked = () => {
+                                console.warn('⚠️ Database deletion blocked');
+                                resolve(); // Continue anyway
+                            };
+                        });
+                        console.log(`✅ Database destroyed: ${this.dbName}`);
+                    }
+                } catch (error) {
+                    console.warn('⚠️ Failed to destroy database:', error);
+                }
+            }
+
+            getTable(tableName) {
+                if (!this.isInitialized || !this.db) {
+                    throw new Error(`Database not initialized for table ${tableName}`);
+                }
+                return this.db.table(tableName);
+            }
+        }
+
+        // Master instance
+        let manager;
+        let isMaster = true; // This is the master
+
+        async function initMaster() {
+            try {
+                document.getElementById('status').textContent = 'Master: Initializing...';
+                
+                manager = new SharedDexieManager('test-shared-db', schemas, false);
+                await manager.initialize();
+                
+                document.getElementById('status').textContent = 'Master: Ready ✅';
+                console.log('🎯 Master initialized successfully');
+            } catch (error) {
+                document.getElementById('status').textContent = `Master: Error - ${error.message}`;
+                console.error('❌ Master initialization failed:', error);
+            }
+        }
+
+        // Event handlers
+        document.getElementById('addFoo').addEventListener('click', async () => {
+            try {
+                const fooTable = manager.getTable('foo');
+                const foo = {
+                    id: `foo_${Date.now()}`,
+                    name: `Foo Item ${Math.floor(Math.random() * 100)}`,
+                    value: Math.floor(Math.random() * 1000),
+                    timestamp: Date.now()
+                };
+                await fooTable.put(foo);
+                console.log('✅ Added foo:', foo);
+                updateResults();
+            } catch (error) {
+                console.error('❌ Failed to add foo:', error);
+            }
+        });
+
+        document.getElementById('addBar').addEventListener('click', async () => {
+            try {
+                const barTable = manager.getTable('bar');
+                const bar = {
+                    id: `bar_${Date.now()}`,
+                    title: `Bar Item ${Math.floor(Math.random() * 100)}`,
+                    count: Math.floor(Math.random() * 50),
+                    active: Math.random() > 0.5
+                };
+                await barTable.put(bar);
+                console.log('✅ Added bar:', bar);
+                updateResults();
+            } catch (error) {
+                console.error('❌ Failed to add bar:', error);
+            }
+        });
+
+        document.getElementById('listAll').addEventListener('click', updateResults);
+
+        document.getElementById('startWorker').addEventListener('click', () => {
+            const worker = new Worker('test-shared-worker.js');
+            
+            worker.onmessage = (e) => {
+                console.log('📨 Worker message:', e.data);
+                if (e.data.type === 'status') {
+                    document.getElementById('status').textContent += ` | Worker: ${e.data.message}`;
+                }
+                if (e.data.type === 'data-added') {
+                    updateResults(); // Refresh display when worker adds data
+                }
+            };
+            
+            worker.onerror = (error) => {
+                console.error('❌ Worker error:', error);
+            };
+            
+            // Tell worker to initialize
+            worker.postMessage({ command: 'init', schemas });
+        });
+
+        async function updateResults() {
+            try {
+                const fooTable = manager.getTable('foo');
+                const barTable = manager.getTable('bar');
+                
+                const foos = await fooTable.toArray();
+                const bars = await barTable.toArray();
+                
+                const resultsDiv = document.getElementById('results');
+                resultsDiv.innerHTML = `
+                    <h3>Database Contents</h3>
+                    <h4>Foos (${foos.length}):</h4>
+                    <pre>${JSON.stringify(foos, null, 2)}</pre>
+                    <h4>Bars (${bars.length}):</h4>
+                    <pre>${JSON.stringify(bars, null, 2)}</pre>
+                `;
+            } catch (error) {
+                console.error('❌ Failed to update results:', error);
+            }
+        }
+
+        // Initialize master on page load
+        initMaster();
+    </script>
+</body>
+</html>

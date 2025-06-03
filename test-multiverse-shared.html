@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Multiverse Shared IndexedDB Test</title>
+    <script src="https://unpkg.com/dexie@3.2.4/dist/dexie.min.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .controls { margin: 20px 0; }
+        button { margin: 5px; padding: 10px; }
+        .results { margin-top: 20px; }
+        .person { 
+            border: 1px solid #ccc; 
+            margin: 5px; 
+            padding: 10px; 
+            display: inline-block; 
+            background: #f9f9f9;
+        }
+        .male { background: #e6f3ff; }
+        .female { background: #ffe6f3; }
+        .married { border-color: #ff6b6b; border-width: 2px; }
+        .single { border-color: #4ecdc4; }
+    </style>
+</head>
+<body>
+    <h1>🌌 Multiverse Shared IndexedDB Test</h1>
+    <div id="status">Initializing Master Multiverse...</div>
+    
+    <div style="background: #f0f8ff; padding: 15px; margin: 10px 0; border-radius: 5px; border-left: 4px solid #007acc;">
+        <h3>🧪 Testing Multiverse + SharedDexieSun</h3>
+        <p><strong>Goal:</strong> Use actual multiverse factory with shared IndexedDB storage</p>
+        <ol>
+            <li><strong>Wait for "Master: Multiverse ready! 🌌"</strong> - Master creates multiverse</li>
+            <li><strong>Click "Start Worker"</strong> - Worker creates its own multiverse instance</li>
+            <li><strong>Watch console</strong> - Both should share same IndexedDB</li>
+            <li><strong>Click "Worker Add Data"</strong> - Worker adds data via multiverse</li>
+            <li><strong>Click "Show Data"</strong> - Master should see worker's changes!</li>
+        </ol>
+        <p><em>Success = Multiverse instances sharing IndexedDB without conflicts</em></p>
+    </div>
+    
+    <div class="controls">
+        <button id="addPerson">👤 Add Person (Master)</button>
+        <button id="listAll">📊 Show Data</button>
+        <br><br>
+        <strong>🧪 Core Test Buttons:</strong><br>
+        <button id="startWorker" style="background: #4CAF50; color: white; font-weight: bold;">🤖 STEP 2: Start Worker</button>
+        <button id="workerAdd" style="background: #FF9800; color: white; font-weight: bold;">🤖 STEP 4: Worker Add Data</button>
+    </div>
+
+    <div id="results" class="results"></div>
+
+    <script>
+        // Multiverse-compatible schemas
+        const FIELD_TYPES = {
+            string: { type: 'string' },
+            number: { type: 'number' },
+            boolean: { type: 'boolean' },
+            object: { type: 'object' }
+        };
+
+        const peopleSchema = {
+            name: 'people',
+            fields: {
+                id: FIELD_TYPES.string,
+                name: FIELD_TYPES.string,
+                age: FIELD_TYPES.number,
+                gender: FIELD_TYPES.string,
+                source: FIELD_TYPES.string, // 'master' or 'worker'
+                timestamp: FIELD_TYPES.number
+            }
+        };
+
+        // Our SharedDexieManager (same as before)
+        class SharedDexieManager {
+            constructor(dbName, schemas, dontClear = false) {
+                this.dbName = dbName;
+                this.schemas = schemas;
+                this.dontClear = dontClear;
+                this.db = null;
+                this.isInitialized = false;
+            }
+
+            async initialize() {
+                if (this.isInitialized) return;
+
+                try {
+                    if (!this.dontClear) {
+                        console.log('🔧 Master: Destroying existing multiverse database');
+                        await this.destroyDatabase();
+                    }
+
+                    this.db = new Dexie(this.dbName);
+
+                    const stores = {};
+                    for (const [tableName, schema] of Object.entries(this.schemas)) {
+                        const indexes = this.extractIndexes(schema);
+                        const indexString = ['id', ...indexes].join(',');
+                        stores[tableName] = indexString;
+                        console.log(`🔧 Creating ${tableName} table with indexes: ${indexString}`);
+                    }
+
+                    this.db.version(1).stores(stores);
+                    await this.db.open();
+
+                    this.isInitialized = true;
+                    console.log(`✅ Multiverse database initialized: ${this.dbName}`);
+                } catch (error) {
+                    console.error('❌ Multiverse database failed:', error);
+                    throw error;
+                }
+            }
+
+            extractIndexes(schema) {
+                // For multiverse schemas, we'll index all string and number fields
+                const indexes = [];
+                for (const [fieldName, field] of Object.entries(schema.fields)) {
+                    if (field.type === 'string' || field.type === 'number') {
+                        indexes.push(fieldName);
+                    }
+                }
+                return indexes;
+            }
+
+            async destroyDatabase() {
+                try {
+                    const databases = await indexedDB.databases();
+                    const existingDb = databases.find(db => db.name === this.dbName);
+                    
+                    if (existingDb) {
+                        await new Promise((resolve, reject) => {
+                            const deleteRequest = indexedDB.deleteDatabase(this.dbName);
+                            deleteRequest.onsuccess = () => resolve();
+                            deleteRequest.onerror = () => reject(deleteRequest.error);
+                            deleteRequest.onblocked = () => {
+                                console.warn('⚠️ Database deletion blocked');
+                                resolve();
+                            };
+                        });
+                        console.log(`✅ Multiverse database wiped clean: ${this.dbName}`);
+                    }
+                } catch (error) {
+                    console.warn('⚠️ Failed to wipe multiverse database:', error);
+                }
+            }
+
+            getTable(tableName) {
+                if (!this.isInitialized || !this.db) {
+                    throw new Error(`Multiverse database not ready for ${tableName}`);
+                }
+                return this.db.table(tableName);
+            }
+        }
+
+        // Multiverse-compatible AsyncSun using SharedDexieManager
+        class MultiverseSharedSun {
+            constructor(tableName, schema, sharedManager) {
+                this.tableName = tableName;
+                this.schema = schema;
+                this.sharedManager = sharedManager;
+                this.isAsync = true;
+            }
+
+            async get(key) {
+                const table = this.sharedManager.getTable(this.tableName);
+                const result = await table.get(key);
+                return result ? this.deserialize(result) : undefined;
+            }
+
+            async set(key, value) {
+                const table = this.sharedManager.getTable(this.tableName);
+                const record = { ...this.serialize(value), id: key };
+                await table.put(record);
+            }
+
+            async delete(key) {
+                const table = this.sharedManager.getTable(this.tableName);
+                await table.delete(key);
+            }
+
+            async clear() {
+                const table = this.sharedManager.getTable(this.tableName);
+                await table.clear();
+            }
+
+            async has(key) {
+                const table = this.sharedManager.getTable(this.tableName);
+                const result = await table.get(key);
+                return result !== undefined;
+            }
+
+            async count() {
+                const table = this.sharedManager.getTable(this.tableName);
+                return await table.count();
+            }
+
+            async *find(query) {
+                const table = this.sharedManager.getTable(this.tableName);
+                const allRecords = await table.toArray();
+                
+                for (const record of allRecords) {
+                    const { id, ...data } = record;
+                    const deserialized = this.deserialize(data);
+                    
+                    if (!query) {
+                        yield deserialized;
+                    } else if (typeof query === 'object') {
+                        const matches = Object.entries(query).every(([key, value]) => 
+                            deserialized[key] === value
+                        );
+                        if (matches) {
+                            yield deserialized;
+                        }
+                    }
+                }
+            }
+
+            async *keys() {
+                const table = this.sharedManager.getTable(this.tableName);
+                const allRecords = await table.toArray();
+                for (const record of allRecords) {
+                    yield record.id;
+                }
+            }
+
+            async *values() {
+                yield* this.find();
+            }
+
+            async *entries() {
+                const table = this.sharedManager.getTable(this.tableName);
+                const allRecords = await table.toArray();
+                for (const record of allRecords) {
+                    const { id, ...data } = record;
+                    yield [id, this.deserialize(data)];
+                }
+            }
+
+            serialize(data) {
+                return data; // Simple pass-through for now
+            }
+
+            deserialize(data) {
+                return data; // Simple pass-through for now
+            }
+        }
+
+        // Master multiverse setup
+        let sharedManager;
+        let masterPeopleCollection;
+        let worker;
+
+        async function initMaster() {
+            try {
+                document.getElementById('status').textContent = 'Master: Creating multiverse...';
+                
+                // Create shared database manager
+                sharedManager = new SharedDexieManager('multiverse-shared', { people: peopleSchema }, false);
+                await sharedManager.initialize();
+                
+                // Create multiverse-compatible collection using shared storage
+                masterPeopleCollection = new MultiverseSharedSun('people', peopleSchema, sharedManager);
+                
+                // Add initial data
+                await createInitialData();
+                
+                document.getElementById('status').textContent = 'Master: Multiverse ready! 🌌';
+                await updateDisplay();
+            } catch (error) {
+                document.getElementById('status').textContent = `Master: Error - ${error.message}`;
+                console.error('❌ Master multiverse failed:', error);
+            }
+        }
+
+        async function createInitialData() {
+            const people = [
+                { id: 'master_1', name: 'Alice Master', age: 25, gender: 'female', source: 'master', timestamp: Date.now() },
+                { id: 'master_2', name: 'Bob Master', age: 30, gender: 'male', source: 'master', timestamp: Date.now() }
+            ];
+            
+            for (const person of people) {
+                await masterPeopleCollection.set(person.id, person);
+            }
+            console.log('👥 Master: Initial multiverse data created');
+        }
+
+        async function addRandomPerson() {
+            const names = ['Charlie', 'Diana', 'Eve', 'Frank'];
+            const person = {
+                id: `master_${Date.now()}`,
+                name: `${names[Math.floor(Math.random() * names.length)]} Master`,
+                age: 20 + Math.floor(Math.random() * 20),
+                gender: Math.random() > 0.5 ? 'male' : 'female',
+                source: 'master',
+                timestamp: Date.now()
+            };
+            
+            await masterPeopleCollection.set(person.id, person);
+            console.log('👤 Master: Added person via multiverse:', person.name);
+            await updateDisplay();
+        }
+
+        async function updateDisplay() {
+            const people = [];
+            for await (const person of masterPeopleCollection.find()) {
+                people.push(person);
+            }
+            
+            const resultsDiv = document.getElementById('results');
+            let html = `<h3>👥 Multiverse Population: ${people.length}</h3>`;
+            
+            // Group by source
+            const masterPeople = people.filter(p => p.source === 'master');
+            const workerPeople = people.filter(p => p.source === 'worker');
+            
+            html += `<h4>Master Data (${masterPeople.length})</h4>`;
+            masterPeople.forEach(person => {
+                html += `
+                    <div class="person ${person.gender}">
+                        <strong>${person.name}</strong><br>
+                        ${person.gender}, age ${person.age}<br>
+                        🏠 Source: ${person.source}
+                    </div>
+                `;
+            });
+            
+            html += `<h4>Worker Data (${workerPeople.length})</h4>`;
+            workerPeople.forEach(person => {
+                html += `
+                    <div class="person ${person.gender}">
+                        <strong>${person.name}</strong><br>
+                        ${person.gender}, age ${person.age}<br>
+                        🤖 Source: ${person.source}
+                    </div>
+                `;
+            });
+            
+            resultsDiv.innerHTML = html;
+        }
+
+        // Event handlers
+        document.getElementById('addPerson').addEventListener('click', addRandomPerson);
+        document.getElementById('listAll').addEventListener('click', updateDisplay);
+
+        document.getElementById('startWorker').addEventListener('click', () => {
+            worker = new Worker('test-multiverse-worker.js');
+            
+            worker.onmessage = (e) => {
+                console.log('📨 Worker:', e.data);
+                if (e.data.type === 'status') {
+                    document.getElementById('status').textContent += ` | Worker: ${e.data.message}`;
+                }
+                if (e.data.type === 'data-changed') {
+                    updateDisplay();
+                }
+            };
+            
+            worker.postMessage({ command: 'init', schema: peopleSchema });
+        });
+
+        document.getElementById('workerAdd').addEventListener('click', () => {
+            if (worker) {
+                worker.postMessage({ command: 'add-person' });
+            }
+        });
+
+        // Initialize
+        initMaster();
+    </script>
+</body>
+</html>

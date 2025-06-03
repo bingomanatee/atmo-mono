@@ -10,6 +10,7 @@ export interface WorkerMessage {
   dontClear: boolean;
   timestamp: number;
   testMode?: boolean;
+  sharedSimulatorBuffer?: SharedArrayBuffer; // Shared memory for direct simulator access
 }
 
 export interface WorkerResponse {

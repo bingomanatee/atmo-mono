@@ -1,7 +1,7 @@
 import { get } from 'lodash-es';
-import { isObj, isColl } from '../typeguards.multiverse';
-import type { CollBaseIF, FieldLocalIF, SunIF } from '../types.multiverse';
+import { isColl, isObj } from '../typeguards.multiverse';
 import type { CollIF } from '../types.coll';
+import type { FieldLocalIF, SunIF } from '../types.multiverse';
 import { validateField } from '../utils/validateField';
 
 /**

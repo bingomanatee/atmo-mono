@@ -146,13 +146,6 @@ export class PlateSpectrumGenerator {
 
       // Convert radius from radians to kilometers (same as generateLargePlates)
       const radius = this.config.planetRadius * radiusRadians;
-      console.log(
-        radius,
-        '= radians',
-        radiusRadians,
-        '* planetRadius: ',
-        this.config.planetRadius,
-      );
       // Calculate area from radius: A = πr²
       const area = Math.PI * radius * radius;
 

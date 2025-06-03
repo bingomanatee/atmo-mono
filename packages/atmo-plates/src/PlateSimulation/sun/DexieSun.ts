@@ -208,99 +208,72 @@ export class DexieSun<T extends Record<string, any>> implements AsyncSunIF<T> {
   }
 
   async get(key: string): Promise<T | undefined> {
-    if (this.isIndexedDBAvailable && this.table) {
-      try {
-        const result = await this.table.get(key);
-        if (!result) return undefined;
-
-        // Remove the id property that was added for Dexie and deserialize
-        const { id, ...data } = result;
-        return this.deserialize(data) as T;
-      } catch (error) {
-        console.error('DexieSun get error, falling back to memory:', error);
-        this.isIndexedDBAvailable = false;
-      }
+    if (!this.isIndexedDBAvailable || !this.table) {
+      throw new Error(
+        'DexieSun: IndexedDB not available - cannot perform get operation',
+      );
     }
 
-    // Fallback to memory storage
-    return this.fallbackData.get(key);
+    const result = await this.table.get(key);
+    if (!result) return undefined;
+
+    // Remove the id property that was added for Dexie and deserialize
+    const { id, ...data } = result;
+    return this.deserialize(data) as T;
   }
 
   async set(key: string, value: T): Promise<void> {
-    if (this.isIndexedDBAvailable && this.table) {
-      try {
-        // Serialize the value and add id property for Dexie
-        const serializedValue = this.serialize(value);
-        const record = { ...serializedValue, id: key };
-        await this.table.put(record);
-        return;
-      } catch (error) {
-        console.error('DexieSun set error, falling back to memory:', error);
-        this.isIndexedDBAvailable = false;
-      }
+    if (!this.isIndexedDBAvailable || !this.table) {
+      throw new Error(
+        'DexieSun: IndexedDB not available - cannot perform set operation',
+      );
     }
 
-    // Fallback to memory storage
-    this.fallbackData.set(key, value);
+    // Serialize the value and add id property for Dexie
+    const serializedValue = this.serialize(value);
+    const record = { ...serializedValue, id: key };
+    await this.table.put(record);
   }
 
   async delete(key: string): Promise<void> {
-    if (this.isIndexedDBAvailable && this.table) {
-      try {
-        await this.table.delete(key);
-        return;
-      } catch (error) {
-        console.error('DexieSun delete error, falling back to memory:', error);
-        this.isIndexedDBAvailable = false;
-      }
+    if (!this.isIndexedDBAvailable || !this.table) {
+      throw new Error(
+        'DexieSun: IndexedDB not available - cannot perform delete operation',
+      );
     }
 
-    // Fallback to memory storage
-    this.fallbackData.delete(key);
+    await this.table.delete(key);
   }
 
   async clear(): Promise<void> {
-    if (this.isIndexedDBAvailable && this.table) {
-      try {
-        await this.table.clear();
-        return;
-      } catch (error) {
-        console.error('DexieSun clear error, falling back to memory:', error);
-        this.isIndexedDBAvailable = false;
-      }
+    if (!this.isIndexedDBAvailable || !this.table) {
+      throw new Error(
+        'DexieSun: IndexedDB not available - cannot perform clear operation',
+      );
     }
 
-    // Fallback to memory storage
-    this.fallbackData.clear();
+    await this.table.clear();
   }
 
   async has(key: string): Promise<boolean> {
-    if (this.isIndexedDBAvailable && this.table) {
-      try {
-        const result = await this.table.get(key);
-        return result !== undefined;
-      } catch (error) {
-        console.error('DexieSun has error, falling back to memory:', error);
-        this.isIndexedDBAvailable = false;
-      }
+    if (!this.isIndexedDBAvailable || !this.table) {
+      throw new Error(
+        'DexieSun: IndexedDB not available - cannot perform has operation',
+      );
     }
 
-    // Fallback to memory storage
-    return this.fallbackData.has(key);
+    const result = await this.table.get(key);
+    return result !== undefined;
   }
 
   async count(): Promise<number> {
-    if (this.isIndexedDBAvailable && this.table) {
-      try {
-        return await this.table.count();
-      } catch (error) {
-        console.error('DexieSun count error, falling back to memory:', error);
-        this.isIndexedDBAvailable = false;
-      }
+    if (!this.isIndexedDBAvailable || !this.table) {
+      throw new Error(
+        'DexieSun: IndexedDB not available - cannot perform count operation',
+      );
     }
 
-    // Fallback to memory storage
-    return this.fallbackData.size;
+    return await this.table.count();
   }
 
   async *find(query?: any): AsyncGenerator<T, void, unknown> {

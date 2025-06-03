@@ -12,7 +12,7 @@
 
 // Re-export multiverse dependencies
 export { Multiverse } from '@wonderlandlabs/multiverse';
-export { DexieSun } from '../../PlateSimulation/managers/sun/DexieSun';
+export { DexieSun } from '../../PlateSimulation/sun/DexieSun';
 
 // Re-export atmo-utils dependencies
 export {
@@ -40,15 +40,81 @@ export async function initWorkerMultiverse(
   });
 }
 
+// SharedArrayBuffer-based simulator state sharing
+export interface SharedSimulatorState {
+  planetRadius: number;
+  plateCount: number;
+  // Add more shared state as needed
+}
+
+// Create shared memory buffer for simulator state
+export function createSharedSimulatorBuffer(): {
+  buffer: SharedArrayBuffer;
+  view: Float32Array;
+  state: SharedSimulatorState;
+} {
+  // Check if SharedArrayBuffer is available
+  if (typeof SharedArrayBuffer === 'undefined') {
+    throw new Error(
+      'SharedArrayBuffer not available - required for shared simulator state',
+    );
+  }
+
+  const buffer = new SharedArrayBuffer(1024); // 1KB shared memory
+  const view = new Float32Array(buffer);
+
+  // Memory layout:
+  // [0] = planetRadius
+  // [1] = plateCount
+  // [2-255] = reserved for future use
+
+  const state: SharedSimulatorState = {
+    get planetRadius() {
+      return view[0];
+    },
+    set planetRadius(value: number) {
+      view[0] = value;
+    },
+    get plateCount() {
+      return view[1];
+    },
+    set plateCount(value: number) {
+      view[1] = value;
+    },
+  };
+
+  return { buffer, view, state };
+}
+
+// Worker-side access to shared simulator state
+export function accessSharedSimulatorState(
+  buffer: SharedArrayBuffer,
+): SharedSimulatorState {
+  const view = new Float32Array(buffer);
+
+  return {
+    get planetRadius() {
+      return view[0];
+    },
+    set planetRadius(value: number) {
+      view[0] = value;
+    },
+    get plateCount() {
+      return view[1];
+    },
+    set plateCount(value: number) {
+      view[1] = value;
+    },
+  };
+}
+
 export async function initWorkerDexieSun(options: {
   dbName: string;
   tableName: string;
   schema: any;
   dontClear?: boolean;
 }) {
-  const { DexieSun } = await import(
-    '../../PlateSimulation/managers/sun/DexieSun'
-  );
+  const { DexieSun } = await import('../../PlateSimulation/sun/DexieSun');
 
   return new DexieSun({
     ...options,

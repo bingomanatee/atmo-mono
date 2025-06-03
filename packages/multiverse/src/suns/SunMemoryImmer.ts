@@ -1,8 +1,8 @@
 import { produce } from 'immer';
 import { MUTATION_ACTIONS } from '../constants';
 import { isMutatorAction, isObj } from '../typeguards.multiverse';
-import type { CollIF, CollSyncIF } from '../types.coll';
-import type { MutationAction, MutatorSync, SunIF } from '../types.multiverse';
+import type { CollSyncIF } from '../types.coll';
+import type { MutatorSync, SunIF } from '../types.multiverse';
 import { applyFieldFilters } from './applyFieldFilters';
 import { SunMemory } from './SunMemory';
 

@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Worker Engine + IDBSun Proof of Concept</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .controls { margin: 20px 0; }
+        button { margin: 5px; padding: 10px; }
+        .results { margin-top: 20px; }
+        .status { background: #f0f8ff; padding: 10px; margin: 10px 0; border-radius: 5px; }
+        .success { background: #e8f5e8; border-left: 4px solid #4CAF50; }
+        .error { background: #ffe8e8; border-left: 4px solid #f44336; }
+        .data-item {
+            border: 1px solid #ccc;
+            margin: 5px;
+            padding: 10px;
+            display: inline-block;
+            background: #f9f9f9;
+            border-radius: 3px;
+        }
+        .master-data { background: #e6f3ff; border-color: #2196F3; }
+        .worker-data { background: #fff3e0; border-color: #FF9800; }
+    </style>
+</head>
+<body>
+    <h1>🔧 Worker Engine + IDBSun Proof of Concept</h1>
+    <div id="status" class="status">Initializing Master...</div>
+
+    <div style="background: #f0f8ff; padding: 15px; margin: 10px 0; border-radius: 5px; border-left: 4px solid #007acc;">
+        <h3>🎯 Proof of Concept Goals</h3>
+        <p><strong>Test:</strong> Worker engine using IDBSun for shared data storage</p>
+        <ol>
+            <li><strong>Master creates IDBSun</strong> - Sets up shared IndexedDB with schema</li>
+            <li><strong>Worker connects to same IDBSun</strong> - No schema conflicts</li>
+            <li><strong>Both read/write shared data</strong> - Real-time data synchronization</li>
+            <li><strong>Worker processes data independently</strong> - Autonomous worker behavior</li>
+        </ol>
+        <p><em>Success = Master and Worker sharing data via IDBSun without conflicts</em></p>
+    </div>
+
+    <div class="controls">
+        <h3>🎮 Master Controls</h3>
+        <button id="addData">📝 Master: Add Data</button>
+        <button id="showData">📊 Show All Data</button>
+        <button id="clearData">🗑️ Clear All Data</button>
+
+        <h3>🤖 Worker Controls</h3>
+        <button id="startWorker" style="background: #4CAF50; color: white; font-weight: bold;">🚀 Start Worker Engine</button>
+        <button id="workerAdd" style="background: #FF9800; color: white; font-weight: bold;">🤖 Worker: Add Data</button>
+        <button id="workerProcess" style="background: #9C27B0; color: white; font-weight: bold;">⚙️ Worker: Process Data</button>
+    </div>
+
+    <div id="results" class="results"></div>
+
+    <script type="module">
+        // Import multiverse and IDBSun
+        import { Multiverse, CollAsync, SchemaLocal, FIELD_TYPES } from './packages/multiverse/dist/index.js';
+        import { createIDBSun } from './packages/atmo-plates/dist/index.js';
+
+        // Simple data schema for testing
+        const dataSchema = new SchemaLocal('testData', {
+            id: FIELD_TYPES.string,
+            value: { ...FIELD_TYPES.number, meta: { index: true } },
+            source: { ...FIELD_TYPES.string, meta: { index: true } }, // 'master' or 'worker'
+            timestamp: { ...FIELD_TYPES.number, meta: { index: true } },
+            processed: { ...FIELD_TYPES.boolean, meta: { index: true } },
+            processingResult: FIELD_TYPES.number
+        });
+
+        // Master setup
+        let masterMultiverse;
+        let masterDataCollection;
+        let worker;
+
+        async function initMaster() {
+            try {
+                console.log('🔧 Master: Starting initialization...');
+                document.getElementById('status').textContent = 'Master: Creating multiverse...';
+
+                // Create multiverse
+                console.log('🔧 Master: Creating Multiverse instance...');
+                masterMultiverse = new Multiverse();
+                console.log('✅ Master: Multiverse created');
+
+                document.getElementById('status').textContent = 'Master: Creating IDBSun...';
+                console.log('🔧 Master: Creating IDBSun with config:', {
+                    dbName: 'worker-engine-poc',
+                    tableName: 'testData',
+                    isMaster: true
+                });
+
+                // Create IDBSun for master (creates schema)
+                const dataSun = await createIDBSun({
+                    dbName: 'worker-engine-poc',
+                    tableName: 'testData',
+                    schema: dataSchema,
+                    isMaster: true // Master creates the schema
+                });
+
+                console.log('✅ Master: IDBSun created successfully');
+                console.log('📊 Master: Storage info:', dataSun.getStorageInfo());
+
+                document.getElementById('status').textContent = 'Master: Creating universe...';
+                console.log('🔧 Master: Creating universe...');
+
+                // Create universe and collection
+                const universe = masterMultiverse.add({ name: 'poc' });
+                console.log('✅ Master: Universe created');
+
+                document.getElementById('status').textContent = 'Master: Creating collection...';
+                console.log('🔧 Master: Creating CollAsync...');
+
+                masterDataCollection = new CollAsync({
+                    name: 'testData',
+                    universe,
+                    schema: dataSchema,
+                    sun: dataSun
+                });
+                console.log('✅ Master: CollAsync created');
+
+                console.log('🔧 Master: Adding collection to universe...');
+                universe.add(masterDataCollection);
+                console.log('✅ Master: Collection added to universe');
+
+                document.getElementById('status').textContent = 'Master: Adding initial data...';
+                console.log('🔧 Master: Adding initial data...');
+
+                // Add initial test data
+                await addInitialData();
+                console.log('✅ Master: Initial data added');
+
+                document.getElementById('status').textContent = 'Master: IDBSun ready! 🎯';
+                document.getElementById('status').className = 'status success';
+                console.log('🔧 Master: Updating display...');
+                await updateDisplay();
+                console.log('✅ Master: Initialization complete!');
+            } catch (error) {
+                document.getElementById('status').textContent = `Master: Error - ${error.message}`;
+                document.getElementById('status').className = 'status error';
+                console.error('❌ Master initialization failed:', error);
+                console.error('❌ Error stack:', error.stack);
+            }
+        }
+
+        async function addInitialData() {
+            console.log('🔧 Master: Preparing initial data...');
+            const initialData = [
+                { id: 'master_1', value: 10, source: 'master', timestamp: Date.now(), processed: false, processingResult: 0 },
+                { id: 'master_2', value: 25, source: 'master', timestamp: Date.now(), processed: false, processingResult: 0 }
+            ];
+            console.log('🔧 Master: Initial data prepared:', initialData);
+
+            for (let i = 0; i < initialData.length; i++) {
+                const item = initialData[i];
+                console.log(`🔧 Master: Adding item ${i + 1}/${initialData.length}:`, item);
+                await masterDataCollection.set(item.id, item);
+                console.log(`✅ Master: Item ${i + 1} added successfully`);
+            }
+            console.log('📝 Master: All initial data created successfully');
+        }
+
+        async function addMasterData() {
+            const item = {
+                id: `master_${Date.now()}`,
+                value: Math.floor(Math.random() * 100),
+                source: 'master',
+                timestamp: Date.now(),
+                processed: false,
+                processingResult: 0
+            };
+
+            await masterDataCollection.set(item.id, item);
+            console.log('📝 Master: Added data via IDBSun:', item);
+            await updateDisplay();
+        }
+
+        async function clearAllData() {
+            // Get all items and delete them
+            const allItems = [];
+            for await (const item of masterDataCollection.find()) {
+                allItems.push(item);
+            }
+
+            for (const item of allItems) {
+                await masterDataCollection.delete(item.id);
+            }
+
+            console.log('🗑️ Master: Cleared all data');
+            await updateDisplay();
+        }
+
+        async function updateDisplay() {
+            const allData = [];
+            for await (const item of masterDataCollection.find()) {
+                allData.push(item);
+            }
+
+            const resultsDiv = document.getElementById('results');
+            let html = `<h3>📊 Shared Data Store: ${allData.length} items</h3>`;
+
+            // Group by source
+            const masterData = allData.filter(item => item.source === 'master');
+            const workerData = allData.filter(item => item.source === 'worker');
+
+            html += `<h4>🎮 Master Data (${masterData.length})</h4>`;
+            masterData.forEach(item => {
+                const processedStatus = item.processed ? `✅ Processed (${item.processingResult})` : '⏳ Unprocessed';
+                html += `
+                    <div class="data-item master-data">
+                        <strong>ID:</strong> ${item.id}<br>
+                        <strong>Value:</strong> ${item.value}<br>
+                        <strong>Status:</strong> ${processedStatus}<br>
+                        <strong>Time:</strong> ${new Date(item.timestamp).toLocaleTimeString()}
+                    </div>
+                `;
+            });
+
+            html += `<h4>🤖 Worker Data (${workerData.length})</h4>`;
+            workerData.forEach(item => {
+                const processedStatus = item.processed ? `✅ Processed (${item.processingResult})` : '⏳ Unprocessed';
+                html += `
+                    <div class="data-item worker-data">
+                        <strong>ID:</strong> ${item.id}<br>
+                        <strong>Value:</strong> ${item.value}<br>
+                        <strong>Status:</strong> ${processedStatus}<br>
+                        <strong>Time:</strong> ${new Date(item.timestamp).toLocaleTimeString()}
+                    </div>
+                `;
+            });
+
+            resultsDiv.innerHTML = html;
+        }
+
+        // Event handlers
+        document.getElementById('addData').addEventListener('click', addMasterData);
+        document.getElementById('showData').addEventListener('click', updateDisplay);
+        document.getElementById('clearData').addEventListener('click', clearAllData);
+
+        document.getElementById('startWorker').addEventListener('click', () => {
+            worker = new Worker('test-worker-idbsun-poc-worker.js', { type: 'module' });
+
+            worker.onmessage = (e) => {
+                console.log('📨 Worker message:', e.data);
+
+                if (e.data.type === 'status') {
+                    const statusDiv = document.getElementById('status');
+                    statusDiv.textContent += ` | Worker: ${e.data.message}`;
+                    if (e.data.success) {
+                        statusDiv.className = 'status success';
+                    }
+                }
+
+                if (e.data.type === 'data-changed') {
+                    updateDisplay();
+                }
+
+                if (e.data.type === 'error') {
+                    console.error('❌ Worker error:', e.data.message);
+                    document.getElementById('status').textContent += ` | Worker Error: ${e.data.message}`;
+                    document.getElementById('status').className = 'status error';
+                }
+            };
+
+            worker.postMessage({ command: 'init' });
+        });
+
+        document.getElementById('workerAdd').addEventListener('click', () => {
+            if (worker) {
+                worker.postMessage({ command: 'add-data' });
+            } else {
+                alert('Please start the worker first!');
+            }
+        });
+
+        document.getElementById('workerProcess').addEventListener('click', () => {
+            if (worker) {
+                worker.postMessage({ command: 'process-data' });
+            } else {
+                alert('Please start the worker first!');
+            }
+        });
+
+        // Initialize master
+        initMaster();
+    </script>
+</body>
+</html>

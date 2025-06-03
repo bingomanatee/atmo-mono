@@ -35,9 +35,12 @@
     "vitest": "^3.1.3"
   },
   "dependencies": {
+    "@wonderlandlabs/atmo-utils": "workspace:*",
+    "@wonderlandlabs/atmo-workers": "workspace:*",
     "@wonderlandlabs/multiverse": "workspace:*",
     "dexie": "^4.0.11",
     "h3-js": "^4.2.1",
+    "idb": "^8.0.0",
     "lodash-es": "^4.17.21",
     "rxjs": "^7.8.1",
     "three": "^0.176.0",

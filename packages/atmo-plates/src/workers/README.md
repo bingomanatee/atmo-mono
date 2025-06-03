@@ -110,7 +110,7 @@ export default {
 ```typescript
 // platelet-worker.ts (Strategy 1 version)
 import { Multiverse } from '@wonderlandlabs/multiverse';
-import { DexieSun } from '../PlateSimulation/managers/sun/DexieSun';
+import { DexieSun } from '../PlateSimulation/sun/DexieSun';
 import { getCellsInRange, cellToVector } from '@wonderlandlabs/atmo-utils';
 import { Vector3 } from 'three';
 
