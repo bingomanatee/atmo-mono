@@ -1,12 +1,13 @@
 import {
   cellToChildren,
   cellToVector,
+  getCellsInRange,
   getH3CellForPosition,
+  getNeighbors,
   h3HexRadiusAtResolution,
   latLngToCell,
   pointToLatLon,
 } from '@wonderlandlabs/atmo-utils';
-import { gridDisk } from 'h3-js';
 import { Vector3 } from 'three';
 import { floatElevation } from '../../utils/plateUtils';
 import { log } from '../../utils/utils';
@@ -169,9 +170,7 @@ export function createPlateletFromCell(
     throw new Error(`Failed to get position for H3 cell ${cell}`);
   }
 
-  const neighborCellIds = gridDisk(cell, 1).filter(
-    (neighbor) => neighbor !== cell,
-  );
+  const neighborCellIds = getNeighbors(cell);
 
   // Calculate average distance to neighbor cell positions
   let totalNeighborDistance = 0;
@@ -342,9 +341,7 @@ export async function generateCircularPlatelets(
     createdPlateletIds.push(platelet.id);
 
     // Get neighbors and enqueue if valid and not processed
-    const neighbors = gridDisk(currentCell, 1).filter(
-      (cell) => cell !== currentCell,
-    );
+    const neighbors = getNeighbors(currentCell);
     for (const neighbor of neighbors) {
       if (!processedPlateletCells.has(neighbor)) {
         // Check if neighbor's center is within plate radius

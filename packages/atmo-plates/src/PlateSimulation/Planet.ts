@@ -1,10 +1,10 @@
 import {
   cellToLatLng,
+  getCellsInRange,
   getH3CellForPosition,
   latLonToPoint,
   pointToLatLon,
 } from '@wonderlandlabs/atmo-utils';
-import { gridDisk } from 'h3-js';
 import type { Vector3Like } from 'three';
 import { Vector3 } from 'three';
 import { v4 as uuidV4 } from 'uuid';
@@ -52,7 +52,7 @@ export class Planet implements SimPlanetIF {
    */
   #getL0Neighbors(cell: string): string[] {
     if (!this.#l0NeighborCache.has(cell)) {
-      const neighbors = gridDisk(cell, 1);
+      const neighbors = getCellsInRange(cell, 1);
       this.#l0NeighborCache.set(cell, neighbors);
     }
     return this.#l0NeighborCache.get(cell)!;

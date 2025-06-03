@@ -750,7 +750,7 @@ describe('PlateSimulation', () => {
       expect(await plateletsCollection.count()).toBe(initialCount);
     });
 
-    it.only('should delete edge platelets when there are more than 30', async () => {
+    it('should delete edge platelets when there are more than 30', async () => {
       // Create a simulation with a larger plate to generate more platelets
       const sim = new PlateSimulation({
         planetRadius: EARTH_RADIUS,

@@ -1,5 +1,4 @@
-import { randomNormal, varyP } from '@wonderlandlabs/atmo-utils';
-import { latLngToCell } from 'h3-js';
+import { latLngToCell, randomNormal, varyP } from '@wonderlandlabs/atmo-utils';
 import { Object3D, Vector3 } from 'three';
 import { v4 as uuidV4 } from 'uuid';
 import { COLLECTIONS } from '../../PlateSimulation/constants';

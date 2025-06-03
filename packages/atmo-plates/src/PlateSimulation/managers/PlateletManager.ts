@@ -313,10 +313,6 @@ export class PlateletManager {
     );
     await Promise.all(batchWrites);
 
-    log(
-      `✅ Generated ${generatedPlatelets.length} platelets for plate ${plateId}`,
-    );
-
     return generatedPlatelets;
   }
 
@@ -523,19 +519,6 @@ export class PlateletManager {
     // Calculate how many H3 cell radii we need to cover the plate
     const h3CellRadius = h3HexRadiusAtResolution(planetRadius, resolution);
 
-    // Validation check for reasonable H3 cell radius
-    if (h3CellRadius < 100) {
-      console.warn(
-        `⚠️ H3 cell radius seems small (${h3CellRadius.toFixed(1)}km). Consider using lower resolution for larger cells.`,
-      );
-    }
-
-    if (h3CellRadius < 1) {
-      console.error(
-        `❌ H3 cell radius is suspiciously small: ${h3CellRadius}km. This suggests a unit conversion error.`,
-      );
-    }
-
     // Use 133% of plate radius to account for hexagonal geometry
     const searchRadius = plateRadiusKm * 1.33;
 
@@ -547,22 +530,8 @@ export class PlateletManager {
     const maxSafeRings = 50; // H3 gridDisk can handle up to ~50 rings safely
     const gridDiskRings = Math.min(ringsNeeded, maxSafeRings);
 
-    log(
-      `   Search radius (133% of plate): ${searchRadius.toFixed(2)} (same units as plate.radius)`,
-    );
-    log(
-      `   Rings needed: ${ringsNeeded}, using: ${gridDiskRings} rings (capped at ${maxSafeRings})`,
-    );
-
-    if (ringsNeeded > maxSafeRings) {
-      console.warn(
-        `⚠️ Rings needed (${ringsNeeded}) exceeds safe limit (${maxSafeRings}). This suggests unit mismatch - plate.radius might be in radians instead of km.`,
-      );
-    }
-
     // Get all cells within the gridDisk rings using atmo-utils helper
     const candidateCells = getCellsInRange(centralCell, gridDiskRings);
-    console.log(`   Found ${candidateCells.length} candidate cells`);
 
     // Filter cells that are actually within the plate radius
     const validCells: string[] = [];
@@ -624,23 +593,13 @@ export class PlateletManager {
             platelets.push(platelet);
             successCount++;
           } else {
-            log(
-              `   Warning: Platelet creation failed for cell ${cell} - position is undefined`,
-            );
             failureCount++;
           }
         } catch (error) {
-          log(`   Warning: Error creating platelet for cell ${cell}: ${error}`);
           failureCount++;
         }
       }
-
-      log(
-        `   Platelet creation: ${successCount} successful, ${failureCount} failed`,
-      );
     }
-
-    log(`   ✅ Created ${platelets.length} platelets using gridDisk method`);
 
     return platelets;
   }
