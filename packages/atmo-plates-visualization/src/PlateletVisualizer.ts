@@ -159,7 +159,7 @@ export class PlateletVisualizer extends PlateVisualizerBase {
         platelet.thickness,
         platelet.radius * OVERFLOW,
       );
-      const direction = platelet.position.clone().normalize();
+      const direction = new Vector3().copy(platelet.position).normalize();
       const outwardRotation = new THREE.Quaternion().setFromUnitVectors(
         new THREE.Vector3(0, 1, 0),
         direction,
@@ -261,8 +261,8 @@ export class PlateletVisualizer extends PlateVisualizerBase {
       this.orbitalFrame.add(this.instancedMesh);
     }
 
-    // Add a red sphere at the plate center for debugging (1/10th the size)
-    const plateMarkerGeometry = new THREE.SphereGeometry(25, 8, 6); // 100km radius sphere (was 1000km)
+    // Add a red sphere at the plate center for debugging (100km radius)
+    const plateMarkerGeometry = new THREE.SphereGeometry(100, 8, 6); // 100km radius sphere
     const plateMarkerMaterial = new THREE.MeshBasicMaterial({
       color: 0xff0000, // Bright red color
       transparent: false, // Make it solid
@@ -275,7 +275,7 @@ export class PlateletVisualizer extends PlateVisualizerBase {
 
     // Convert global plate position to local coordinates relative to orbital frame
     const localPosition = this.orbitalFrame.worldToLocal(
-      this.plate.position.clone(),
+      new Vector3().copy(this.plate.position),
     );
     plateMarker.position.copy(localPosition);
     plateMarker.name = `PlateMarker_${this.plate.id}`;

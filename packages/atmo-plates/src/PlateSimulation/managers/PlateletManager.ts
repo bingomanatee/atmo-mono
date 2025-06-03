@@ -596,18 +596,11 @@ export class PlateletManager {
       }
     }
 
-    log(
-      `   Filtering results: ${validCells.length} valid, ${outOfRangeCount} out of range, ${invalidCellCount} invalid cells`,
-    );
-
-    log(`   Filtered to ${validCells.length} valid cells within plate radius`);
-
     // Create platelets for all valid cells
     const platelets: Platelet[] = [];
 
     if (validCells.length === 0) {
       // Fallback: create center platelet if no valid cells found
-      log(`   No valid cells found, creating center platelet fallback`);
       const centerPlatelet = createCenterPlatelet(
         plate,
         planetRadius,

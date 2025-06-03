@@ -100,17 +100,81 @@ export class PassiveDexieSun<T extends Record<string, any>>
   }
 
   /**
-   * Deserialize data from storage (restore Vector3 objects)
+   * Deserialize data from storage using schema definitions
    */
-  private deserialize(data: any): any {
+  private deserialize(data: any, fieldName?: string): any {
+    if (data === null || data === undefined) {
+      return data;
+    }
+
+    // Handle Vector3 objects (legacy support)
     if (data && typeof data === 'object' && data._isVector3) {
       return new Vector3(data.x, data.y, data.z);
     }
 
+    // If we have a field name and schema, use schema-based deserialization
+    if (fieldName && this.schema?.fields?.[fieldName]) {
+      const field = this.schema.fields[fieldName];
+
+      // Use custom import function if available
+      if (field.import && typeof field.import === 'function') {
+        try {
+          return field.import({
+            inputRecord: data,
+            field,
+            schema: this.schema,
+            key: fieldName,
+          });
+        } catch (error) {
+          console.warn(`Error in custom import for field ${fieldName}:`, error);
+          // Fall through to default handling
+        }
+      }
+
+      // Handle different field types
+      switch (field.type) {
+        case 'Object':
+          if (
+            typeof data === 'object' &&
+            data !== null &&
+            !Array.isArray(data)
+          ) {
+            // If field has univFields mapping, reconstruct nested object
+            if (field.univFields && typeof field.univFields === 'object') {
+              const reconstructed: any = {};
+              for (const [localKey, universalKey] of Object.entries(
+                field.univFields,
+              )) {
+                if (data.hasOwnProperty(universalKey)) {
+                  reconstructed[localKey] = this.deserialize(
+                    data[universalKey],
+                  );
+                }
+              }
+              return reconstructed;
+            }
+            // Otherwise deserialize all properties
+            const deserialized: any = {};
+            for (const [key, value] of Object.entries(data)) {
+              deserialized[key] = this.deserialize(value);
+            }
+            return deserialized;
+          }
+          break;
+
+        case 'Array':
+          if (Array.isArray(data)) {
+            return data.map((item) => this.deserialize(item));
+          }
+          break;
+      }
+    }
+
+    // Default handling for objects and arrays without schema info
     if (typeof data === 'object' && data !== null) {
       const deserialized: any = {};
       for (const [key, value] of Object.entries(data)) {
-        deserialized[key] = this.deserialize(value);
+        deserialized[key] = this.deserialize(value, key);
       }
       return deserialized;
     }

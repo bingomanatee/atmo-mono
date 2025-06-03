@@ -92,18 +92,72 @@ export class DexieSun<T extends Record<string, any>> implements AsyncSunIF<T> {
   }
 
   /**
-   * Deserialize objects from IndexedDB storage
+   * Deserialize objects from IndexedDB storage using schema definitions
    */
-  private deserialize(obj: any): any {
+  private deserialize(obj: any, fieldName?: string): any {
     if (obj === null || obj === undefined) {
       return obj;
     }
 
+    // Handle Vector3 objects (legacy support)
     if (typeof obj === 'object' && obj._isVector3) {
       const vec = obj as SerializableVector3;
       return new Vector3(vec.x, vec.y, vec.z);
     }
 
+    // If we have a field name and schema, use schema-based deserialization
+    if (fieldName && this.schema?.fields?.[fieldName]) {
+      const field = this.schema.fields[fieldName];
+
+      // Use custom import function if available
+      if (field.import && typeof field.import === 'function') {
+        try {
+          return field.import({
+            inputRecord: obj,
+            field,
+            schema: this.schema,
+            key: fieldName,
+          });
+        } catch (error) {
+          console.warn(`Error in custom import for field ${fieldName}:`, error);
+          // Fall through to default handling
+        }
+      }
+
+      // Handle different field types
+      switch (field.type) {
+        case 'Object':
+          if (typeof obj === 'object' && obj !== null && !Array.isArray(obj)) {
+            // If field has univFields mapping, reconstruct nested object
+            if (field.univFields && typeof field.univFields === 'object') {
+              const reconstructed: any = {};
+              for (const [localKey, universalKey] of Object.entries(
+                field.univFields,
+              )) {
+                if (obj.hasOwnProperty(universalKey)) {
+                  reconstructed[localKey] = this.deserialize(obj[universalKey]);
+                }
+              }
+              return reconstructed;
+            }
+            // Otherwise deserialize all properties
+            const deserialized: any = {};
+            for (const [key, value] of Object.entries(obj)) {
+              deserialized[key] = this.deserialize(value);
+            }
+            return deserialized;
+          }
+          break;
+
+        case 'Array':
+          if (Array.isArray(obj)) {
+            return obj.map((item) => this.deserialize(item));
+          }
+          break;
+      }
+    }
+
+    // Default handling for objects and arrays without schema info
     if (Array.isArray(obj)) {
       return obj.map((item) => this.deserialize(item));
     }
@@ -111,7 +165,7 @@ export class DexieSun<T extends Record<string, any>> implements AsyncSunIF<T> {
     if (typeof obj === 'object' && obj.constructor === Object) {
       const deserialized: any = {};
       for (const [key, value] of Object.entries(obj)) {
-        deserialized[key] = this.deserialize(value);
+        deserialized[key] = this.deserialize(value, key);
       }
       return deserialized;
     }

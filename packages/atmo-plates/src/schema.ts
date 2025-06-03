@@ -1,11 +1,6 @@
 // ─── Imports ─────────────────────────────────────────────────────
-import {
-  FIELD_TYPES,
-  SchemaLocal,
-  SchemaUniversal,
-} from '@wonderlandlabs/multiverse';
+import { FIELD_TYPES, SchemaUniversal } from '@wonderlandlabs/multiverse';
 import { COLLECTIONS } from './PlateSimulation/constants';
-import { Platelet } from './PlateSimulation/Platelet';
 import type { Plate } from './PlateSimulation/PlateSimulation';
 import { coord } from './utils';
 
@@ -47,7 +42,7 @@ export const SIM_PLATES_SCHEMA = {
   planetId: { type: FIELD_TYPES.string, meta: { required: true, index: true } },
 };
 
-export const SIM_PLATELETS_SCHEMA = new SchemaLocal<Platelet>('platelets', {
+export const SIM_PLATELETS_SCHEMA = {
   id: { type: FIELD_TYPES.string, meta: { required: true, index: true } },
   plateId: { type: FIELD_TYPES.string, meta: { required: true, index: true } },
   planetId: { type: FIELD_TYPES.string, meta: { required: true, index: true } },
@@ -65,7 +60,7 @@ export const SIM_PLATELETS_SCHEMA = new SchemaLocal<Platelet>('platelets', {
   },
   density: { type: FIELD_TYPES.number, meta: { required: true } },
   thickness: { type: FIELD_TYPES.number, meta: { required: true } },
-});
+};
 
 export const SIM_SIMULATIONS_SCHEMA = {
   id: { type: FIELD_TYPES.string, meta: { index: true } },

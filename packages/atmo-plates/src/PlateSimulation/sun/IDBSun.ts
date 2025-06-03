@@ -3,6 +3,7 @@ import type {
   Pair,
   SunIfAsync,
 } from '@wonderlandlabs/multiverse';
+import { FIELD_TYPES } from '@wonderlandlabs/multiverse';
 import { deleteDB, IDBPDatabase, openDB } from 'idb';
 import { Vector3 } from 'three';
 import { log } from '../../utils/utils';
@@ -137,7 +138,7 @@ export class IDBSun<T extends Record<string, any>> implements SunIfAsync<T> {
         ) => {
           // Object stores and indexes should already be created by initializeSharedDatabase
           // This upgrade callback will only run if the database doesn't exist yet
-          log(
+          console.warn(
             `⚠️ IDBSun: Unexpected database upgrade for ${this.tableName} - object stores should already exist`,
           );
         },
@@ -153,28 +154,11 @@ export class IDBSun<T extends Record<string, any>> implements SunIfAsync<T> {
         },
       });
 
-      const role = this.isMaster ? 'Master' : 'Worker';
-      console.log(
-        `✅ IDBSun ${role}: Connected to ${this.dbName}.${this.tableName}`,
-      );
-
       // Verify object store exists before testing access
       if (!this.db.objectStoreNames.contains(this.tableName)) {
         throw new Error(
           `Object store '${this.tableName}' was not created properly`,
         );
-      }
-
-      // Test database access with error handling
-      try {
-        const count = await this.count();
-        log(`📊 IDBSun ${role}: Found ${count} existing records`);
-      } catch (error) {
-        log(
-          `⚠️ IDBSun ${role}: Could not count records (this may be normal for new databases):`,
-          error,
-        );
-        // Don't throw - this might be expected for new databases
       }
     } catch (error) {
       log(`❌ IDBSun initialization failed for ${this.tableName}:`, error);
@@ -183,22 +167,77 @@ export class IDBSun<T extends Record<string, any>> implements SunIfAsync<T> {
   }
 
   /**
-   * Serialize data for storage (handle Vector3 objects)
+   * Serialize a specific field using schema definitions
+   */
+  private serializeField(data: any, fieldName: string): any {
+    if (data === null || data === undefined) {
+      return data;
+    }
+
+    const field = this.schema?.fields?.[fieldName];
+    if (!field) {
+      return this.serialize(data);
+    }
+
+    // Handle different field types using FIELD_TYPES
+    switch (field.type) {
+      case FIELD_TYPES.object:
+        if (typeof data === 'object' && data !== null && !Array.isArray(data)) {
+          // Handle Vector3 objects
+          if (data instanceof Vector3) {
+            return {
+              x: data.x,
+              y: data.y,
+              z: data.z,
+            };
+          }
+
+          // Otherwise serialize all properties
+          return data;
+        }
+        break;
+
+      case FIELD_TYPES.array:
+        if (Array.isArray(data)) {
+          return data;
+        } else {
+          return [];
+        }
+        break;
+    }
+
+    return data;
+  }
+
+  /**
+   * Generic serialize for data without specific field context
    */
   private serialize(data: any): any {
+    if (data === null || data === undefined) {
+      return data;
+    }
+
     if (data instanceof Vector3) {
       return {
         x: data.x,
         y: data.y,
         z: data.z,
-        _isVector3: true,
-      } as SerializableVector3;
+      };
+    }
+
+    if (Array.isArray(data)) {
+      return data.map((item) => this.serialize(item));
     }
 
     if (typeof data === 'object' && data !== null) {
       const serialized: any = {};
       for (const [key, value] of Object.entries(data)) {
-        serialized[key] = this.serialize(value);
+        // Try field-specific serialization if we have schema info
+        if (this.schema?.fields?.[key]) {
+          serialized[key] = this.serializeField(value, key);
+        } else {
+          serialized[key] = this.serialize(value);
+        }
       }
       return serialized;
     }
@@ -207,17 +246,95 @@ export class IDBSun<T extends Record<string, any>> implements SunIfAsync<T> {
   }
 
   /**
-   * Deserialize data from storage (restore Vector3 objects)
+   * Deserialize a specific field using schema definitions
+   */
+  private deserializeField(data: any, fieldName: string): any {
+    if (data === null || data === undefined) {
+      return data;
+    }
+
+    const field = this.schema?.fields?.[fieldName];
+    if (!field) {
+      return data;
+    }
+
+    // Use custom import function if available
+    if (field.import && typeof field.import === 'function') {
+      try {
+        return field.import({
+          inputRecord: data,
+          field,
+          schema: this.schema,
+          key: fieldName,
+        });
+      } catch (error) {
+        console.warn(`Error in custom import for field ${fieldName}:`, error);
+        // Fall through to default handling
+      }
+    }
+
+    // Handle different field types using FIELD_TYPES
+    switch (field.type) {
+      case FIELD_TYPES.object:
+        if (typeof data === 'object' && data !== null && !Array.isArray(data)) {
+          // Check for Vector3 meta hint
+          if (
+            field.meta?.isVector3 &&
+            typeof data === 'object' &&
+            'x' in data &&
+            'y' in data &&
+            'z' in data
+          ) {
+            return new Vector3(data.x, data.y, data.z);
+          }
+
+          // If field has univFields mapping, reconstruct nested object
+          if (field.univFields && typeof field.univFields === 'object') {
+            const reconstructed: any = {};
+            for (const [localKey, universalKey] of Object.entries(
+              field.univFields,
+            )) {
+              if (data.hasOwnProperty(universalKey)) {
+                reconstructed[localKey] = this.deserialize(data[universalKey]);
+              }
+            }
+            return reconstructed;
+          }
+          // Otherwise deserialize all properties
+          return this.deserialize(data);
+        }
+        break;
+
+      case FIELD_TYPES.array:
+        if (Array.isArray(data)) {
+          return Array.from(data);
+        }
+        break;
+    }
+
+    // Fall back to generic deserialization
+    return this.deserialize(data);
+  }
+
+  /**
+   * Generic deserialize for data without specific field context
    */
   private deserialize(data: any): any {
-    if (data && typeof data === 'object' && data._isVector3) {
-      return new Vector3(data.x, data.y, data.z);
+    if (data === null || data === undefined) {
+      return data;
+    }
+
+    if (Array.isArray(data)) {
+      return data.map((item) => this.deserialize(item));
     }
 
     if (typeof data === 'object' && data !== null) {
       const deserialized: any = {};
       for (const [key, value] of Object.entries(data)) {
-        deserialized[key] = this.deserialize(value);
+        // Try field-specific deserialization if we have schema info
+        deserialized[key] = this.schema?.fields?.[key]
+          ? this.deserializeField(value, key)
+          : this.deserialize(value);
       }
       return deserialized;
     }
@@ -233,8 +350,25 @@ export class IDBSun<T extends Record<string, any>> implements SunIfAsync<T> {
     const result = await this.db.get(this.tableName, key);
     if (!result) return undefined;
 
-    // CRITICAL FIX: Don't remove the id field! Keep the entire record including id
-    return this.deserialize(result) as T;
+    let deserialized = this.deserialize(result) as T;
+
+    if (
+      this.schema?.filterRecord &&
+      typeof this.schema.filterRecord === 'function'
+    ) {
+      try {
+        deserialized = this.schema.filterRecord({
+          inputRecord: deserialized,
+          schema: this.schema,
+          key,
+        });
+      } catch (error) {
+        console.warn(`Error in schema filterRecord for key ${key}:`, error);
+        // Continue with unfiltered result
+      }
+    }
+
+    return deserialized;
   }
 
   async set(key: string, value: T): Promise<void> {

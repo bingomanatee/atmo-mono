@@ -113,6 +113,9 @@ export function createCenterPlatelet(
   // Calculate a reasonable radius for the platelet (same as other platelets at this resolution)
   const calculatedRadius = h3HexRadiusAtResolution(planetRadius, resolution);
 
+  // Use half the H3 radius for coverage area (consistent with createPlateletFromCell)
+  const coverageRadius = calculatedRadius * 0.5;
+
   // Calculate elevation (same as normal platelets)
   const elevation = floatElevation(plate.thickness, plate.density);
 
@@ -122,7 +125,7 @@ export function createCenterPlatelet(
     planetId: plate.planetId, // Add planetId from plate
     h3Cell: 'center', // Not tied to H3 grid - just a simple center platelet
     position: position,
-    radius: calculatedRadius,
+    radius: coverageRadius,
     thickness: plate.thickness,
     density: plate.density,
     isActive: true,
@@ -179,13 +182,19 @@ export function createPlateletFromCell(
   // This ensures platelets are sized correctly for their H3 resolution level
   const calculatedRadius = h3HexRadiusAtResolution(planetRadius, resolution);
 
+  // Use half the distance between centers as the coverage radius
+  // This represents the actual area each platelet should cover
+  const coverageRadius = averageNeighborDistance
+    ? averageNeighborDistance * 0.5
+    : calculatedRadius * 0.5;
+
   return {
     id: `${plate.id}-${cell}`,
     plateId: plate.id,
     planetId: plate.planetId, // Add planetId from plate
     h3Cell: cell,
     position,
-    radius: averageNeighborDistance || calculatedRadius,
+    radius: coverageRadius,
     thickness: plate.thickness,
     density: plate.density,
     isActive: true,

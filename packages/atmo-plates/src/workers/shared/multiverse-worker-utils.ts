@@ -142,13 +142,17 @@ export function createPlateletFromCellWorker(
     (neighbor) => neighbor !== cell,
   );
 
+  // Use half the H3 radius for coverage area (consistent with main thread)
+  const h3Radius = h3HexRadiusAtResolution(planetRadius, resolution);
+  const coverageRadius = h3Radius * 0.5;
+
   return {
     id: `${plate.id}-${cell}`, // Use consistent ID format
     plateId: plate.id,
     planetId: plate.planetId, // Add planetId from plate
     h3Cell: cell, // Include h3Cell property
     position: position,
-    radius: h3HexRadiusAtResolution(planetRadius, resolution),
+    radius: coverageRadius,
     thickness: plate.thickness || 1.0,
     density: plate.density || 1.0,
     isActive: true,
@@ -158,7 +162,7 @@ export function createPlateletFromCellWorker(
       (plate.thickness || 1.0) *
       (plate.density || 1.0) *
       Math.PI *
-      Math.pow(h3HexRadiusAtResolution(planetRadius, resolution), 2),
+      Math.pow(h3Radius, 2),
     elasticity: 0.5,
     velocity: { x: 0, y: 0, z: 0 }, // Plain object for worker context
   };
