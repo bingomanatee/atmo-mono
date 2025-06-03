@@ -23,7 +23,7 @@ import {
 } from '../utils/plateletUtils';
 
 export class PlateletManager {
-  public static readonly PLATELET_CELL_LEVEL = 3; // Resolution level for platelets (higher resolution, smaller platelets)
+  public static readonly PLATELET_CELL_LEVEL = 2; // Resolution level for platelets (level 2 = ~154km cells, good balance)
 
   private sim: PlateSimulationIF;
   private useWorkers: boolean = false;
@@ -95,12 +95,6 @@ export class PlateletManager {
               super(scriptURL, options);
             }
 
-            // CRITICAL: Set up event listeners IMMEDIATELY after worker creation
-            // This ensures we catch any early messages from the worker
-            log(
-              '👂 PlateletManager: Setting up event listeners immediately after worker creation',
-            );
-
             this.addEventListener('message', (event) => {
               log('📨 PlateletManager: Received message from worker:', {
                 type: event.data.type,
@@ -138,11 +132,12 @@ export class PlateletManager {
 
               // Handle worker-error signal
               if (event.data.type === 'worker-error') {
-                log(
+                console.log(
                   '❌ PlateletManager: Worker initialization failed!',
                   event.data.error,
+                  '📊 PlateletManager: Worker error details:',
+                  event.data,
                 );
-                log('📊 PlateletManager: Worker error details:', event.data);
 
                 // Mark the system as failed - don't wait for more workers
                 plateletManager.workerAvailable = false;
@@ -288,18 +283,10 @@ export class PlateletManager {
       throw new Error(`Planet ${plate.planetId} not found in simulation`);
     const planetRadius = planet.radius;
 
-    log(`🌍 PLATELET GENERATION DEBUG:
-      sim.planetRadius: ${this.sim.planetRadius}km
-      planet.radius: ${planetRadius}km
-      plate.radius: ${plate.radius}km`);
-
     // Check H3 cell radius calculation
     const h3CellRadius = h3HexRadiusAtResolution(
       planetRadius,
       PlateletManager.PLATELET_CELL_LEVEL,
-    );
-    log(
-      `   h3CellRadius at resolution ${PlateletManager.PLATELET_CELL_LEVEL}: ${h3CellRadius}km`,
     );
 
     // Get the platelets collection from the simulation
@@ -525,39 +512,57 @@ export class PlateletManager {
     planetRadius: number,
     resolution: number,
   ): Promise<Platelet[]> {
-    log(`🎯 Using gridDisk method for plate ${plate.id}`);
-
     // Get the central H3 cell for the plate position
     const platePosition = new Vector3().copy(plate.position);
     const { lat, lon } = pointToLatLon(platePosition, planetRadius);
     const centralCell = latLngToCell(lat, lon, resolution);
 
-    log(`   Central H3 cell: ${centralCell}`);
-    log(`   Plate radius: ${plate.radius}km`);
+    // Smart unit detection for plate radius
+    let plateRadiusKm = plate.radius;
 
     // Calculate how many H3 cell radii we need to cover the plate
     const h3CellRadius = h3HexRadiusAtResolution(planetRadius, resolution);
-    log(`   H3 cell radius at resolution ${resolution}: ${h3CellRadius}km`);
+
+    // Validation check for reasonable H3 cell radius
+    if (h3CellRadius < 100) {
+      console.warn(
+        `⚠️ H3 cell radius seems small (${h3CellRadius.toFixed(1)}km). Consider using lower resolution for larger cells.`,
+      );
+    }
+
+    if (h3CellRadius < 1) {
+      console.error(
+        `❌ H3 cell radius is suspiciously small: ${h3CellRadius}km. This suggests a unit conversion error.`,
+      );
+    }
 
     // Use 133% of plate radius to account for hexagonal geometry
-    const searchRadius = plate.radius * 1.33;
+    const searchRadius = plateRadiusKm * 1.33;
 
     // Calculate how many H3 cell "rings" we need to cover the search radius
-    // Each ring isok  approximately one H3 cell radius away from the previous ring
+    // Each ring is approximately one H3 cell radius away from the previous ring
     const ringsNeeded = Math.ceil(searchRadius / h3CellRadius);
 
-    // Use the full rings needed for circular boundary (no artificial cap)
-    // Let gridDisk expand to the actual circular boundary
-    const gridDiskRings = ringsNeeded;
+    // SAFETY CHECK: Cap the rings to prevent H3 overflow
+    const maxSafeRings = 50; // H3 gridDisk can handle up to ~50 rings safely
+    const gridDiskRings = Math.min(ringsNeeded, maxSafeRings);
 
-    log(`   Search radius (133% of plate): ${searchRadius.toFixed(2)}km`);
     log(
-      `   Rings needed: ${ringsNeeded}, using: ${gridDiskRings} rings (no cap)`,
+      `   Search radius (133% of plate): ${searchRadius.toFixed(2)} (same units as plate.radius)`,
     );
+    log(
+      `   Rings needed: ${ringsNeeded}, using: ${gridDiskRings} rings (capped at ${maxSafeRings})`,
+    );
+
+    if (ringsNeeded > maxSafeRings) {
+      console.warn(
+        `⚠️ Rings needed (${ringsNeeded}) exceeds safe limit (${maxSafeRings}). This suggests unit mismatch - plate.radius might be in radians instead of km.`,
+      );
+    }
 
     // Get all cells within the gridDisk rings using atmo-utils helper
     const candidateCells = getCellsInRange(centralCell, gridDiskRings);
-    log(`   Found ${candidateCells.length} candidate cells`);
+    console.log(`   Found ${candidateCells.length} candidate cells`);
 
     // Filter cells that are actually within the plate radius
     const validCells: string[] = [];
@@ -581,7 +586,7 @@ export class PlateletManager {
 
         const distanceToPlate = cellPosition.distanceTo(plateCenter);
 
-        if (distanceToPlate <= plate.radius) {
+        if (distanceToPlate <= plateRadiusKm) {
           validCells.push(cell);
         } else {
           outOfRangeCount++;

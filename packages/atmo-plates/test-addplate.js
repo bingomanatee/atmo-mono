@@ -21,7 +21,7 @@ async function testAddPlate() {
     density: 2.8, // g/cm³
     thickness: 35, // km
     position: new Vector3(EARTH_RADIUS, 0, 0), // On the surface
-    planetId: sim.planet.id,
+    planetId: sim.simulation.planetId,
   });
 
   console.log(`✅ Added plate with ID: ${plateId}`);

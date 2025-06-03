@@ -140,7 +140,12 @@ export function getNeighbors(h3Index: string): string[] {
  * @returns An array of H3 cell indices within the specified distance
  */
 export function getCellsInRange(h3Index: string, distance: number): string[] {
-  return h3.gridDisk(h3Index, distance);
+  try {
+    return h3.gridDisk(h3Index, distance);
+  } catch (err) {
+    console.log('error calling getCellsInRange', h3Index, distance);
+    throw err;
+  }
 }
 
 /**

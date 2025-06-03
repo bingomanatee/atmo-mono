@@ -13,7 +13,6 @@ import type { Vector3Like } from 'three';
 import { Vector3 } from 'three';
 import { COLLECTIONS } from './PlateSimulation/constants';
 import {
-  createAsyncSun,
   createSharedDexieSun,
   createIDBSun,
   getStorageCapabilities,
@@ -383,44 +382,50 @@ export async function simUniverse(
       '🌌 Created shared multiverse with IDBSun storage for better worker support',
     );
   } else {
-    // Use separate DexieSun instances (original behavior)
-    platesSun = await createAsyncSun({
+    // Use separate IDBSun instances
+    platesSun = await createIDBSun({
       dbName: 'atmo-plates',
       tableName: COLLECTIONS.PLATES,
       schema: platesSchema,
+      isMaster: true,
     });
 
-    planetsSun = await createAsyncSun({
+    planetsSun = await createIDBSun({
       dbName: 'atmo-plates',
       tableName: COLLECTIONS.PLANETS,
       schema: planetsSchema,
+      isMaster: true,
     });
 
-    simulationsSun = await createAsyncSun({
+    simulationsSun = await createIDBSun({
       dbName: 'atmo-plates',
       tableName: COLLECTIONS.SIMULATIONS,
       schema: simulationsSchema,
+      isMaster: true,
     });
 
-    plateStepsSun = await createAsyncSun({
+    plateStepsSun = await createIDBSun({
       dbName: 'atmo-plates',
       tableName: COLLECTIONS.STEPS,
       schema: plateStepsSchema,
+      isMaster: true,
     });
 
-    plateletStepsSun = await createAsyncSun({
+    plateletStepsSun = await createIDBSun({
       dbName: 'atmo-plates',
       tableName: COLLECTIONS.PLATELET_STEPS,
       schema: plateletStepsSchema,
+      isMaster: true,
     });
 
-    plateletsSun = await createAsyncSun({
+    plateletsSun = await createIDBSun({
       dbName: 'atmo-plates',
       tableName: COLLECTIONS.PLATELETS,
       schema: plateletsSchema,
+      isMaster: true,
     });
 
-    log('🔧 Created multiverse with separate DexieSun storage');
+    log('🔧 Created multiverse with separate IDBSun storage');
   }
 
   // Create collections with adaptive suns

@@ -28,35 +28,6 @@ interface IDBSunFactoryOptions extends SunFactoryOptions {
 }
 
 /**
- * Factory function to create the best available AsyncSun implementation
- * Prefers IndexedDB (DexieSun) with fallback to memory storage
- */
-export async function createAsyncSun<T extends Record<string, any>>(
-  options: SunFactoryOptions,
-): Promise<AsyncSunIF<T>> {
-  const { dbName, tableName, schema } = options;
-
-  // Check if IndexedDB is available
-  if (!isIndexedDBAvailable()) {
-    console.warn(
-      `⚠️ IndexedDB not available - falling back to memory storage for ${tableName}`,
-    );
-    return memoryAsyncSunF({ schema });
-  }
-
-  log(`🔧 Creating DexieSun for ${tableName}`);
-  const dexieSun = new DexieSun<T>({
-    dbName: `${dbName}-${tableName}`, // Separate database per table to avoid schema conflicts
-    tableName,
-    schema,
-    dontClear: false, // Clear data each run for fresh experiments
-  });
-
-  // Return the DexieSun
-  return dexieSun;
-}
-
-/**
  * Check if IndexedDB is available in the current environment
  */
 function isIndexedDBAvailable(): boolean {
@@ -83,9 +54,6 @@ export async function createSharedDexieSun<T extends Record<string, any>>(
 
   // Check if IndexedDB is available
   if (!isIndexedDBAvailable()) {
-    log(
-      `⚠️ IndexedDB not available - falling back to memory storage for ${tableName}`,
-    );
     return memoryAsyncSunF({ schema });
   }
 
@@ -112,9 +80,6 @@ export async function createVersionedDexieSun<T extends Record<string, any>>(
 
   // Check if IndexedDB is available
   if (!isIndexedDBAvailable()) {
-    log(
-      `⚠️ IndexedDB not available - falling back to memory storage for ${tableName}`,
-    );
     return memoryAsyncSunF({ schema });
   }
 
@@ -153,26 +118,11 @@ export async function createIDBSun<T extends Record<string, any>>(
   );
 
   if (!indexedDBAvailable) {
-    console.error(
-      `🚨🚨🚨 CRITICAL: IndexedDB NOT AVAILABLE - FALLING BACK TO MEMORY STORAGE FOR ${tableName.toUpperCase()} 🚨🚨🚨`,
-    );
-    console.error(
-      `🚨 THIS MEANS DATA WILL NOT PERSIST AND WORKERS CANNOT SHARE DATA! 🚨`,
-    );
-    console.error(`🚨 ALL PLATE DATA WILL BE LOST ON PAGE RELOAD! 🚨`);
-    log(
-      `⚠️ IndexedDB not available - falling back to memory storage for ${tableName}`,
-    );
     const memorySun = memoryAsyncSunF({ schema });
-    console.warn(
-      `⚠️ Created MEMORY-ONLY storage for ${tableName} (backend: memory) - NO PERSISTENCE!`,
-    );
-    log(`✅ Created memory storage for ${tableName} (backend: memory)`);
     return memorySun;
   }
 
   const role = isMaster ? 'Master' : 'Worker';
-  console.log(`🔧 Creating IDBSun ${role} for ${tableName}`);
 
   const idbSun = new IDBSun<T>({
     dbName,

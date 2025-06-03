@@ -12,10 +12,10 @@ describe('PlateletCollisionSimulator', () => {
   let platelets: Platelet[];
   let planetId: string;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     // Create a new simulation with a planet
     sim = new PlateSimulation();
-    sim.init();
+    await sim.init();
     planetId = uuidV4();
 
     // Create test platelets in the sector with specific interaction patterns

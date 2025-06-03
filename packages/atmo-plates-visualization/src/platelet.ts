@@ -148,7 +148,10 @@ async function generateAndVisualizePlatelets() {
   console.log(`🔍 Getting plates from collection...`);
 
   // Manually iterate the async generator
-  const plateGenerator = platesCollection.find('planetId', sim.planet.id);
+  const plateGenerator = platesCollection.find(
+    'planetId',
+    sim.simulation.planetId,
+  );
   let plateResult = await plateGenerator.next();
 
   while (!plateResult.done) {

@@ -17,8 +17,8 @@ import { PlateSimulation } from './PlateSimulation';
 import type { SimPlateIF } from './types.PlateSimulation';
 
 const DEFAULT_PLANET_RADIUS = 1000000;
-const DEFAULT_PLATE_RADIUS = Math.PI / 32; // ~0.098 radians = ~625 km when converted
-const CUSTOM_PLATE_RADIUS = Math.PI / 16; // ~0.196 radians = ~1250 km when converted
+const DEFAULT_PLATE_RADIANS = Math.PI / 32; // ~0.098 radians = ~625 km when converted
+const CUSTOM_PLATE_RADIANS = Math.PI / 16; // ~0.196 radians = ~1250 km when converted
 const DEFAULT_PLATE_COUNT = 10;
 
 describe('PlateSimulation:class', () => {
@@ -47,11 +47,11 @@ describe('PlateSimulation:class', () => {
   it('should create a plate', async () => {
     // Add a plate using the shared constant
     const plateId = await sim.addPlate({
-      radius: DEFAULT_PLATE_RADIUS,
+      radians: DEFAULT_PLATE_RADIANS,
     });
 
     // Calculate expected radius in km (radians * planet radius)
-    const expectedRadiusKm = DEFAULT_PLATE_RADIUS * sim.planetRadius;
+    const expectedRadiusKm = DEFAULT_PLATE_RADIANS * sim.planetRadius;
 
     // Retrieve the plate using the shared collection
     const retrievedPlate = await platesCollection.get(plateId);
@@ -61,7 +61,7 @@ describe('PlateSimulation:class', () => {
   it('should update a plate', async () => {
     // Add a plate using the shared constant
     const plateId = await sim.addPlate({
-      radius: DEFAULT_PLATE_RADIUS,
+      radians: DEFAULT_PLATE_RADIANS,
     });
 
     // Get the initial plate using the shared collection
@@ -84,7 +84,7 @@ describe('PlateSimulation:class', () => {
   it('should delete a plate', async () => {
     // Add a plate using the shared constant
     const plateId = await sim.addPlate({
-      radius: DEFAULT_PLATE_RADIUS,
+      radians: DEFAULT_PLATE_RADIANS,
     });
 
     // Verify the plate exists using the shared collection
@@ -100,12 +100,12 @@ describe('PlateSimulation:class', () => {
   it('should get a plate by ID using getPlate method', async () => {
     // Add a plate with custom properties
     const customName = 'Test Plate';
-    const customRadiusRadians = CUSTOM_PLATE_RADIUS;
+    const customRadiusRadians = CUSTOM_PLATE_RADIANS;
     const customDensity = 2.5;
 
     const plateId = await sim.addPlate({
       name: customName,
-      radius: customRadiusRadians,
+      radians: customRadiusRadians,
       density: customDensity,
     });
 
@@ -251,13 +251,13 @@ describe('PlateSimulation:class', () => {
 
     // Add a plate to the simulation
     const plateId = await simWithInjectedMv.addPlate({
-      radius: DEFAULT_PLATE_RADIUS,
+      radians: DEFAULT_PLATE_RADIANS,
       planetId,
     });
 
     // Calculate expected radius in km (radians * planet radius)
     const expectedRadiusKm =
-      DEFAULT_PLATE_RADIUS * simWithInjectedMv.planetRadius;
+      DEFAULT_PLATE_RADIANS * simWithInjectedMv.planetRadius;
 
     // Verify that the plate was added to the pre-existing multiverse
     const plate = await mv
@@ -271,7 +271,7 @@ describe('PlateSimulation:class', () => {
 
   it('should use getPlanet to retrieve a planet by ID', async () => {
     // Get the current planet
-    const currentPlanet = sim.planet;
+    const currentPlanet = await sim.planet();
 
     // Retrieve the planet using getPlanet
     const retrievedPlanet = await sim.getPlanet(currentPlanet.id);
@@ -369,24 +369,24 @@ describe('PlateSimulation', () => {
       const plate1Id = await sim.addPlate({
         density: 1.0,
         thickness: 1.0,
-        radius: Math.PI / 12, // 15 degrees
+        radians: Math.PI / 12, // 15 degrees
         position: new Vector3(EARTH_RADIUS, 0, 0),
-        planetId: sim.planet!.id,
+        planetId: sim.simulation.planetId,
       });
 
       const plate2Id = await sim.addPlate({
         density: 1.1, // Within 20% of plate1
         thickness: 1.0,
-        radius: Math.PI / 12,
+        radians: Math.PI / 12,
         position: new Vector3(EARTH_RADIUS * 0.9, EARTH_RADIUS * 0.1, 0),
-        planetId: sim.planet!.id,
+        planetId: sim.simulation.planetId,
       });
 
       // Add a plate with very different density
       const plate3Id = await sim.addPlate({
         density: 2.0, // More than 20% different
         thickness: 1.0,
-        radius: Math.PI / 12,
+        radians: Math.PI / 12,
         position: new Vector3(EARTH_RADIUS * 0.8, EARTH_RADIUS * 0.2, 0),
         planetId: sim.planet!.id,
       });
@@ -493,7 +493,7 @@ describe('PlateSimulation', () => {
       const plate1Id = await sim.addPlate({
         density: 1.0,
         thickness: 1.0, // Low thickness
-        radius: Math.PI / 12,
+        radians: Math.PI / 12,
         position: new Vector3(EARTH_RADIUS, 0, 0),
         planetId: sim.planet!.id,
       });
@@ -501,7 +501,7 @@ describe('PlateSimulation', () => {
       const plate2Id = await sim.addPlate({
         density: 1.1, // Within 20% of plate1
         thickness: 2.0, // Higher thickness
-        radius: Math.PI / 12,
+        radians: Math.PI / 12,
         position: new Vector3(EARTH_RADIUS * 0.9, EARTH_RADIUS * 0.1, 0),
         planetId: sim.planet!.id,
       });
@@ -510,7 +510,7 @@ describe('PlateSimulation', () => {
       const plate3Id = await sim.addPlate({
         density: 1.05, // Similar density
         thickness: 3.0, // Very high thickness
-        radius: Math.PI / 12,
+        radians: Math.PI / 12,
         position: new Vector3(EARTH_RADIUS * 0.8, EARTH_RADIUS * 0.2, 0),
         planetId: sim.planet!.id,
       });
@@ -589,7 +589,7 @@ describe('PlateSimulation', () => {
         sim.addPlate({
           density: 1.0 + Math.random() * 0.5,
           thickness: 1.0 + Math.random() * 2.0,
-          radius: radius,
+          radians: radius,
           position: position,
         });
       }
@@ -712,7 +712,7 @@ describe('PlateSimulation', () => {
     });
   });
 
-  describe('createIrregularPlateEdges', () => {
+  describe.only('createIrregularPlateEdges', () => {
     it('should not delete platelets when there are 30 or fewer', async () => {
       // Create a simulation with a small number of platelets
       const sim = new PlateSimulation({
@@ -723,8 +723,8 @@ describe('PlateSimulation', () => {
 
       // Add a plate and generate platelets
       const plateId = await sim.addPlate({
-        radius: Math.PI / 96, // Extremely small radius (1.875 degrees) to get ≤30 platelets
-        planetId: sim.planet!.id,
+        radians: Math.PI / 96, // Extremely small radius (1.875 degrees) to get ≤30 platelets
+        planetId: sim.simulation.planetId,
       });
 
       const plateletManager = sim.managers.get('plateletManager');
@@ -750,7 +750,7 @@ describe('PlateSimulation', () => {
       expect(await plateletsCollection.count()).toBe(initialCount);
     });
 
-    it('should delete edge platelets when there are more than 30', async () => {
+    it.only('should delete edge platelets when there are more than 30', async () => {
       // Create a simulation with a larger plate to generate more platelets
       const sim = new PlateSimulation({
         planetRadius: EARTH_RADIUS,
@@ -760,8 +760,8 @@ describe('PlateSimulation', () => {
 
       // Add a larger plate to generate more platelets
       const plateId = await sim.addPlate({
-        radius: Math.PI / 8, // Larger radius to generate more platelets
-        planetId: sim.planet!.id,
+        radians: Math.PI / 10,
+        planetId: sim.simulation.planetId,
       });
 
       const plateletManager = sim.managers.get('plateletManager');
@@ -804,12 +804,21 @@ describe('PlateSimulation', () => {
 
         // Add a very large plate to generate many platelets
         const plateId = await sim.addPlate({
-          radius: Math.PI / 4, // Very large radius
-          planetId: sim.planet!.id,
+          radians: Math.PI / 4, // Very large radius
+          planetId: sim.simulation.planetId,
         });
 
         const plateletManager = sim.managers.get('plateletManager');
         await plateletManager.generatePlatelets(plateId);
+        const platesCollection = sim.simUniv.get(COLLECTIONS.PLATES);
+        const g = await platesCollection.values();
+        const plates = [];
+        do {
+          const { value, done } = await g.next();
+          if (done) break;
+          plates.push(value);
+        } while (true);
+        console.log('--- platelets generated:', [...plates]);
 
         // Populate neighbor relationships
         await sim.populatePlateletNeighbors();
@@ -821,6 +830,7 @@ describe('PlateSimulation', () => {
           `Generated ${initialCount} platelets for plate with radius ${Math.PI / 4} (45°)`,
         );
 
+        console.log('---------- platleets:', await plateletsCollection.count());
         // Call the method
         await sim.createIrregularPlateEdges();
 

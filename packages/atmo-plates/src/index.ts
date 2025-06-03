@@ -13,8 +13,8 @@ export { PlateSpectrumGenerator } from './generator/PlateSpectrumGenerator';
 export {
   DexieSun,
   IndexedSun,
-  createAsyncSun,
   createDexieSun,
+  createIDBSun,
   createMemoryAsyncSun,
   getStorageCapabilities,
 } from './PlateSimulation/sun';

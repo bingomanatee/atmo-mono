@@ -99,7 +99,7 @@ export function createCenterPlatelet(
   plate: SimPlateIF,
   planetRadius: number,
   resolution: number,
-): Platelet {
+): PlateletIF {
   // Create a unique ID for the center platelet
   const plateletId = `${plate.id}-center`;
 
@@ -161,17 +161,14 @@ export function createPlateletFromCell(
   let totalNeighborDistance = 0;
   let validNeighborCount = 0;
 
-  neighborCellIds.forEach((neighborH3Cell) => {
+  neighborCellIds.forEach((cell) => {
     try {
-      const neighborPosition = cellToVector(neighborH3Cell, planetRadius);
+      const neighborPosition = cellToVector(cell, planetRadius);
       totalNeighborDistance += position.distanceTo(neighborPosition);
       validNeighborCount++;
     } catch (error) {
       // Handle cases where cellToVector might fail for some reason (e.g., invalid cell ID)
-      console.error(
-        `Error getting position for neighbor cell ${neighborH3Cell}:`,
-        error,
-      );
+      console.error(`Error getting position for neighbor cell ${cell}:`, error);
     }
   });
 

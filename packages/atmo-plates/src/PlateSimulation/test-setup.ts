@@ -24,7 +24,7 @@ export async function createTestPlate(
   return await sim.addPlate({
     id: 'test_plate',
     name: 'Test Plate',
-    radius: 5000 / EARTH_RADIUS, // Convert 5000 km to radians
+    radians: Math.PI / 8,
     density: 2800,
     thickness: 100, // 100 km
     planetId: earthPlanetId,

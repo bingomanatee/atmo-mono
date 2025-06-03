@@ -31,6 +31,7 @@ export type AddPlateProps = (PlateExtendedIF | PlateIF) & {
   name?: string;
   planetId?: string;
   position?: Vector3Like;
+  radians: number;
 };
 
 export interface PlateSimulationProps {

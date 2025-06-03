@@ -13,6 +13,7 @@
 // Re-export multiverse dependencies
 export { Multiverse } from '@wonderlandlabs/multiverse';
 export { DexieSun } from '../../PlateSimulation/sun/DexieSun';
+import { gridDisk } from 'h3-js';
 
 // Re-export atmo-utils dependencies
 export {

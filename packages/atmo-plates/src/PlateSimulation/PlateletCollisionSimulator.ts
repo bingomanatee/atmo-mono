@@ -15,11 +15,11 @@ export class PlateletCollisionSimulator {
 
     // Load platelets from the simulation
     const plateletsCollection = sim.simUniv.get(COLLECTIONS.PLATELETS);
-    for (const [id, platelet] of plateletsCollection.values()) {
+    plateletsCollection.each((platelet: Platelet) => {
       if (platelet.sector === sectorId) {
-        this.#platelets.set(id, platelet);
+        this.#platelets.set(platelet.id, platelet);
       }
-    }
+    });
   }
 
   get platelets(): Map<string, Platelet> {

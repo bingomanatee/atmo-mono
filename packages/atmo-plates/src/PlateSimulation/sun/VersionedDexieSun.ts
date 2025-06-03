@@ -225,8 +225,8 @@ export class VersionedDexieSun<T extends Record<string, any>>
     const result = await this.table.get(key);
     if (!result) return undefined;
 
-    const { id, ...data } = result;
-    return this.deserialize(data) as T;
+    // CRITICAL FIX: Don't remove the id field! Keep the entire record including id
+    return this.deserialize(result) as T;
   }
 
   async set(key: string, value: T): Promise<void> {

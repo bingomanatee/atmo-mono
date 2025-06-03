@@ -4,7 +4,9 @@ import {
   getNeighbors,
   randomNormal,
 } from '@wonderlandlabs/atmo-utils';
+import { getH3CellForPosition } from '@wonderlandlabs/atmo-utils/dist';
 import { Multiverse } from '@wonderlandlabs/multiverse';
+import { gridDisk } from 'h3-js';
 import { shuffle } from 'lodash-es';
 import type { Vector3Like } from 'three';
 import { Vector3 } from 'three';
@@ -243,19 +245,17 @@ export class PlateSimulation implements PlateSimulationIF {
           .get(simulation.planetId);
 
         if (planet) {
-          this.planet = planet;
+          // Planet exists, no need to set anything - we'll use simulation.planetId
         } else {
           // If the planet doesn't exist but the simulation references it, create a new one
           console.warn(
             `Planet ${simulation.planetId} referenced in simulation ${this.#defaultSimId} not found. Creating a new planet.`,
           );
-          this.makePlanet(this.planetRadius);
+          const newPlanet = this.makePlanet(this.planetRadius);
 
-          const { id: planetId } = await this.planet();
-
-          // Update the simulation with the new planet ID and maxPlateRadius
+          // Update the simulation with the new planet ID
           await simulationsCollection.mutate(this.#defaultSimId, (sim) => {
-            return { ...sim, planetId };
+            return { ...sim, planetId: newPlanet.id };
           });
         }
       } else {
@@ -411,6 +411,7 @@ export class PlateSimulation implements PlateSimulationIF {
     let {
       id,
       name,
+      radians,
       radius,
       density = 1,
       thickness = 1,
@@ -454,9 +455,9 @@ export class PlateSimulation implements PlateSimulationIF {
         }
       }
 
-      // If we still don't have a planetId, use the current planet
+      // If we still don't have a planetId, use the simulation's planetId
       if (!planetId) {
-        if (!this.planet) {
+        if (!this.simulation?.planetId) {
           throw new Error('No planet available and no planetId provided');
         }
         planetId = this.simulation.planetId;
@@ -501,7 +502,7 @@ export class PlateSimulation implements PlateSimulationIF {
     } else {
       // If it's a basic plate, extend it with derived properties
       // Convert radius from radians to kilometers (same as PlateSpectrumGenerator)
-      const radiusKm = radius * planet.radius;
+      const radiusKm = radius ? radius : radians * planet.radius;
 
       const basicPlate: PlateIF & { id: string } = {
         id,
@@ -513,7 +514,6 @@ export class PlateSimulation implements PlateSimulationIF {
       // Extend the plate with derived properties
       const extendedPlate = extendPlate(basicPlate, planet.radius);
 
-      // Add simulation-specific properties
       plateData = {
         ...extendedPlate,
         name,
@@ -781,11 +781,6 @@ export class PlateSimulation implements PlateSimulationIF {
     plate: any,
   ): Promise<{ plateletCount: number }> {
     let plateletCount = 0;
-    const neighborUpdates: Array<{
-      id: string;
-      platelet: any;
-      neighbors: string[];
-    }> = [];
     const plateletsCollection = this.simUniv.get(COLLECTIONS.PLATELETS);
 
     // Use real-time find with plateId - no intermediate data structures
@@ -793,16 +788,10 @@ export class PlateSimulation implements PlateSimulationIF {
       currentPlateletId,
       currentPlatelet,
     ] of plateletsCollection.find('plateId', plateId)) {
-      const neighbors = await this.validUnrealizedPlateletNeighbors(
-        currentPlatelet,
-        cplate,
-      );
+      plateletCount++;
 
-      neighborUpdates.push({
-        id: currentPlateletId,
-        platelet: currentPlatelet,
-        neighbors,
-      });
+      // Perform gap-filling for this platelet
+      await this.validUnrealizedPlateletNeighbors(currentPlatelet, plate);
     }
 
     console.log(`  Found ${plateletCount} platelets for plate ${plateId}`);
@@ -814,9 +803,7 @@ export class PlateSimulation implements PlateSimulationIF {
       return { plateletCount };
     }
 
-    // Batch write all neighbor updates for this plate
-    await this.writeNeighborUpdates(neighborUpdates, plateletsCollection);
-
+    // Gap-filling is complete for this plate
     return { plateletCount };
   }
 
@@ -871,6 +858,14 @@ export class PlateSimulation implements PlateSimulationIF {
 
     const planet = await this.planet();
     const plateletsCollection = this.simUniv.get(COLLECTIONS.PLATELETS);
+
+    if (!Array.isArray(platelet.neighborCellIds)) {
+      console.warn(
+        '⚠️ neighborCellIds is not an array, skipping platelet:',
+        platelet,
+      );
+      return missingCoordinates; // Return empty array if not iterable
+    }
 
     for (const neighborCell of platelet.neighborCellIds) {
       const neighborPosition = cellToVector(neighborCell, planet.radius);
@@ -944,8 +939,8 @@ export class PlateSimulation implements PlateSimulationIF {
   }
 
   /**
-   * Refresh neighbor relationships by removing invalid neighbor IDs
-   * This removes neighbors that don't exist in the collection
+   * Refresh neighbor relationships by validating neighborCellIds
+   * This ensures all H3 cell IDs in neighborCellIds correspond to existing platelets
    * Uses efficient has() checks instead of loading full neighbor objects
    */
   async refreshNeighbors(): Promise<void> {
@@ -958,32 +953,33 @@ export class PlateSimulation implements PlateSimulationIF {
     let totalNeighborsRemoved = 0;
 
     for await (const [_, platelet] of plateletsCollection.values()) {
-      if (platelet.neighbors && platelet.neighbors.length > 0) {
-        const originalLength = platelet.neighbors.length;
+      if (platelet.neighborCellIds && platelet.neighborCellIds.length > 0) {
+        const originalLength = platelet.neighborCellIds.length;
 
-        // Filter out invalid neighbors using efficient has() check
-        const validNeighbors = [];
-        for (const neighborId of platelet.neighbors) {
+        // Filter out H3 cell IDs that don't have corresponding platelets
+        const validNeighborCells = [];
+        for (const cellId of platelet.neighborCellIds) {
+          const neighborPlateletId = `${platelet.plateId}-${cellId}`;
           // Use has() to check existence - much more efficient than get()
-          if (await plateletsCollection.has(neighborId)) {
-            validNeighbors.push(neighborId);
+          if (await plateletsCollection.has(neighborPlateletId)) {
+            validNeighborCells.push(cellId);
           }
         }
 
-        if (validNeighbors.length !== originalLength) {
-          // Update the platelet with cleaned neighbor list
+        if (validNeighborCells.length !== originalLength) {
+          // Update the platelet with cleaned neighborCellIds list
           await plateletsCollection.set(platelet.id, {
             ...platelet,
-            neighbors: validNeighbors,
+            neighborCellIds: validNeighborCells,
           });
           totalCleaned++;
-          totalNeighborsRemoved += originalLength - validNeighbors.length;
+          totalNeighborsRemoved += originalLength - validNeighborCells.length;
         }
       }
     }
 
     console.log(
-      `Refreshed neighbors: cleaned ${totalCleaned} platelets, removed ${totalNeighborsRemoved} invalid neighbor references`,
+      `Refreshed neighborCellIds: cleaned ${totalCleaned} platelets, removed ${totalNeighborsRemoved} invalid H3 cell references`,
     );
   }
 
@@ -1072,7 +1068,9 @@ export class PlateSimulation implements PlateSimulationIF {
     }> = [];
 
     platelets.forEach((platelet: any) => {
-      const neighborCount = platelet.neighbors ? platelet.neighbors.length : 0;
+      const neighborCount = platelet.neighborCellIds
+        ? platelet.neighborCellIds.length
+        : 0;
       plateletNeighborCounts.push({
         id: platelet.id,
         neighborCount,
@@ -1196,14 +1194,14 @@ export class PlateSimulation implements PlateSimulationIF {
 
     // Find the platelet in our local array
     const platelet = platelets.find((p) => p.id === plateletId);
-    if (!platelet || !platelet.neighbors) {
+    if (!platelet || !platelet.neighborCellIds) {
       return;
     }
 
-    // Get available neighbors (not already deleted)
-    const neighbors = platelet.neighbors.filter(
-      (neighborId: string) => !deletedSet.has(neighborId),
-    );
+    // Convert H3 cell IDs to platelet IDs and filter out already deleted ones
+    const neighbors = platelet.neighborCellIds
+      .map((cellId: string) => `${platelet.plateId}-${cellId}`)
+      .filter((neighborId: string) => !deletedSet.has(neighborId));
 
     // Calculate how many more we can delete
     const remainingDeletions = maxAllowedDeletions - deletedSet.size;

@@ -6,7 +6,6 @@ export { SharedDexieSun } from './SharedDexieSun';
 export { SharedDexieManager } from './SharedDexieManager';
 export { VersionedDexieSun } from './VersionedDexieSun';
 export {
-  createAsyncSun,
   createDexieSun,
   createIDBSun,
   createSharedDexieSun,
