@@ -36,10 +36,14 @@ export default class PlateSimulationPlateManager {
   }
 
   // Method to initialize steps for a specific plate
-  initPlateSteps(plateId: string) {
-    const steps = this.stepsCollection.find('plateId', plateId);
-    if (!steps?.length) {
-      const plateStepId = this.#addFirstStep(plateId);
+  async initPlateSteps(plateId: string) {
+    const stepsIterable = this.stepsCollection.find('plateId', plateId);
+    const steps = [];
+    for await (const step of stepsIterable) {
+      steps.push(step);
+    }
+    if (steps.length === 0) {
+      const plateStepId = await this.#addFirstStep(plateId);
 
       // Get the PlateletManager instance
       const plateletManager = this.#sim.managers.get(
@@ -49,7 +53,7 @@ export default class PlateSimulationPlateManager {
         throw new Error('PlateletManager not found in sim.managers');
 
       // Generate initial platelet steps
-      const platelets = plateletManager.generatePlatelets(plateId);
+      const platelets = await plateletManager.generatePlatelets(plateId);
       const plateletStepsCollection = this.#sim.simUniv.get(
         COLLECTIONS.PLATELET_STEPS,
       );
@@ -95,10 +99,9 @@ export default class PlateSimulationPlateManager {
   }
 
   // Method to add the first step for a specific plate
-  #addFirstStep(plateId: string) {
-    // @ts-ignore
-    const plate: SimPlateIF = this.#sim.getPlate(plateId);
-    const planet = this.#sim.getPlanet(plate.planetId);
+  async #addFirstStep(plateId: string) {
+    const plate: SimPlateIF = await this.#sim.getPlate(plateId);
+    const planet = await this.#sim.getPlanet(plate.planetId);
 
     const stepId = uuidV4();
 
@@ -110,8 +113,8 @@ export default class PlateSimulationPlateManager {
 
     const stepData = {
       id: stepId,
-      plateId: plate.id,
-      plateletId: plate.id,
+      plateId: plateId, // Use the passed plateId parameter directly
+      plateletId: plateId, // Use the passed plateId parameter directly
       step: 0,
       speed, // Use provided speed or random between 5-250
       position,
@@ -119,7 +122,7 @@ export default class PlateSimulationPlateManager {
       start: position,
     };
 
-    this.stepsCollection.set(stepId, stepData);
+    await this.stepsCollection.set(stepId, stepData);
 
     return stepId;
   }

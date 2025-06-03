@@ -534,6 +534,29 @@ export class PlateSimulation implements PlateSimulationIF {
       );
     }
 
+    try {
+      const plateletManager = this.managers.get('plateletManager') as any;
+      if (plateletManager) {
+        const initialPlatelets = await plateletManager.generatePlatelets(id);
+
+        if (initialPlatelets.length > 30) {
+          await this.populatePlateletNeighbors();
+
+          const plateletsCollection = this.simUniv.get('platelets');
+          const currentPlatelets: any[] = [];
+          for await (const [_, platelet] of plateletsCollection.find(
+            'plateId',
+            id,
+          )) {
+            currentPlatelets.push(platelet);
+          }
+          await this.createIrregularEdgesForPlate(id, currentPlatelets);
+        }
+      }
+    } catch (error) {
+      // Don't throw error - plate creation should still succeed even if edge degradation fails
+    }
+
     return id;
   }
 
@@ -755,22 +778,13 @@ export class PlateSimulation implements PlateSimulationIF {
       'planetId',
       this.simulation.planetId,
     )) {
-      console.log(`Processing neighbors for plate ${plateId}...`);
-
       const result = await this.addEdgePlatelets(plateId, plate);
 
       totalPlateletsProcessed += result.plateletCount;
       totalPlatesProcessed++;
-
-      console.log(
-        `  Completed neighbors for plate ${plateId} (${result.plateletCount} platelets)`,
-      );
     }
 
     console.timeEnd('  🔗 Computing neighbor relationships');
-    console.log(
-      `Neighbor relationships populated: ${totalPlatesProcessed} plates, ${totalPlateletsProcessed} platelets processed`,
-    );
   }
 
   /**
@@ -794,12 +808,7 @@ export class PlateSimulation implements PlateSimulationIF {
       await this.validUnrealizedPlateletNeighbors(currentPlatelet, plate);
     }
 
-    console.log(`  Found ${plateletCount} platelets for plate ${plateId}`);
-
     if (plateletCount < 2) {
-      console.log(
-        `  Skipping plate ${plateId} - not enough platelets for neighbor relationships`,
-      );
       return { plateletCount };
     }
 
@@ -841,7 +850,7 @@ export class PlateSimulation implements PlateSimulationIF {
         PlateletManager.PLATELET_CELL_LEVEL,
       );
       await plateletsCollection.set(plateletId, newPlatelet);
-      const saved = plateletsCollection.fond(newPlatelet.id);
+      const saved = await plateletsCollection.get(newPlatelet.id);
 
       await this.validUnrealizedPlateletNeighbors(saved, plate);
     }
@@ -894,10 +903,10 @@ export class PlateSimulation implements PlateSimulationIF {
     plateId: string,
   ): Promise<string[]> {
     const candidatesWithDistance: Array<{ id: string; distance: number }> = [];
-    const neighborCells = getNeighbors(currentPlatelet.h3Cell);
+    const neighborCells = await getNeighbors(currentPlatelet.h3Cell);
 
     for (const neighborCell of neighborCells) {
-      const neighborPosition = cellToVector(neighborCell, planetRadius);
+      const neighborPosition = await cellToVector(neighborCell, planetRadius);
       const distanceToPlateCenter = neighborPosition.distanceTo(platePosition);
 
       if (distanceToPlateCenter <= plateRadius) {
@@ -977,31 +986,19 @@ export class PlateSimulation implements PlateSimulationIF {
         }
       }
     }
-
-    console.log(
-      `Refreshed neighborCellIds: cleaned ${totalCleaned} platelets, removed ${totalNeighborsRemoved} invalid H3 cell references`,
-    );
   }
 
   /**
    * Create irregular edges for larger plates by deleting edge platelets
-   * TEMPORARILY DISABLED - No edge erosion will be performed
    */
   async createIrregularPlateEdges(): Promise<void> {
-    console.log(
-      'Edge erosion is disabled - skipping irregular plate edge creation',
-    );
-    return;
     const plateletsCollection = this.simUniv.get(COLLECTIONS.PLATELETS);
     if (!plateletsCollection) {
       throw new Error('platelets collection not found');
     }
 
-    // Refresh neighbor relationships BEFORE edge detection to ensure accurate neighbor counts
-    console.log('Refreshing neighbor relationships before edge detection...');
     await this.refreshNeighbors();
 
-    // Group platelets by plate
     const plateletsByPlate = new Map<string, any[]>();
     for await (const [_, platelet] of plateletsCollection.values()) {
       const plateId = platelet.plateId;
@@ -1011,38 +1008,19 @@ export class PlateSimulation implements PlateSimulationIF {
       plateletsByPlate.get(plateId)!.push(platelet);
     }
 
-    let totalDeleted = 0;
-
-    // Shuffle the plates to randomize processing order
     const plateEntries = Array.from(plateletsByPlate.entries());
     const shuffledPlateEntries = shuffle(plateEntries);
 
-    // Process each plate individually in random order
     for (const [plateId, platelets] of shuffledPlateEntries) {
       const plateSize = platelets.length;
 
       if (plateSize <= 30) {
-        console.log(
-          `Plate ${plateId}: ${plateSize} platelets - too small, skipping edge deletion`,
-        );
         continue;
       }
 
-      const deletedCount = await this.createIrregularEdgesForPlate(
-        plateId,
-        platelets,
-      );
-      totalDeleted += deletedCount;
-
-      console.log(
-        `Plate ${plateId}: ${plateSize} platelets → deleted ${deletedCount} platelets (${((deletedCount / plateSize) * 100).toFixed(1)}%)`,
-      );
+      await this.createIrregularEdgesForPlate(plateId, platelets);
     }
 
-    console.log(`Total deleted across all plates: ${totalDeleted} platelets`);
-
-    // Refresh neighbor relationships AFTER deletion to clean up any orphaned references
-    console.log('Refreshing neighbor relationships after deletion...');
     await this.refreshNeighbors();
   }
 
@@ -1103,22 +1081,7 @@ export class PlateSimulation implements PlateSimulationIF {
       edgePlatelets = shuffledEdges.slice(0, Math.floor(plateSize * 0.4));
     }
 
-    // Get some stats for logging
-    const minNeighborCount = plateletNeighborCounts[0]?.neighborCount || 0;
-    const maxNeighborCount =
-      plateletNeighborCounts[plateletNeighborCounts.length - 1]
-        ?.neighborCount || 0;
-
-    // Log detailed info about this plate
-    console.log(
-      `  Plate ${plateId}: ${plateSize} platelets, ${edgePlatelets.length} edge platelets (≤${EDGE_NEIGHBOR_THRESHOLD} neighbors, 60% of avg ${avgNeighborCount.toFixed(1)})`,
-    );
-    console.log(
-      `    Neighbor stats: Min: ${minNeighborCount}, Max: ${maxNeighborCount}, Avg: ${avgNeighborCount.toFixed(1)}`,
-    );
-
     if (edgePlatelets.length === 0) {
-      console.log(`  No edge platelets found for plate ${plateId}, skipping`);
       return 0;
     }
 
@@ -1126,43 +1089,43 @@ export class PlateSimulation implements PlateSimulationIF {
     const shuffledEdgePlatelets = shuffle(edgePlatelets);
     const allPlateletsToDelete = new Set<string>();
 
-    // Calculate maximum allowed deletions (4% of total plate size - much more conservative)
-    const maxAllowedDeletions = Math.floor(plateSize * 0.04);
+    // Calculate maximum allowed deletions (20% of total plate size for large plates)
+    const maxAllowedDeletions = Math.floor(
+      plateSize * (plateSize >= 40 ? 0.2 : 0.15),
+    );
 
     if (plateSize >= 40) {
-      // For large plates (40+ platelets): Use limited recursive deletion
       const deleteCount = Math.min(
-        Math.floor(shuffledEdgePlatelets.length * 0.03), // Reduced from 8% to 3%
+        Math.max(
+          Math.ceil(plateSize * 0.15),
+          Math.floor(shuffledEdgePlatelets.length * 0.4),
+        ),
         maxAllowedDeletions,
       );
       const plateletsToDelete = shuffledEdgePlatelets.slice(0, deleteCount);
 
-      console.log(
-        `    Large plate: deleting ${deleteCount} of ${shuffledEdgePlatelets.length} edge platelets (max ${maxAllowedDeletions} allowed)`,
-      );
-
-      // For each selected edge platelet, delete only the platelet itself (no cascade)
       plateletsToDelete.forEach((item) => {
-        allPlateletsToDelete.add(item.id);
+        this.limitedDeleteNeighbors(
+          item.id,
+          allPlateletsToDelete,
+          platelets,
+          maxAllowedDeletions,
+        );
       });
-
-      console.log(
-        `    Limited deletion resulted in ${allPlateletsToDelete.size} total platelets marked for deletion`,
-      );
     } else {
-      // For smaller plates (30-39 platelets): Use simple limited deletion
       const deleteCount = Math.min(
-        Math.floor(shuffledEdgePlatelets.length * 0.05), // Reduced from 12% to 5%
+        Math.max(2, Math.floor(shuffledEdgePlatelets.length * 0.25)),
         maxAllowedDeletions,
       );
       const plateletsToDelete = shuffledEdgePlatelets.slice(0, deleteCount);
 
-      console.log(
-        `    Medium plate: deleting ${deleteCount} of ${shuffledEdgePlatelets.length} edge platelets (max ${maxAllowedDeletions} allowed)`,
-      );
-
       plateletsToDelete.forEach((item) => {
-        allPlateletsToDelete.add(item.id);
+        this.limitedDeleteNeighbors(
+          item.id,
+          allPlateletsToDelete,
+          platelets,
+          maxAllowedDeletions,
+        );
       });
     }
 
@@ -1206,9 +1169,9 @@ export class PlateSimulation implements PlateSimulationIF {
     // Calculate how many more we can delete
     const remainingDeletions = maxAllowedDeletions - deletedSet.size;
 
-    // Delete at most 10% of neighbors, but respect the hard cap (much more conservative)
+    // Delete at most 40% of neighbors, but respect the hard cap (more aggressive cascading)
     const neighborsToDelete = Math.min(
-      Math.ceil(neighbors.length * 0.1),
+      Math.ceil(neighbors.length * 0.4),
       remainingDeletions,
     );
 

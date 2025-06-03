@@ -471,6 +471,14 @@ export async function simUniverse(
     sunF: () => plateletsSun,
   });
 
+  // Add all collections to the universe
+  simUniv.add(platesCollection);
+  simUniv.add(planetsCollection);
+  simUniv.add(simulationsCollection);
+  simUniv.add(plateCollection);
+  simUniv.add(plateletStepsCollection);
+  simUniv.add(plateletsCollection);
+
   return simUniv;
 }
 

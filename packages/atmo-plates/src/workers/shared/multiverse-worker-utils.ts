@@ -13,12 +13,12 @@
 // Re-export multiverse dependencies
 export { Multiverse } from '@wonderlandlabs/multiverse';
 export { DexieSun } from '../../PlateSimulation/sun/DexieSun';
-import { gridDisk } from 'h3-js';
 
 // Re-export atmo-utils dependencies
 export {
   getCellsInRange,
   cellToVector,
+  getNeighborsSync,
   h3HexRadiusAtResolution,
   pointToLatLon,
   latLngToCell,
@@ -138,9 +138,7 @@ export function createPlateletFromCellWorker(
   }
 
   // Calculate neighbor H3 cell IDs
-  const neighborCellIds = gridDisk(cell, 1).filter(
-    (neighbor) => neighbor !== cell,
-  );
+  const neighborCellIds = getNeighborsSync(cell);
 
   // Use half the H3 radius for coverage area (consistent with main thread)
   const h3Radius = h3HexRadiusAtResolution(planetRadius, resolution);

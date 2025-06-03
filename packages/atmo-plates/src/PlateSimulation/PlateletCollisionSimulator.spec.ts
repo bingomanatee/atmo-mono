@@ -36,6 +36,7 @@ describe('PlateletCollisionSimulator', () => {
         thickness: baseThickness,
         density: 1,
         sector: sectorId,
+        h3Cell: baseCell,
         planetId,
       }),
       new Platelet({
@@ -44,6 +45,7 @@ describe('PlateletCollisionSimulator', () => {
         thickness: baseThickness,
         density: 1,
         sector: sectorId,
+        h3Cell: baseCell + '1',
         planetId,
       }),
       new Platelet({
@@ -52,6 +54,7 @@ describe('PlateletCollisionSimulator', () => {
         thickness: baseThickness,
         density: 1,
         sector: sectorId,
+        h3Cell: baseCell + '2',
         planetId,
       }),
       new Platelet({
@@ -60,6 +63,7 @@ describe('PlateletCollisionSimulator', () => {
         thickness: baseThickness,
         density: 1,
         sector: sectorId,
+        h3Cell: baseCell + '3',
         planetId,
       }),
       new Platelet({
@@ -68,6 +72,7 @@ describe('PlateletCollisionSimulator', () => {
         thickness: baseThickness,
         density: 1,
         sector: sectorId,
+        h3Cell: baseCell + '4',
         planetId,
       }),
     ];

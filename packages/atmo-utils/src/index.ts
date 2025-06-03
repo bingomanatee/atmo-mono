@@ -4,6 +4,7 @@ export * from './stringify.ts';
 export * from './asError.ts';
 export * from './h3/h3.utils.js';
 export * from './h3/constants.js';
+export * from './h3/h3-cache.js';
 export * from './vector/latLonToPoint.js';
 export * from './vector/randomNormal.js';
 export * from './vector/cellToVector.js';

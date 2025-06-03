@@ -8,6 +8,7 @@
 
 import * as h3 from 'h3-js';
 import { EARTH_RADIUS } from './constants.ts';
+import { h3Cache } from './h3-cache.ts';
 
 // Constants
 const res0CellRadiusOnEarth = 1077.58; // Half of the center-to-center distance at res 0 in km (was 1077580 m)
@@ -103,11 +104,40 @@ export function latLngToCell(
 
 /**
  * Convert an H3 cell index to latitude and longitude (center of the cell)
+ * Uses IndexedDB cache for faster lookups when available
  *
  * @param h3Index - The H3 cell index as a string
  * @returns An object with lat and lng properties in degrees
  */
-export function cellToLatLng(h3Index: string): { lat: number; lng: number } {
+export async function cellToLatLng(
+  h3Index: string,
+): Promise<{ lat: number; lng: number }> {
+  // Try to get from cache first
+  const cachedLatLng = await h3Cache.getCellLatLng(h3Index);
+  if (cachedLatLng) {
+    return cachedLatLng;
+  }
+
+  // Compute lat/lng using the sync version
+  const result = cellToLatLngSync(h3Index);
+
+  // Cache the result
+  h3Cache.setCellLatLng(h3Index, result.lat, result.lng);
+
+  return result;
+}
+
+/**
+ * Synchronous version of cellToLatLng for backward compatibility
+ * Does not use caching
+ *
+ * @param h3Index - The H3 cell index as a string
+ * @returns An object with lat and lng properties in degrees
+ */
+export function cellToLatLngSync(h3Index: string): {
+  lat: number;
+  lng: number;
+} {
   const [lat, lng] = h3.cellToLatLng(h3Index);
   return { lat, lng };
 }
@@ -124,11 +154,36 @@ export function getResolution(h3Index: string): number {
 
 /**
  * Get the neighbors of an H3 cell
+ * Uses IndexedDB cache for faster lookups when available
  *
  * @param h3Index - The H3 cell index as a string
  * @returns An array of neighboring H3 cell indices
  */
-export function getNeighbors(h3Index: string): string[] {
+export async function getNeighbors(h3Index: string): Promise<string[]> {
+  // Try to get from cache first
+  const cachedNeighbors = await h3Cache.getCellNeighbors(h3Index);
+  if (cachedNeighbors) {
+    console.log('returning cachedk neighbors for ', h3Index, cachedNeighbors);
+    return cachedNeighbors;
+  }
+
+  // Compute neighbors using the sync version
+  const neighbors = getNeighborsSync(h3Index);
+
+  // Cache the result
+  h3Cache.setCellNeighbors(h3Index, neighbors);
+
+  return neighbors;
+}
+
+/**
+ * Synchronous version of getNeighbors for backward compatibility
+ * Does not use caching
+ *
+ * @param h3Index - The H3 cell index as a string
+ * @returns An array of neighboring H3 cell indices
+ */
+export function getNeighborsSync(h3Index: string): string[] {
   return h3.gridDisk(h3Index, 1).filter((index) => index !== h3Index);
 }
 
@@ -143,7 +198,7 @@ export function getCellsInRange(h3Index: string, distance: number): string[] {
   try {
     return h3.gridDisk(h3Index, distance);
   } catch (err) {
-    console.log('error calling getCellsInRange', h3Index, distance);
+    console.log('error calling getCellsInRange', h3Index, distance, err);
     throw err;
   }
 }

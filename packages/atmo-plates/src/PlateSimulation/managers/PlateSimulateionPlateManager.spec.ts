@@ -8,9 +8,9 @@ describe('PlateSimulationPlateManager', () => {
   let manager: PlateSimulationPlateManager;
   let testPlateId: string;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     sim = new PlateSimulation();
-    sim.init(); // Ensure init is called
+    await sim.init(); // Ensure init is called and awaited
 
     // Create Earth planet
     const earthPlanet = sim.makePlanet(6371000, 'earth'); // Earth radius in meters
@@ -18,7 +18,7 @@ describe('PlateSimulationPlateManager', () => {
     planetsCollection.set(earthPlanet.id, earthPlanet);
 
     // Create test plate
-    testPlateId = sim.addPlate({
+    testPlateId = await sim.addPlate({
       id: 'test-plate',
       name: 'Test Plate',
       radius: 637100, // 10% of Earth radius
@@ -28,27 +28,30 @@ describe('PlateSimulationPlateManager', () => {
     });
 
     // Get the actual plate from the simulation
-    const plate = sim.getPlate(testPlateId);
+    const plate = await sim.getPlate(testPlateId);
     if (!plate) throw new Error('Test plate not found');
 
     manager = sim.managers.get(MANAGERS.PLATE) as PlateSimulationPlateManager;
   });
 
-  it('should initialize steps for a plate when initPlateSteps is called', () => {
-    manager.initPlateSteps(testPlateId);
+  it('should initialize steps for a plate when initPlateSteps is called', async () => {
+    await manager.initPlateSteps(testPlateId);
     const stepsCollection = sim.simUniv.get(COLLECTIONS.PLATELET_STEPS);
-    const steps = new Map(stepsCollection.values());
-    expect(steps.size).toBeGreaterThan(0);
+    const steps = [];
+    for await (const step of stepsCollection.values()) {
+      steps.push(step);
+    }
+    expect(steps.length).toBeGreaterThan(0);
   });
 
   it('should not throw in constructor even if plate not found initially', () => {
     expect(() => new PlateSimulationPlateManager(sim)).not.toThrow();
   });
 
-  it('should throw in initPlateSteps if plate not found', () => {
+  it('should throw in initPlateSteps if plate not found', async () => {
     const nonExistentManager = new PlateSimulationPlateManager(sim);
-    expect(() => nonExistentManager.initPlateSteps('non-existent')).toThrow(
-      'cannot find plate non-existent',
-    );
+    await expect(
+      nonExistentManager.initPlateSteps('non-existent'),
+    ).rejects.toThrow('cannot find plate non-existent');
   });
 });

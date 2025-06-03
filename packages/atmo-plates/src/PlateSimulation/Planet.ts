@@ -1,10 +1,10 @@
 import {
   cellToLatLng,
   getH3CellForPosition,
+  getNeighbors,
   latLonToPoint,
   pointToLatLon,
 } from '@wonderlandlabs/atmo-utils';
-import { gridDisk } from 'h3-js';
 import type { Vector3Like } from 'three';
 import { Vector3 } from 'three';
 import { v4 as uuidV4 } from 'uuid';
@@ -50,9 +50,11 @@ export class Planet implements SimPlanetIF {
   /**
    * Get L0 neighbors for a cell, using cache if available
    */
-  #getL0Neighbors(cell: string): string[] {
+  async #getL0Neighbors(cell: string): Promise<string[]> {
     if (!this.#l0NeighborCache.has(cell)) {
-      const neighbors = gridDisk(cell, 1);
+      const neighbors = await getNeighbors(cell);
+      // Include the cell itself for gridDisk behavior
+      neighbors.push(cell);
       this.#l0NeighborCache.set(cell, neighbors);
     }
     return this.#l0NeighborCache.get(cell)!;

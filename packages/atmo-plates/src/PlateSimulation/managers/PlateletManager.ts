@@ -39,7 +39,6 @@ export class PlateletManager {
     this.workerAvailable = this.useWorkers;
 
     if (this.useWorkers) {
-      log('🔧 PlateletManager initialized with worker support enabled');
       this.initializeWorkerManager();
     }
   }
@@ -50,21 +49,13 @@ export class PlateletManager {
   private async initializeWorkerManager(): Promise<void> {
     try {
       if (typeof window === 'undefined') {
-        log('⚠️ Window not available, disabling workers');
         this.workerAvailable = false;
         return;
       }
 
-      // Create a custom worker manager that supports module workers
-      // This extends the atmo-workers functionality to handle ES6 modules
       const workerUrl = '/platelet-worker.js';
-      log('🔧 PlateletManager: Setting up worker with URL:', workerUrl);
-
-      // Set expected workers count
-      this.expectedWorkers = 1; // We're creating 1 worker
+      this.expectedWorkers = 1;
       this.workersReady = 0;
-
-      // Create a reference to this PlateletManager for use in closures
       const plateletManager = this;
 
       // Create a custom window object with module worker support
@@ -72,152 +63,38 @@ export class PlateletManager {
         ...window,
         Worker: class extends Worker {
           constructor(scriptURL: string | URL, options?: WorkerOptions) {
-            log(
-              '🏗️ PlateletManager: Creating worker with URL:',
-              scriptURL,
-              'options:',
-              options,
-            );
-
-            // Always try to create as module worker first
             try {
               super(scriptURL, { ...options, type: 'module' });
-              log(
-                '✅ PlateletManager: Successfully created module worker for:',
-                scriptURL,
-              );
             } catch (error) {
-              // Fallback to regular worker
-              log(
-                '⚠️ PlateletManager: Module worker failed, falling back to regular worker:',
-                error,
-              );
               super(scriptURL, options);
             }
 
             this.addEventListener('message', (event) => {
-              log('📨 PlateletManager: Received message from worker:', {
-                type: event.data.type,
-                taskId: event.data.taskId,
-                requestId: event.data.requestId,
-                timestamp: event.data.timestamp,
-                fullData: event.data,
-              });
-
-              // Handle worker-ready signal that BrowserWorker doesn't handle
               if (event.data.type === 'worker-ready') {
-                log(
-                  '🎉 PlateletManager: Worker is ready! Incrementing ready count.',
-                );
                 plateletManager.workersReady++;
-                log(
-                  `📊 PlateletManager: Workers ready: ${plateletManager.workersReady}/${plateletManager.expectedWorkers}`,
-                );
-
-                // Check if all workers are ready
                 if (
                   plateletManager.workersReady >=
                   plateletManager.expectedWorkers
                 ) {
                   plateletManager.workerAvailable = true;
-                  log(
-                    '✅ PlateletManager: ALL WORKERS CONFIRMED READY - Workers now available for tasks!',
-                  );
-                } else {
-                  log(
-                    `⏳ PlateletManager: Waiting for ${plateletManager.expectedWorkers - plateletManager.workersReady} more workers to be ready`,
-                  );
                 }
               }
 
-              // Handle worker-error signal
               if (event.data.type === 'worker-error') {
-                console.log(
-                  '❌ PlateletManager: Worker initialization failed!',
-                  event.data.error,
-                  '📊 PlateletManager: Worker error details:',
-                  event.data,
-                );
-
-                // Mark the system as failed - don't wait for more workers
                 plateletManager.workerAvailable = false;
-
-                // Create error to propagate to the simulation initialization
-                const workerError = new Error(
-                  `Worker initialization failed: ${event.data.error}`,
-                );
-                if (event.data.stack) {
-                  workerError.stack = event.data.stack;
-                }
-
-                log(
-                  '💥 PlateletManager: Worker initialization failed - system unavailable',
-                );
-                // Note: We can't throw here since we're in an event handler
-                // The error will be detected when tasks are submitted
-              }
-
-              // Handle task progress messages
-              if (event.data.type === 'task-progress') {
-                log(
-                  `📈 PlateletManager: Task progress - ${event.data.taskId}: ${event.data.progress}% - ${event.data.message}`,
-                );
-              }
-
-              // Handle detailed worker task errors
-              if (event.data.type === 'worker-task-error') {
-                log(
-                  '❌ PlateletManager: Worker task error details:',
-                  event.data.error,
-                );
-              }
-
-              // Handle unhandled worker errors
-              if (event.data.type === 'worker-unhandled-error') {
-                log(
-                  '💥 PlateletManager: Worker unhandled error:',
-                  event.data.error,
-                );
-              }
-
-              // Handle unhandled promise rejections
-              if (event.data.type === 'worker-unhandled-rejection') {
-                log(
-                  '💥 PlateletManager: Worker unhandled promise rejection:',
-                  event.data.error,
-                );
               }
             });
 
             this.addEventListener('error', (error) => {
-              log('❌ PlateletManager: Worker error event:', error);
+              // Worker error handling
             });
 
             this.addEventListener('messageerror', (error) => {
-              log('❌ PlateletManager: Worker message error event:', error);
+              // Worker message error handling
             });
-
-            log(
-              '✅ PlateletManager: Event listeners set up for worker:',
-              scriptURL,
-            );
           }
         },
       };
-
-      // Create worker manager with platelet generation manifest
-      log('🔧 PlateletManager: Creating BrowserWorkerManager with config:', {
-        name: 'platelet-manager',
-        workerManifests: [
-          {
-            name: 'platelet-worker',
-            scriptUrl: workerUrl,
-            tasks: ['generate-platelets'],
-          },
-        ],
-        maxConcurrentTasks: Math.min(navigator.hardwareConcurrency || 4, 8),
-        workerTimeout: 120000, // Increased to 2 minutes for complex platelet generation
-      });
 
       const workerManager = createBrowserWorkerManager({
         name: 'platelet-manager',
@@ -230,39 +107,12 @@ export class PlateletManager {
           },
         ],
         maxConcurrentTasks: Math.min(navigator.hardwareConcurrency || 4, 8),
-        workerTimeout: 120000, // Increased to 2 minutes for complex platelet generation
+        workerTimeout: 120000,
       });
-
-      log('✅ PlateletManager: BrowserWorkerManager created successfully');
 
       this.taskManager = workerManager.taskManager;
       this.browserWorker = workerManager.browserWorker;
-
-      log('🔗 PlateletManager: TaskManager and BrowserWorker assigned');
-
-      // Log worker status periodically
-      setTimeout(() => {
-        const workerStatus = this.browserWorker?.getWorkerStatus();
-        log('📊 PlateletManager: Worker status after 1 second:', workerStatus);
-      }, 1000);
-
-      setTimeout(() => {
-        const workerStatus = this.browserWorker?.getWorkerStatus();
-        log('📊 PlateletManager: Worker status after 3 seconds:', workerStatus);
-      }, 3000);
-
-      log('✅ PlateletManager: atmo-workers system initialized');
-      log(
-        '⏳ PlateletManager: Waiting for worker confirmation before marking as available...',
-      );
-      log(
-        `📊 PlateletManager: Expected workers: ${this.expectedWorkers}, Ready workers: ${this.workersReady}`,
-      );
-
-      // Workers will be marked as available when they send worker-ready signals
-      // No timeout needed - we wait for actual confirmation
     } catch (error) {
-      log(`❌ Failed to initialize worker manager: ${error}`);
       this.workerAvailable = false;
     }
   }
@@ -313,10 +163,6 @@ export class PlateletManager {
     );
     await Promise.all(batchWrites);
 
-    log(
-      `✅ Generated ${generatedPlatelets.length} platelets for plate ${plateId}`,
-    );
-
     return generatedPlatelets;
   }
 
@@ -328,14 +174,8 @@ export class PlateletManager {
     plateIds: string[],
   ): Promise<Map<string, Platelet[]>> {
     if (!this.useWorkers || !this.workerAvailable || !this.taskManager) {
-      log('⚠️ Workers not available, falling back to sequential processing');
       return this.generatePlateletsSequentially(plateIds);
     }
-
-    log(
-      `🚀 Starting parallel platelet generation for ${plateIds.length} plates`,
-    );
-    const startTime = performance.now();
 
     try {
       // Get all plates data
@@ -371,13 +211,7 @@ export class PlateletManager {
         ).toPromise(),
       );
 
-      // Wait for all tasks to complete
       const results = await Promise.all(taskPromises);
-      const endTime = performance.now();
-
-      log(
-        `✅ Parallel processing completed in ${(endTime - startTime).toFixed(2)}ms`,
-      );
 
       // Collect platelets from IDBSun storage
       const plateletsByPlate = new Map<string, Platelet[]>();
@@ -396,11 +230,7 @@ export class PlateletManager {
             platelets.push(platelet);
           }
           plateletsByPlate.set(plateId, platelets);
-          log(
-            `✅ Retrieved ${platelets.length} platelets for plate ${plateId}`,
-          );
         } else {
-          log(`⚠️ No platelets generated for plate ${plateId}, using fallback`);
           const plate = plates[i].plate;
           const fallbackPlatelets = await this.generatePlateletsWithGridDisk(
             plate,
@@ -413,9 +243,6 @@ export class PlateletManager {
 
       return plateletsByPlate;
     } catch (error) {
-      log(
-        `❌ Parallel processing failed: ${error}, falling back to sequential`,
-      );
       return this.generatePlateletsSequentially(plateIds);
     }
   }
@@ -449,8 +276,6 @@ export class PlateletManager {
       throw new Error('TaskManager not initialized');
     }
 
-    log(`🔧 Using atmo-workers for platelet generation: plate ${plate.id}`);
-
     try {
       // Submit task to the worker pool
       const result = await this.taskManager
@@ -469,8 +294,6 @@ export class PlateletManager {
           },
         )
         .toPromise();
-
-      log(`✅ atmo-workers completed for plate ${plate.id}:`, result);
 
       if (result && result.plateletCount > 0) {
         // Retrieve platelets from IDBSun storage
@@ -578,7 +401,7 @@ export class PlateletManager {
       }
 
       try {
-        const cellPosition = cellToVector(cell, planetRadius);
+        const cellPosition = await cellToVector(cell, planetRadius);
         if (!cellPosition) {
           invalidCellCount++;
           continue;
@@ -614,7 +437,7 @@ export class PlateletManager {
 
       for (const cell of validCells) {
         try {
-          const platelet = createPlateletFromCell(
+          const platelet = await createPlateletFromCell(
             cell,
             plate,
             planetRadius,
@@ -624,23 +447,13 @@ export class PlateletManager {
             platelets.push(platelet);
             successCount++;
           } else {
-            log(
-              `   Warning: Platelet creation failed for cell ${cell} - position is undefined`,
-            );
             failureCount++;
           }
         } catch (error) {
-          log(`   Warning: Error creating platelet for cell ${cell}: ${error}`);
           failureCount++;
         }
       }
-
-      log(
-        `   Platelet creation: ${successCount} successful, ${failureCount} failed`,
-      );
     }
-
-    log(`   ✅ Created ${platelets.length} platelets using gridDisk method`);
 
     return platelets;
   }
@@ -714,7 +527,7 @@ export class PlateletManager {
     const plateletCells = getCellsInH0Cell(h0Cell, resolution);
 
     // Filter cells within radius of the plate
-    const validPlateletCells = filterCellsByPlateRadius(
+    const validPlateletCells = await filterCellsByPlateRadius(
       plateletCells,
       plate,
       planetRadius,
@@ -727,14 +540,12 @@ export class PlateletManager {
 
     // Create platelets in parallel
     const plateletPromises = validPlateletCells.map((cell) =>
-      Promise.resolve(
-        createPlateletFromCell(cell, plate, planetRadius, resolution),
-      ),
+      createPlateletFromCell(cell, plate, planetRadius, resolution),
     );
     const platelets = await Promise.all(plateletPromises);
 
     // Get neighboring H0 cells to explore next
-    const neighborH0Cells = getNeighboringH0Cells(h0Cell);
+    const neighborH0Cells = await getNeighboringH0Cells(h0Cell);
 
     return { platelets, newCells: neighborH0Cells };
   }

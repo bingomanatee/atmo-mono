@@ -127,7 +127,7 @@ export interface PlateletIF {
   id: string;
   density: number;
   float?: number;
-  h3Index: string;
+  h3Cell: string;
   neighborCellIds: string[];
   planetId: string;
   plateId: string;
@@ -147,7 +147,7 @@ export interface RawPlatelet {
   thickness?: number;
   density?: number;
   sector?: string;
-  h3Index?: string;
+  h3Cell?: string;
   float?: number;
 }
 
