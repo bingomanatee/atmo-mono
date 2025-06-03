@@ -4,8 +4,8 @@ export interface Platelet {
   // Unique identifier for the platelet
   id: string;
 
-  // H3 cell ID for this platelet's location
-  h3Cell?: string;
+  // H3 cell ID for this platelet's location (required)
+  h3Cell: string;
 
   // Position in 3D space
   position: Vector3;
@@ -50,14 +50,14 @@ export interface Platelet {
 export function createPlatelet(
   plateId: string,
   position: Vector3,
-  options: Partial<Platelet> = {},
+  options: Partial<Platelet> & { h3Cell: string; planetId: string }, // h3Cell and planetId are required
 ): Platelet {
   return {
     id: crypto.randomUUID(),
     position: position.clone(),
     plateId,
-    planetId: options.planetId!, // Include planetId from options (required)
-    h3Cell: options.h3Cell, // Include h3Cell property from options
+    planetId: options.planetId, // Include planetId from options (required)
+    h3Cell: options.h3Cell, // Include h3Cell property from options (required)
     mass: options.mass ?? 1.0,
     elasticity: options.elasticity ?? 0.5,
     radius: options.radius ?? 1.0,

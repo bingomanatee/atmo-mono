@@ -323,9 +323,17 @@ async function generateAndVisualizePlatelets() {
   await sim.populatePlateletNeighbors();
   console.timeEnd('⏱️ Neighbor Population');
 
-  // Skip the complex edge deletion for now - just focus on getting platelets visible
+  // Apply edge detection to flag platelets for visualization
   console.log(
-    'Skipping edge deletion for now - focusing on basic visualization...',
+    '🔴 Applying edge detection to flag platelets for visualization...',
+  );
+  console.time('⏱️ Edge Detection');
+  await sim.createIrregularPlateEdges();
+  console.timeEnd('⏱️ Edge Detection');
+
+  const deletedCount = sim.getDeletedPlateletCount();
+  console.log(
+    `🔴 Flagged ${deletedCount} platelets as deleted for red visualization`,
   );
 
   // Create a PlateVisualizer for each plate AFTER deleting platelets
@@ -351,6 +359,19 @@ async function generateAndVisualizePlatelets() {
   console.timeEnd('⏱️ Visualization Creation');
 
   console.log(`Created visualizers for ${plateVisualizers.length} plates.`);
+
+  // Refresh colors to show flagged platelets in red
+  if (deletedCount > 0) {
+    console.log(
+      '🎨 Refreshing visualization colors to show flagged platelets...',
+    );
+    plateVisualizers.forEach((visualizer) => {
+      visualizer.refreshColors();
+    });
+    console.log(
+      `✅ Color refresh complete - ${deletedCount} platelets should now be red`,
+    );
+  }
 
   // Add axes helper
   const axesHelper = new THREE.AxesHelper(EARTH_RADIUS * 0.5); // Make axes helper relative to Earth radius

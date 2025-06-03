@@ -11,12 +11,15 @@ export class Platelet implements PlateletIF {
   thickness: number;
   density: number;
   sector: string;
-  h3Index: string;
+  h3Cell: string;
   neighborCellIds: string[];
 
   constructor(data: Partial<PlateletIF> = {}) {
     this.id = data.id ?? uuidV4();
-    this.h3Index = data.h3Index;
+    this.h3Cell = data.h3Cell; // Use h3Cell from the interface
+    if (!this.h3Cell) {
+      throw new Error('platelet required h3Cell');
+    }
     this.neighborCellIds = Array.isArray(data.neighborCellIds)
       ? data.neighborCellIds
       : [];

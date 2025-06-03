@@ -1,6 +1,7 @@
 import {
   cellToChildren,
   cellToVector,
+  getH3CellForPosition,
   h3HexRadiusAtResolution,
   latLngToCell,
   pointToLatLon,
@@ -119,11 +120,21 @@ export function createCenterPlatelet(
   // Calculate elevation (same as normal platelets)
   const elevation = floatElevation(plate.thickness, plate.density);
 
-  return {
+  // Get a valid H3 cell for the plate position
+  const h3Cell = getH3CellForPosition(position, planetRadius, resolution);
+
+  // Validate that we got a valid H3 cell
+  if (!h3Cell || typeof h3Cell !== 'string' || h3Cell.length === 0) {
+    throw new Error(
+      `Failed to get valid H3 cell for center platelet at position ${position.toArray()}`,
+    );
+  }
+
+  const platelet = {
     id: plateletId,
     plateId: plate.id,
     planetId: plate.planetId, // Add planetId from plate
-    h3Cell: 'center', // Not tied to H3 grid - just a simple center platelet
+    h3Cell: h3Cell, // Use valid H3 cell for the plate position
     position: position,
     radius: coverageRadius,
     thickness: plate.thickness,
@@ -138,6 +149,8 @@ export function createCenterPlatelet(
     velocity: new Vector3(),
     averageNeighborDistance: calculatedRadius * 2, // Reasonable default
   };
+
+  return platelet;
 }
 
 /**

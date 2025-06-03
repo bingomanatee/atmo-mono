@@ -168,40 +168,54 @@ export class PlateletVisualizer extends PlateVisualizerBase {
       localMatrix.compose(position, quaternion, scale);
       this.instancedMesh.setMatrixAt(index, localMatrix);
 
-      const normalizedDensity = THREE.MathUtils.mapLinear(
-        platelet.density,
-        MIN_DENSITY,
-        MAX_DENSITY,
-        0,
-        1,
-      );
+      // Check if this platelet is flagged as deleted
+      const simulation = this.plateletManager['sim'];
+      const isDeleted =
+        simulation &&
+        simulation.isPlateletDeleted &&
+        simulation.isPlateletDeleted(platelet.id);
 
-      const hue = THREE.MathUtils.mapLinear(
-        normalizedDensity,
-        0,
-        1,
-        MIN_HUE,
-        MAX_HUE,
-      );
+      let instanceColor: THREE.Color;
 
-      const lightness = THREE.MathUtils.mapLinear(
-        normalizedDensity,
-        0,
-        1,
-        MAX_LIGHTNESS,
-        MIN_LIGHTNESS,
-      );
+      if (isDeleted) {
+        // Color deleted platelets bright red for visualization
+        instanceColor = new THREE.Color(0xff0000); // Bright red
+        if (index < 3) {
+          log(`   🔴 Platelet ${index} is flagged as deleted - coloring red`);
+        }
+      } else {
+        // Normal density-based coloring
+        const normalizedDensity = THREE.MathUtils.mapLinear(
+          platelet.density,
+          MIN_DENSITY,
+          MAX_DENSITY,
+          0,
+          1,
+        );
 
-      const saturation = varyP({
-        max: 0.6,
-        min: 0.3,
-      });
+        const hue = THREE.MathUtils.mapLinear(
+          normalizedDensity,
+          0,
+          1,
+          MIN_HUE,
+          MAX_HUE,
+        );
 
-      const instanceColor = new THREE.Color().setHSL(
-        hue,
-        saturation,
-        lightness,
-      );
+        const lightness = THREE.MathUtils.mapLinear(
+          normalizedDensity,
+          0,
+          1,
+          MAX_LIGHTNESS,
+          MIN_LIGHTNESS,
+        );
+
+        const saturation = varyP({
+          max: 0.6,
+          min: 0.3,
+        });
+
+        instanceColor = new THREE.Color().setHSL(hue, saturation, lightness);
+      }
 
       this.instancedMesh.setColorAt(index, instanceColor);
     });
@@ -294,6 +308,75 @@ export class PlateletVisualizer extends PlateVisualizerBase {
 
   public update(): void {
     this.orbitalFrame.orbit();
+  }
+
+  /**
+   * Refresh the visualization colors (call after edge detection)
+   */
+  public refreshColors(): void {
+    if (this.instancedMesh && this.platelets.length > 0) {
+      log(`🎨 Refreshing colors for ${this.platelets.length} platelets`);
+
+      // Re-run the color logic from updateMeshInstances
+      this.platelets.forEach((platelet, index) => {
+        const simulation = this.plateletManager['sim'];
+        const isDeleted =
+          simulation &&
+          simulation.isPlateletDeleted &&
+          simulation.isPlateletDeleted(platelet.id);
+
+        let instanceColor: THREE.Color;
+
+        if (isDeleted) {
+          // Color deleted platelets bright red for visualization
+          instanceColor = new THREE.Color(0xff0000); // Bright red
+          log(
+            `   🔴 Platelet ${platelet.id} is flagged as deleted - coloring red`,
+          );
+        } else {
+          // Normal density-based coloring
+          const normalizedDensity = THREE.MathUtils.mapLinear(
+            platelet.density,
+            MIN_DENSITY,
+            MAX_DENSITY,
+            0,
+            1,
+          );
+
+          const hue = THREE.MathUtils.mapLinear(
+            normalizedDensity,
+            0,
+            1,
+            MIN_HUE,
+            MAX_HUE,
+          );
+
+          const lightness = THREE.MathUtils.mapLinear(
+            normalizedDensity,
+            0,
+            1,
+            MAX_LIGHTNESS,
+            MIN_LIGHTNESS,
+          );
+
+          const saturation = varyP({
+            max: 0.6,
+            min: 0.3,
+          });
+
+          instanceColor = new THREE.Color().setHSL(hue, saturation, lightness);
+        }
+
+        this.instancedMesh!.setColorAt(index, instanceColor);
+      });
+
+      // Update the instance colors
+      if (this.instancedMesh.instanceColor) {
+        this.instancedMesh.instanceColor.needsUpdate = true;
+      }
+
+      log(`✅ Colors refreshed for plate ${this.plate.id}`);
+    }
   }
 
   public clear(): void {

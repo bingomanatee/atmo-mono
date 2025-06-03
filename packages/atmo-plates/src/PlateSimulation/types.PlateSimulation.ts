@@ -106,7 +106,7 @@ export interface PlateletStepIF extends Identifiable {
   position: Vector3Like;
   thickness: number;
   float: number; // Floating elevation
-  h3Index: string; // H3 index of current location
+  h3Cell: string; // H3 cell of current location (changed from h3Index)
   sector: string; // L0 H3 cell for tracking large-scale movement
 }
 
@@ -127,7 +127,7 @@ export interface PlateletIF {
   id: string;
   density: number;
   float?: number;
-  h3Index: string;
+  h3Cell: string; // Changed from h3Index to h3Cell to match database schema
   neighborCellIds: string[];
   planetId: string;
   plateId: string;

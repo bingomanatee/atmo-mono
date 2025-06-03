@@ -62,6 +62,7 @@ export class PlateSimulation implements PlateSimulationIF {
   #step: number = 0;
   #maxPlateRadius: number | undefined;
   #useSharedStorage: boolean = false; // Flag for shared IndexedDB storage
+  public deletedPlatelets: Set<string> = new Set(); // Track platelets flagged as "deleted" for visualization
 
   /**
    * Create a new plate simulation
@@ -534,6 +535,9 @@ export class PlateSimulation implements PlateSimulationIF {
       );
     }
 
+    // TODO: Auto-integration disabled due to validation issues
+    // Edge deletion flagging can be applied manually after platelet generation
+
     return id;
   }
 
@@ -952,28 +956,40 @@ export class PlateSimulation implements PlateSimulationIF {
     let totalCleaned = 0;
     let totalNeighborsRemoved = 0;
 
+    // First, collect all platelets to avoid transaction timeout
+    const allPlatelets: any[] = [];
     for await (const [_, platelet] of plateletsCollection.values()) {
-      if (platelet.neighborCellIds && platelet.neighborCellIds.length > 0) {
-        const originalLength = platelet.neighborCellIds.length;
+      allPlatelets.push(platelet);
+    }
 
-        // Filter out H3 cell IDs that don't have corresponding platelets
-        const validNeighborCells = [];
-        for (const cellId of platelet.neighborCellIds) {
-          const neighborPlateletId = `${platelet.plateId}-${cellId}`;
-          // Use has() to check existence - much more efficient than get()
-          if (await plateletsCollection.has(neighborPlateletId)) {
-            validNeighborCells.push(cellId);
+    // Process platelets in smaller batches to avoid transaction timeouts
+    const batchSize = 50;
+    for (let i = 0; i < allPlatelets.length; i += batchSize) {
+      const batch = allPlatelets.slice(i, i + batchSize);
+
+      for (const platelet of batch) {
+        if (platelet.neighborCellIds && platelet.neighborCellIds.length > 0) {
+          const originalLength = platelet.neighborCellIds.length;
+
+          // Filter out H3 cell IDs that don't have corresponding platelets
+          const validNeighborCells = [];
+          for (const cellId of platelet.neighborCellIds) {
+            const neighborPlateletId = `${platelet.plateId}-${cellId}`;
+            // Use has() to check existence - much more efficient than get()
+            if (await plateletsCollection.has(neighborPlateletId)) {
+              validNeighborCells.push(cellId);
+            }
           }
-        }
 
-        if (validNeighborCells.length !== originalLength) {
-          // Update the platelet with cleaned neighborCellIds list
-          await plateletsCollection.set(platelet.id, {
-            ...platelet,
-            neighborCellIds: validNeighborCells,
-          });
-          totalCleaned++;
-          totalNeighborsRemoved += originalLength - validNeighborCells.length;
+          if (validNeighborCells.length !== originalLength) {
+            // Update the platelet with cleaned neighborCellIds list
+            await plateletsCollection.set(platelet.id, {
+              ...platelet,
+              neighborCellIds: validNeighborCells,
+            });
+            totalCleaned++;
+            totalNeighborsRemoved += originalLength - validNeighborCells.length;
+          }
         }
       }
     }
@@ -985,13 +1001,8 @@ export class PlateSimulation implements PlateSimulationIF {
 
   /**
    * Create irregular edges for larger plates by deleting edge platelets
-   * TEMPORARILY DISABLED - No edge erosion will be performed
    */
   async createIrregularPlateEdges(): Promise<void> {
-    console.log(
-      'Edge erosion is disabled - skipping irregular plate edge creation',
-    );
-    return;
     const plateletsCollection = this.simUniv.get(COLLECTIONS.PLATELETS);
     if (!plateletsCollection) {
       throw new Error('platelets collection not found');
@@ -1001,9 +1012,15 @@ export class PlateSimulation implements PlateSimulationIF {
     console.log('Refreshing neighbor relationships before edge detection...');
     await this.refreshNeighbors();
 
+    // First collect all platelets to avoid transaction timeout
+    const allPlatelets: any[] = [];
+    for await (const [_, platelet] of plateletsCollection.values()) {
+      allPlatelets.push(platelet);
+    }
+
     // Group platelets by plate
     const plateletsByPlate = new Map<string, any[]>();
-    for await (const [_, platelet] of plateletsCollection.values()) {
+    for (const platelet of allPlatelets) {
       const plateId = platelet.plateId;
       if (!plateletsByPlate.has(plateId)) {
         plateletsByPlate.set(plateId, []);
@@ -1126,13 +1143,13 @@ export class PlateSimulation implements PlateSimulationIF {
     const shuffledEdgePlatelets = shuffle(edgePlatelets);
     const allPlateletsToDelete = new Set<string>();
 
-    // Calculate maximum allowed deletions (4% of total plate size - much more conservative)
-    const maxAllowedDeletions = Math.floor(plateSize * 0.04);
+    // Calculate maximum allowed deletions (8% of total plate size for better visualization)
+    const maxAllowedDeletions = Math.max(1, Math.floor(plateSize * 0.08));
 
     if (plateSize >= 40) {
       // For large plates (40+ platelets): Use limited recursive deletion
       const deleteCount = Math.min(
-        Math.floor(shuffledEdgePlatelets.length * 0.03), // Reduced from 8% to 3%
+        Math.max(1, Math.floor(shuffledEdgePlatelets.length * 0.15)), // Increased to 15% for better visibility
         maxAllowedDeletions,
       );
       const plateletsToDelete = shuffledEdgePlatelets.slice(0, deleteCount);
@@ -1152,7 +1169,7 @@ export class PlateSimulation implements PlateSimulationIF {
     } else {
       // For smaller plates (30-39 platelets): Use simple limited deletion
       const deleteCount = Math.min(
-        Math.floor(shuffledEdgePlatelets.length * 0.05), // Reduced from 12% to 5%
+        Math.max(1, Math.floor(shuffledEdgePlatelets.length * 0.25)), // Increased to 25% for better visibility
         maxAllowedDeletions,
       );
       const plateletsToDelete = shuffledEdgePlatelets.slice(0, deleteCount);
@@ -1166,13 +1183,39 @@ export class PlateSimulation implements PlateSimulationIF {
       });
     }
 
-    // Delete the selected platelets in one batch operation
-    await plateletsCollection.deleteMany(Array.from(allPlateletsToDelete));
+    // Instead of deleting, flag platelets as "deleted" for visualization
+    Array.from(allPlateletsToDelete).forEach((plateletId) => {
+      this.deletedPlatelets.add(plateletId);
+    });
 
-    // Note: No need to clean up neighbor lists since gap-filling ensures complete coverage
+    console.log(
+      `🔴 Flagged ${allPlateletsToDelete.size} platelets as deleted (will be colored red in visualization)`,
+    );
 
-    // Return the number of deleted platelets for this plate
+    // Return the number of flagged platelets for this plate
     return allPlateletsToDelete.size;
+  }
+
+  /**
+   * Check if a platelet is flagged as deleted (for visualization)
+   */
+  public isPlateletDeleted(plateletId: string): boolean {
+    return this.deletedPlatelets.has(plateletId);
+  }
+
+  /**
+   * Clear all deleted platelet flags
+   */
+  public clearDeletedPlatelets(): void {
+    this.deletedPlatelets.clear();
+    console.log('🔄 Cleared all deleted platelet flags');
+  }
+
+  /**
+   * Get count of deleted platelets
+   */
+  public getDeletedPlateletCount(): number {
+    return this.deletedPlatelets.size;
   }
 
   /**

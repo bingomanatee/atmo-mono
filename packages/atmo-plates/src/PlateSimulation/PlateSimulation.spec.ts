@@ -781,13 +781,14 @@ describe('PlateSimulation', () => {
       await sim.createIrregularPlateEdges();
 
       const finalCount = await plateletsCollection.count();
+      const flaggedCount = sim.getDeletedPlateletCount();
 
-      // Verify some platelets were deleted
-      expect(finalCount).toBeLessThan(initialCount);
-      expect(finalCount).toBeGreaterThan(0);
+      // Verify platelets are still in database but some are flagged as deleted
+      expect(finalCount).toBe(initialCount); // No actual deletion
+      expect(flaggedCount).toBeGreaterThan(0); // But some are flagged
 
       console.log(
-        `Deleted ${initialCount - finalCount} platelets (${initialCount} -> ${finalCount})`,
+        `Flagged ${flaggedCount} platelets as deleted (${initialCount} total, ${flaggedCount} flagged)`,
       );
     });
 
