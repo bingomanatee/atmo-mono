@@ -6,6 +6,7 @@ import {
   FIELD_TYPES,
   Multiverse,
   SchemaLocal,
+  SchemaLocalIF,
   Universe,
 } from '@wonderlandlabs/multiverse';
 import type { Vector3Like } from 'three';
@@ -163,12 +164,36 @@ export async function clearExistingAtmoPlatesDatabases(): Promise<void> {
 }
 
 /**
- * Initialize the shared database with all required object stores
+ * Extract fields marked with index: true from the schema
+ */
+function extractIndexedFields(schema: SchemaLocalIF<any>): string[] {
+  const indexedFields: string[] = [];
+
+  console.log(`🔍 Extracting indexes from schema:`, schema.name);
+  console.log(`🔍 Schema fields:`, Object.keys(schema.fields));
+
+  for (const [fieldName, field] of Object.entries(schema.fields)) {
+    console.log(`🔍 Field ${fieldName}:`, field);
+    console.log(`🔍 Field ${fieldName} meta:`, field.meta);
+    console.log(`🔍 Field ${fieldName} index:`, field.meta?.index);
+
+    if (field.meta?.index === true) {
+      indexedFields.push(fieldName);
+      console.log(`✅ Added index for field: ${fieldName}`);
+    }
+  }
+
+  console.log(`🔍 Final indexed fields:`, indexedFields);
+  return indexedFields;
+}
+
+/**
+ * Initialize the shared database with all required object stores and indexes
  * This prevents race conditions when multiple IDBSuns try to initialize simultaneously
  */
 async function initializeSharedDatabase(
   dbName: string,
-  tableNames: string[],
+  schemas: Record<string, SchemaLocalIF<any>>,
   skipDeletion: boolean = false,
 ): Promise<void> {
   try {
@@ -177,16 +202,40 @@ async function initializeSharedDatabase(
       await clearExistingAtmoPlatesDatabases();
     }
 
-    // Create database with all object stores
+    // Create database with all object stores and indexes
     const db = await openDB(dbName, 1, {
       upgrade: (db, oldVersion, newVersion, transaction) => {
-        // Create all object stores
-        for (const tableName of tableNames) {
+        console.log(`🔧 Database upgrade: ${oldVersion} → ${newVersion}`);
+        console.log(`🔧 Schemas to process:`, Object.keys(schemas));
+
+        // Create all object stores with their indexes
+        for (const [tableName, schema] of Object.entries(schemas)) {
+          console.log(`🔧 Processing table: ${tableName}`);
+          console.log(`🔧 Schema for ${tableName}:`, schema);
+
           if (!db.objectStoreNames.contains(tableName)) {
             const store = db.createObjectStore(tableName, {
               keyPath: 'id',
             });
-            // Note: Indexes will be added by individual IDBSuns if needed
+
+            // Create indexes for this table
+            const indexes = extractIndexedFields(schema);
+            console.log(`🔧 Extracted indexes for ${tableName}:`, indexes);
+
+            for (const indexName of indexes) {
+              store.createIndex(indexName, indexName);
+              console.log(
+                `🔧 Created index: ${indexName} for table: ${tableName}`,
+              );
+            }
+
+            console.log(
+              `🔧 Created object store ${tableName} with indexes: [${indexes.join(', ')}]`,
+            );
+          } else {
+            console.log(
+              `🔧 Object store ${tableName} already exists, skipping`,
+            );
           }
         }
       },
@@ -273,18 +322,18 @@ export async function simUniverse(
     const dbName = 'atmo-plates';
     const isMaster = true; // Main thread is the master
 
-    // Initialize the database once for all collections
+    // Initialize the database once for all collections with their schemas
     // Skip database deletion for shared storage to avoid conflicts
     await initializeSharedDatabase(
       dbName,
-      [
-        COLLECTIONS.PLATES,
-        COLLECTIONS.PLANETS,
-        COLLECTIONS.SIMULATIONS,
-        COLLECTIONS.STEPS,
-        COLLECTIONS.PLATELET_STEPS,
-        COLLECTIONS.PLATELETS,
-      ],
+      {
+        [COLLECTIONS.PLATES]: platesSchema,
+        [COLLECTIONS.PLANETS]: planetsSchema,
+        [COLLECTIONS.SIMULATIONS]: simulationsSchema,
+        [COLLECTIONS.STEPS]: plateStepsSchema,
+        [COLLECTIONS.PLATELET_STEPS]: plateletStepsSchema,
+        [COLLECTIONS.PLATELETS]: plateletsSchema,
+      },
       true, // Always skip deletion for shared storage - let caller decide when to clear
     );
 

@@ -30,6 +30,7 @@ export type AddPlateProps = (PlateExtendedIF | PlateIF) & {
   id?: string;
   name?: string;
   planetId?: string;
+  position?: Vector3Like;
 };
 
 export interface PlateSimulationProps {
@@ -67,7 +68,7 @@ export interface PlateSimulationIF {
   readonly simulation: SimSimulation;
 
   // Planet management
-  planet?: SimPlanetIF;
+  planet(): Promise<SimPlanetIF>;
   makePlanet(radius?: number, name?: string): SimPlanetIF;
   getPlanet(id: string): Promise<Planet>;
 
@@ -123,21 +124,16 @@ export interface PlateIF extends PlateIFBase {
 // Interface for Platelet in PlateSimulation context
 export interface PlateletIF {
   id: string;
-  plateId: string;
+  density: number;
+  float?: number;
+  h3Index: string;
+  neighborCellIds: string[];
   planetId: string;
+  plateId: string;
   position: Vector3Like;
   radius: number;
-  thickness: number;
-  density: number;
   sector: string;
-  h3Index?: string;
-  float?: number;
-  // Additional properties for tracking state
-  lastPosition?: Vector3Like;
-  lastStep?: number;
-  lastH3Index?: string;
-  lastFloat?: number;
-  lastThickness?: number;
+  thickness: number;
 }
 
 // Raw platelet data interface

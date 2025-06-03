@@ -10,7 +10,7 @@ import { Vector3 } from 'three';
 import { floatElevation } from '../../utils/plateUtils';
 import { log } from '../../utils/utils';
 import type { Platelet } from '../schemas/platelet';
-import type { SimPlateIF } from '../types.PlateSimulation';
+import type { PlateletIF, SimPlateIF } from '../types.PlateSimulation';
 import { H0_CELLS } from './h0Cells';
 
 /**
@@ -119,13 +119,13 @@ export function createCenterPlatelet(
   return {
     id: plateletId,
     plateId: plate.id,
+    planetId: plate.planetId, // Add planetId from plate
     h3Cell: 'center', // Not tied to H3 grid - just a simple center platelet
     position: position,
     radius: calculatedRadius,
     thickness: plate.thickness,
     density: plate.density,
     isActive: true,
-    neighbors: [], // Neighbors will be added later if needed
     connections: {},
     neighborCellIds: [], // No H3 neighbors since this isn't on the grid
     elevation: elevation,
@@ -145,7 +145,7 @@ export function createPlateletFromCell(
   plate: SimPlateIF,
   planetRadius: number,
   resolution: number,
-): Platelet {
+): PlateletIF {
   const position = cellToVector(cell, planetRadius);
 
   // Ensure position is valid
@@ -185,15 +185,15 @@ export function createPlateletFromCell(
   return {
     id: `${plate.id}-${cell}`,
     plateId: plate.id,
+    planetId: plate.planetId, // Add planetId from plate
     h3Cell: cell,
     position,
-    radius: calculatedRadius,
+    radius: averageNeighborDistance || calculatedRadius,
     thickness: plate.thickness,
     density: plate.density,
     isActive: true,
-    neighbors: [],
     connections: {},
-    neighborCellIds,
+    neighborCellIds, // H3 neighbor cell IDs
     elevation: floatElevation(plate.thickness, plate.density),
     mass:
       plate.thickness * plate.density * Math.PI * Math.pow(calculatedRadius, 2),

@@ -107,8 +107,6 @@ async function generateAndVisualizePlatelets() {
     console.log('🧹 Clearing existing databases for fresh start...');
     await sim.clearDatabases();
     console.log('✅ Database clearing completed');
-
-    console.log('⏳ Starting simulation initialization...');
     await sim.init();
     console.log('✅ Simulation initialized successfully');
 
@@ -150,11 +148,11 @@ async function generateAndVisualizePlatelets() {
   console.log(`🔍 Getting plates from collection...`);
 
   // Manually iterate the async generator
-  const plateGenerator = platesCollection.find();
+  const plateGenerator = platesCollection.find('planetId', sim.planet.id);
   let plateResult = await plateGenerator.next();
 
   while (!plateResult.done) {
-    const plate = plateResult.value;
+    const [id, plate] = plateResult.value;
     allPlates.push(plate);
 
     if (allPlates.length <= 5) {

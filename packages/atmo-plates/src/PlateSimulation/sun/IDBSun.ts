@@ -31,7 +31,6 @@ export class IDBSun<T extends Record<string, any>> implements SunIfAsync<T> {
   private tableName: string;
   private dbName: string;
   private schema: SchemaLocalIF<T>;
-  private indexes: string[];
   private dontClear: boolean = false;
   private isMaster: boolean = false;
   private version: number = 1;
@@ -47,10 +46,6 @@ export class IDBSun<T extends Record<string, any>> implements SunIfAsync<T> {
     this.schema = options.schema;
     this.dontClear = !!options.dontClear;
     this.isMaster = !!options.isMaster;
-
-    // Extract indexed fields from schema
-    this.indexes = this.extractIndexedFields();
-    log(`🔧 IDBSun: Extracted indexes: ${this.indexes.join(', ')}`);
   }
 
   /**
@@ -111,21 +106,6 @@ export class IDBSun<T extends Record<string, any>> implements SunIfAsync<T> {
   }
 
   /**
-   * Extract fields marked with index: true from the schema
-   */
-  private extractIndexedFields(): string[] {
-    const indexedFields: string[] = [];
-
-    for (const [fieldName, field] of Object.entries(this.schema.fields)) {
-      if (field.meta?.index === true) {
-        indexedFields.push(fieldName);
-      }
-    }
-
-    return indexedFields;
-  }
-
-  /**
    * Initialize database using IDB library
    * Master creates schema, workers connect to existing
    */
@@ -140,7 +120,6 @@ export class IDBSun<T extends Record<string, any>> implements SunIfAsync<T> {
 
       // Clear database if requested (master only)
       if (!this.dontClear && this.isMaster) {
-        log(`🔧 IDBSun: Master destroying existing database (dontClear=false)`);
         try {
           await deleteDB(this.dbName);
           log(`✅ Database destroyed: ${this.dbName}`);
@@ -149,10 +128,6 @@ export class IDBSun<T extends Record<string, any>> implements SunIfAsync<T> {
         }
       }
 
-      // Open database with upgrade function
-      log(
-        `🔧 IDBSun: Opening database ${this.dbName} version ${this.version}...`,
-      );
       this.db = await openDB(this.dbName, this.version, {
         upgrade: (
           db: any,
@@ -160,24 +135,16 @@ export class IDBSun<T extends Record<string, any>> implements SunIfAsync<T> {
           newVersion: number,
           transaction: any,
         ) => {
-          log(`🔧 IDBSun: Database upgrade ${oldVersion} → ${newVersion}`);
-
-          // Only create object store if it doesn't exist
-          if (!db.objectStoreNames.contains(this.tableName)) {
-            log(`🔧 IDBSun: Creating object store ${this.tableName}`);
-            const store = db.createObjectStore(this.tableName, {
-              keyPath: 'id',
-            });
-
-            // Create indexes
-            for (const indexName of this.indexes) {
-              log(`🔧 IDBSun: Creating index ${indexName}`);
-              store.createIndex(indexName, indexName);
-            }
-          }
+          // Object stores and indexes should already be created by initializeSharedDatabase
+          // This upgrade callback will only run if the database doesn't exist yet
+          log(
+            `⚠️ IDBSun: Unexpected database upgrade for ${this.tableName} - object stores should already exist`,
+          );
         },
         blocked: () => {
-          log(`⚠️ IDBSun: Database upgrade blocked for ${this.dbName}`);
+          console.error(
+            `⚠️ IDBSun: Database upgrade blocked for ${this.dbName}`,
+          );
         },
         blocking: () => {
           log(
@@ -187,7 +154,9 @@ export class IDBSun<T extends Record<string, any>> implements SunIfAsync<T> {
       });
 
       const role = this.isMaster ? 'Master' : 'Worker';
-      log(`✅ IDBSun ${role}: Connected to ${this.dbName}.${this.tableName}`);
+      console.log(
+        `✅ IDBSun ${role}: Connected to ${this.dbName}.${this.tableName}`,
+      );
 
       // Verify object store exists before testing access
       if (!this.db.objectStoreNames.contains(this.tableName)) {
@@ -331,7 +300,13 @@ export class IDBSun<T extends Record<string, any>> implements SunIfAsync<T> {
       const store = this.db
         .transaction(this.tableName)
         .objectStore(this.tableName);
-      const index = store.index(a);
+
+      try {
+        const index = store.index(a);
+      } catch (err) {
+        console.error('cannot get ', a, 'from table', this.tableName);
+        throw err;
+      }
       const results = await this.db.getAllFromIndex(this.tableName, a, b);
       for (const result of results) {
         yield [result.id, this.serialize(result)];

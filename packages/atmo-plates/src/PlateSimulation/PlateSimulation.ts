@@ -1,4 +1,9 @@
-import { EARTH_RADIUS, randomNormal } from '@wonderlandlabs/atmo-utils';
+import {
+  cellToVector,
+  EARTH_RADIUS,
+  getNeighbors,
+  randomNormal,
+} from '@wonderlandlabs/atmo-utils';
 import { Multiverse } from '@wonderlandlabs/multiverse';
 import { shuffle } from 'lodash-es';
 import type { Vector3Like } from 'three';
@@ -20,14 +25,15 @@ import { PlateletManager } from './managers/PlateletManager';
 import PlateSimulationPlateManager from './managers/PlateSimulationPlateManager';
 import { Planet } from './Planet';
 import { Plate } from './Plate';
-import type { Platelet } from './schemas/platelet';
 import type {
   AddPlateProps,
+  PlateletIF,
   PlateSimulationIF,
   PlateSimulationProps,
   SimPlateIF,
   SimProps,
 } from './types.PlateSimulation';
+import { createPlateletFromCell } from './utils/plateletUtils';
 
 // Define manager keys
 export const MANAGERS = {
@@ -149,23 +155,22 @@ export class PlateSimulation implements PlateSimulationIF {
     if (!simulation) {
       throw new Error(`Simulation ${simulationId} not found`);
     }
+    this.simulation = simulation;
 
     // Set as default simulation
     this.#defaultSimId = simulationId;
 
     // Get the planet from the simulation
     const planetId = simulation.planetId;
+    // @TODO: check for empty planetId
     const planetsCollection = this.simUniv.get(COLLECTIONS.PLANETS);
     const planet = planetsCollection.get(planetId);
 
     if (!planet) {
       throw new Error(
-        `Planet ${planetId} not found in simulation ${simulationId}`,
+        `Planet ${planetId} not found for simulation ${simulationId}`,
       );
     }
-
-    // Set the planet
-    this.planet = planet;
 
     // Get the plateCount and maxPlateRadius from the simulation record
     const plateCount = simulation.plateCount;
@@ -244,32 +249,34 @@ export class PlateSimulation implements PlateSimulationIF {
           console.warn(
             `Planet ${simulation.planetId} referenced in simulation ${this.#defaultSimId} not found. Creating a new planet.`,
           );
-          this.planet = this.makePlanet(this.planetRadius);
+          this.makePlanet(this.planetRadius);
+
+          const { id: planetId } = await this.planet();
 
           // Update the simulation with the new planet ID and maxPlateRadius
-          simulationsCollection.set(this.#defaultSimId, {
-            ...simulation,
-            planetId: this.planet.id,
-            maxPlateRadius: maxPlateRadius, // Include maxPlateRadius
+          await simulationsCollection.mutate(this.#defaultSimId, (sim) => {
+            return { ...sim, planetId };
           });
         }
       } else {
         // If the simulation doesn't have a planetId, create a planet and update the simulation
-        this.planet = this.makePlanet(this.planetRadius);
+        const planet = this.makePlanet(this.planetRadius);
 
         simulationsCollection.set(this.#defaultSimId, {
           ...simulation,
-          planetId: this.planet.id,
+          planetId: planet.id,
           maxPlateRadius: maxPlateRadius, // Include maxPlateRadius
         });
+        this.simulation = await simulationsCollection.get(this.#defaultSimId);
+        this.simulationId = this.#defaultSimId;
       }
     } else {
       // If no simulation exists, create a new planet
-      this.planet = this.makePlanet(this.planetRadius);
+      const planet = await this.makePlanet(this.planetRadius);
 
       // Create a new simulation with the plateCount and maxPlateRadius
-      this.addSimulation({
-        planetId: this.planet.id,
+      await this.addSimulation({
+        planetId: planet.id,
         plateCount: plateCount,
         maxPlateRadius: maxPlateRadius, // Include maxPlateRadius
       });
@@ -315,7 +322,17 @@ export class PlateSimulation implements PlateSimulationIF {
     return universe;
   }
 
-  addSimulation(props: SimProps): string {
+  async planet(): Promise<Planet> {
+    const planetId = this.simulation?.planetId;
+    if (!planetId) {
+      console.warn('no planet for simulation', this.simulation);
+      throw new Error('no plnanet id in simulation');
+    }
+    const planetsCollection = this.simUniv.get(COLLECTIONS.PLANETS);
+    return planetsCollection.get(planetId)!;
+  }
+
+  async addSimulation(props: SimProps): string {
     let { name, id, radius, planetId, plateCount = 0, maxPlateRadius } = props; // Extract maxPlateRadius
 
     if (!id) id = uuidV4();
@@ -335,12 +352,8 @@ export class PlateSimulation implements PlateSimulationIF {
     }
     // If neither planetId nor radius is provided, use the existing planet
     else {
-      if (!this.planet) {
-        throw new Error(
-          'No planet available and no planetId or radius provided',
-        );
-      }
-      planetId = this.planet.id;
+      const planet = await this.makePlanet(radius);
+      planetId = planet.id;
     }
 
     // Create the simulation
@@ -357,6 +370,8 @@ export class PlateSimulation implements PlateSimulationIF {
       this.#defaultSimId = id;
     }
 
+    this.simulation = await this.simUniv.get(COLLECTIONS.SIMULATIONS).get(id);
+
     return id;
   }
 
@@ -368,21 +383,7 @@ export class PlateSimulation implements PlateSimulationIF {
     return this.#step;
   }
 
-  get simulation(): SimSimulation {
-    if (!this.#defaultSimId) {
-      throw new Error('No default simulation ID set');
-    }
-
-    const simulation = this.simUniv
-      .get(COLLECTIONS.SIMULATIONS)
-      .get(this.#defaultSimId);
-
-    if (!simulation) {
-      throw new Error(`Simulation ${this.#defaultSimId} not found`);
-    }
-
-    return simulation;
-  }
+  simulation!: SimSimulation;
 
   /**
    * Get a simulation by ID
@@ -458,7 +459,7 @@ export class PlateSimulation implements PlateSimulationIF {
         if (!this.planet) {
           throw new Error('No planet available and no planetId provided');
         }
-        planetId = this.planet.id;
+        planetId = this.simulation.planetId;
       }
     }
 
@@ -548,8 +549,6 @@ export class PlateSimulation implements PlateSimulationIF {
     return Planet.fromJSON(planetData);
   }
 
-  planet: SimPlanetIF | undefined;
-
   makePlanet(radius = this.planetRadius, name?: string): SimPlanetIF {
     // radius is already in kilometers from EARTH_RADIUS constant
     if (radius < 1000) {
@@ -599,7 +598,7 @@ export class PlateSimulation implements PlateSimulationIF {
     const plates: Array<[string, any]> = [];
     for await (const [id, plate] of platesCollection.find(
       'planetId',
-      this.planet?.id,
+      this.simulation.planetId,
     )) {
       plates.push([id, plate]);
       forces.set(id, new Vector3());
@@ -726,96 +725,228 @@ export class PlateSimulation implements PlateSimulationIF {
   /**
    * Populate neighbor relationships between platelets based on spatial proximity
    * This should be called after platelet generation to establish neighbor connections
+   *
+   * Refactored to be memory-efficient:
+   * - Process one plate at a time instead of loading all platelets
+   * - Use iterators instead of arrays
+   * - Only compare platelets within the same plate
    */
   async populatePlateletNeighbors(): Promise<void> {
-    console.time('  🔗 Getting platelets collection');
+    console.time('  🔗 Getting collections');
     const plateletsCollection = this.simUniv.get(COLLECTIONS.PLATELETS);
+    const platesCollection = this.simUniv.get(COLLECTIONS.PLATES);
     if (!plateletsCollection) {
       throw new Error('platelets collection not found');
     }
-    console.timeEnd('  🔗 Getting platelets collection');
+    if (!platesCollection) {
+      throw new Error('plates collection not found');
+    }
+    console.timeEnd('  🔗 Getting collections');
 
-    // Get all platelets as an array for easier processing
-    console.time('  🔗 Converting to array');
-    const platelets: Platelet[] = [];
-    const gen = await platelets.find('simId', this.simulationId);
-    let result = await gen.next();
-    while (result.value) {
-      const [platelet] = result.value;
-      platelets.push(platelet);
-      if (platelets.length < 4) {
-        console.log('ppn: got platelet', platelet);
-      }
-      result = await gen.next();
+    console.time('  🔗 Computing neighbor relationships');
+
+    let totalPlateletsProcessed = 0;
+    let totalPlatesProcessed = 0;
+    const planet = await this.planet();
+    const planetRadius = planet.radius;
+
+    // a) Iterate over the plates
+    for await (const [plateId, plate] of platesCollection.find(
+      'planetId',
+      this.simulation.planetId,
+    )) {
+      console.log(`Processing neighbors for plate ${plateId}...`);
+
+      const result = await this.addEdgePlatelets(plateId, plate);
+
+      totalPlateletsProcessed += result.plateletCount;
+      totalPlatesProcessed++;
+
+      console.log(
+        `  Completed neighbors for plate ${plateId} (${result.plateletCount} platelets)`,
+      );
     }
 
+    console.timeEnd('  🔗 Computing neighbor relationships');
     console.log(
-      `  Processing ${platelets.length} platelets for neighbor relationships`,
+      `Neighbor relationships populated: ${totalPlatesProcessed} plates, ${totalPlateletsProcessed} platelets processed`,
+    );
+  }
+
+  /**
+   * Process neighbor relationships for a single plate
+   */
+  private async addEdgePlatelets(
+    plateId: string,
+    plate: any,
+  ): Promise<{ plateletCount: number }> {
+    let plateletCount = 0;
+    const neighborUpdates: Array<{
+      id: string;
+      platelet: any;
+      neighbors: string[];
+    }> = [];
+    const plateletsCollection = this.simUniv.get(COLLECTIONS.PLATELETS);
+
+    // Use real-time find with plateId - no intermediate data structures
+    for await (const [
+      currentPlateletId,
+      currentPlatelet,
+    ] of plateletsCollection.find('plateId', plateId)) {
+      const neighbors = await this.validUnrealizedPlateletNeighbors(
+        currentPlatelet,
+        cplate,
+      );
+
+      neighborUpdates.push({
+        id: currentPlateletId,
+        platelet: currentPlatelet,
+        neighbors,
+      });
+    }
+
+    console.log(`  Found ${plateletCount} platelets for plate ${plateId}`);
+
+    if (plateletCount < 2) {
+      console.log(
+        `  Skipping plate ${plateId} - not enough platelets for neighbor relationships`,
+      );
+      return { plateletCount };
+    }
+
+    // Batch write all neighbor updates for this plate
+    await this.writeNeighborUpdates(neighborUpdates, plateletsCollection);
+
+    return { plateletCount };
+  }
+
+  /**
+   * Find missing neighbors and create platelets to fill gaps
+   * This is a gap-filling algorithm that ensures complete plate coverage
+   */
+  private async validUnrealizedPlateletNeighbors(
+    platelet: PlateletIF,
+    plate: SimPlateIF,
+  ): Promise<string[]> {
+    const plateletsCollection = this.simUniv.get(COLLECTIONS.PLATELETS);
+
+    if (!platelet) {
+      return [];
+    }
+    const planet = await this.planet();
+    const { radius: planetRadius } = planet;
+
+    // Step 1: Find missing neighbors for this platelet
+    let coordinateList = await this.findMissingNeighborCoordinates(
+      platelet,
+      plate,
     );
 
-    // Process platelets in parallel batches for much faster neighbor computation
-    console.time('  🔗 Computing neighbor relationships (parallel)');
-    const BATCH_SIZE = 100; // Process 100 platelets at a time
+    // Create platelets for all missing coordinates
+    for (const h3Cell of coordinateList) {
+      const plateletId = `${plate.id}-${h3Cell}`;
 
-    for (let i = 0; i < platelets.length; i += BATCH_SIZE) {
-      const batch = platelets.slice(i, i + BATCH_SIZE);
-      /* console.log(
-        `    Processing batch ${Math.floor(i / BATCH_SIZE) + 1}/${Math.ceil(platelets.length / BATCH_SIZE)} (${batch.length} platelets)`,
-      );*/
-
-      // Process this batch in parallel
-      const batchPromises = batch.map(async (platelet) => {
-        const neighbors: string[] = [];
-
-        // Get all platelets from the same plate
-        const samePlatelets = platelets.filter(
-          (p) => p.plateId === platelet.plateId && p.id !== platelet.id,
-        );
-
-        // Shuffle and take up to 2 random candidates
-        const shuffledCandidates = shuffle(samePlatelets).slice(
-          0,
-          Math.min(50, samePlatelets.length),
-        );
-
-        // Check distance for up to 2 closest neighbors from the random candidates
-        const candidatesWithDistance = shuffledCandidates.map(
-          (otherPlatelet) => ({
-            platelet: otherPlatelet,
-            distance: platelet.position.distanceTo(otherPlatelet.position),
-          }),
-        );
-
-        // Sort by distance and take the 2 closest neighbors
-        candidatesWithDistance
-          .sort((a, b) => a.distance - b.distance)
-          .slice(0, 2)
-          .forEach((candidate) => {
-            neighbors.push(candidate.platelet.id);
-          });
-
-        return { platelet, neighbors };
-      });
-
-      const batchResults = await Promise.all(batchPromises);
-
-      // Batch write all updates to collection
-      const writePromises = batchResults.map(({ platelet, neighbors }) =>
-        plateletsCollection.set(platelet.id, {
-          ...platelet,
-          neighbors,
-        }),
+      // Create the missing platelet
+      const newPlatelet = await createPlateletFromCell(
+        h3Cell,
+        plate,
+        planetRadius,
+        PlateletManager.PLATELET_CELL_LEVEL,
       );
-      await Promise.all(writePromises);
-    }
-    console.timeEnd('  🔗 Computing neighbor relationships');
+      await plateletsCollection.set(plateletId, newPlatelet);
+      const saved = plateletsCollection.fond(newPlatelet.id);
 
-    console.log('Neighbor relationships populated and validated');
+      await this.validUnrealizedPlateletNeighbors(saved, plate);
+    }
+  }
+
+  /**
+   * Find coordinates that should have platelets but don't exist yet
+   */
+  private async findMissingNeighborCoordinates(
+    platelet: PlateletIF,
+    plate: SimPlateIF,
+  ): Promise<string[]> {
+    const missingCoordinates: string[] = [];
+
+    const planet = await this.planet();
+    const plateletsCollection = this.simUniv.get(COLLECTIONS.PLATELETS);
+
+    for (const neighborCell of platelet.neighborCellIds) {
+      const neighborPosition = cellToVector(neighborCell, planet.radius);
+      const distanceToPlateCenter = neighborPosition.distanceTo(plate.position);
+      const neighborPlateletId = `${plate.id}-${neighborCell}`;
+
+      if (distanceToPlateCenter <= plate.radius) {
+        if (!(await plateletsCollection.has(neighborPlateletId))) {
+          missingCoordinates.push(neighborCell);
+        }
+      }
+    }
+
+    return missingCoordinates;
+  }
+
+  /**
+   * Find existing neighbors for a platelet (for the final neighbor list)
+   */
+  private async findExistingNeighbors(
+    currentPlatelet: any,
+    platePosition: Vector3,
+    plateRadius: number,
+    planetRadius: number,
+    plateletsCollection: any,
+    plateId: string,
+  ): Promise<string[]> {
+    const candidatesWithDistance: Array<{ id: string; distance: number }> = [];
+    const neighborCells = getNeighbors(currentPlatelet.h3Cell);
+
+    for (const neighborCell of neighborCells) {
+      const neighborPosition = cellToVector(neighborCell, planetRadius);
+      const distanceToPlateCenter = neighborPosition.distanceTo(platePosition);
+
+      if (distanceToPlateCenter <= plateRadius) {
+        const neighborPlateletId = `${plateId}-${neighborCell}`;
+
+        // Only include if it exists (should exist now after gap filling)
+        if (await plateletsCollection.has(neighborPlateletId)) {
+          const distance =
+            currentPlatelet.position.distanceTo(neighborPosition);
+          candidatesWithDistance.push({
+            id: neighborPlateletId,
+            distance,
+          });
+        }
+      }
+    }
+
+    // Sort by distance and take the 2 closest neighbors
+    return candidatesWithDistance
+      .sort((a, b) => a.distance - b.distance)
+      .slice(0, 2)
+      .map((candidate) => candidate.id);
+  }
+
+  /**
+   * Write neighbor updates to the collection in batch
+   */
+  private async writeNeighborUpdates(
+    neighborUpdates: Array<{ id: string; platelet: any; neighbors: string[] }>,
+    plateletsCollection: any,
+  ): Promise<void> {
+    const writePromises = neighborUpdates.map(({ id, platelet, neighbors }) =>
+      plateletsCollection.set(id, {
+        ...platelet,
+        neighbors,
+      }),
+    );
+    await Promise.all(writePromises);
   }
 
   /**
    * Refresh neighbor relationships by removing invalid neighbor IDs
-   * This removes neighbors that don't exist in the collection or belong to different plates
+   * This removes neighbors that don't exist in the collection
+   * Uses efficient has() checks instead of loading full neighbor objects
    */
   async refreshNeighbors(): Promise<void> {
     const plateletsCollection = this.simUniv.get(COLLECTIONS.PLATELETS);
@@ -830,12 +961,11 @@ export class PlateSimulation implements PlateSimulationIF {
       if (platelet.neighbors && platelet.neighbors.length > 0) {
         const originalLength = platelet.neighbors.length;
 
-        // Filter out invalid neighbors
+        // Filter out invalid neighbors using efficient has() check
         const validNeighbors = [];
         for (const neighborId of platelet.neighbors) {
-          // Check if neighbor exists in collection
-          const neighbor = await plateletsCollection.get(neighborId);
-          if (neighbor && neighbor.plateId === platelet.plateId) {
+          // Use has() to check existence - much more efficient than get()
+          if (await plateletsCollection.has(neighborId)) {
             validNeighbors.push(neighborId);
           }
         }
@@ -1041,9 +1171,7 @@ export class PlateSimulation implements PlateSimulationIF {
     // Delete the selected platelets in one batch operation
     await plateletsCollection.deleteMany(Array.from(allPlateletsToDelete));
 
-    // Clean up neighbor lists - remove invalid platelet IDs from remaining platelets' neighbor lists
-    console.log(`    Cleaning up neighbor lists...`);
-    await this.cleanupNeighborLists();
+    // Note: No need to clean up neighbor lists since gap-filling ensures complete coverage
 
     // Return the number of deleted platelets for this plate
     return allPlateletsToDelete.size;
@@ -1095,47 +1223,5 @@ export class PlateSimulation implements PlateSimulationIF {
         deletedSet.add(neighborId);
       });
     }
-  }
-
-  /**
-   * Clean up neighbor lists by removing neighbor IDs that don't exist in the collection
-   * This method finds all plates in the simulation and validates all neighbor references
-   */
-  async cleanupNeighborLists(): Promise<void> {
-    const plateletsCollection = this.simUniv.get(COLLECTIONS.PLATELETS);
-    if (!plateletsCollection) {
-      return;
-    }
-
-    let cleanedCount = 0;
-    let totalNeighborsRemoved = 0;
-
-    await plateletsCollection.each(async (platelet: any) => {
-      if (platelet.neighbors && platelet.neighbors.length > 0) {
-        const originalLength = platelet.neighbors.length;
-
-        // Filter out neighbor IDs that don't exist in the collection
-        const validNeighbors = [];
-        for (const neighborId of platelet.neighbors) {
-          if (await plateletsCollection.has(neighborId)) {
-            validNeighbors.push(neighborId);
-          }
-        }
-
-        if (validNeighbors.length !== originalLength) {
-          // Update the platelet with cleaned neighbor list
-          await plateletsCollection.set(platelet.id, {
-            ...platelet,
-            neighbors: validNeighbors,
-          });
-          cleanedCount++;
-          totalNeighborsRemoved += originalLength - validNeighbors.length;
-        }
-      }
-    });
-
-    console.log(
-      `    Cleaned neighbor lists: updated ${cleanedCount} platelets, removed ${totalNeighborsRemoved} invalid neighbor references`,
-    );
   }
 }

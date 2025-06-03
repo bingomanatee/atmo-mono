@@ -56,6 +56,8 @@ export function createPlatelet(
     id: crypto.randomUUID(),
     position: position.clone(),
     plateId,
+    planetId: options.planetId!, // Include planetId from options (required)
+    h3Cell: options.h3Cell, // Include h3Cell property from options
     mass: options.mass ?? 1.0,
     elasticity: options.elasticity ?? 0.5,
     radius: options.radius ?? 1.0,
@@ -63,7 +65,6 @@ export function createPlatelet(
     thickness: options.thickness ?? 1.0,
     velocity: options.velocity?.clone() ?? new Vector3(),
     isActive: options.isActive ?? true,
-    neighbors: options.neighbors ?? [],
     neighborCellIds: options.neighborCellIds ?? [],
     connections: options.connections ?? {},
     ...options,

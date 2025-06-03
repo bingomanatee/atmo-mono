@@ -136,13 +136,30 @@ export function createPlateletFromCellWorker(
     return null;
   }
 
+  // Calculate neighbor H3 cell IDs
+  const neighborCellIds = gridDisk(cell, 1).filter(
+    (neighbor) => neighbor !== cell,
+  );
+
   return {
-    id: `platelet_${plate.id}_${cell}`,
+    id: `${plate.id}-${cell}`, // Use consistent ID format
     plateId: plate.id,
-    h3Cell: cell,
+    planetId: plate.planetId, // Add planetId from plate
+    h3Cell: cell, // Include h3Cell property
     position: position,
     radius: h3HexRadiusAtResolution(planetRadius, resolution),
-    // ... other platelet properties
+    thickness: plate.thickness || 1.0,
+    density: plate.density || 1.0,
+    isActive: true,
+    connections: {},
+    neighborCellIds: neighborCellIds, // H3 neighbor cell IDs
+    mass:
+      (plate.thickness || 1.0) *
+      (plate.density || 1.0) *
+      Math.PI *
+      Math.pow(h3HexRadiusAtResolution(planetRadius, resolution), 2),
+    elasticity: 0.5,
+    velocity: { x: 0, y: 0, z: 0 }, // Plain object for worker context
   };
 }
 
