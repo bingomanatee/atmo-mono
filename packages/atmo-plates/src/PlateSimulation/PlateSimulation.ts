@@ -53,6 +53,7 @@ export class PlateSimulation implements PlateSimulationIF {
   #l0NeighborCache: Map<string, string[]> = new Map(); // Cache for L0 cell neighbors
   #step: number = 0;
   #maxPlateRadius: number | undefined;
+  #useSharedStorage: boolean = false; // Flag for shared IndexedDB storage
 
   /**
    * Create a new plate simulation
@@ -69,6 +70,7 @@ export class PlateSimulation implements PlateSimulationIF {
       simulationId,
       plateCount = 0,
       maxPlateRadius, // Extract maxPlateRadius
+      useSharedStorage = false, // Extract useSharedStorage flag
     } = props;
 
     // Initialize basic properties
@@ -90,18 +92,28 @@ export class PlateSimulation implements PlateSimulationIF {
     this.managers.set(MANAGERS.PLATE, new PlateSimulationPlateManager(this));
     this.managers.set(MANAGERS.PLATELET, new PlateletManager(this, false)); // Workers disabled by default
 
-    // Store maxPlateRadius
+    // Store maxPlateRadius and useSharedStorage
     this.#maxPlateRadius = maxPlateRadius;
+    this.#useSharedStorage = useSharedStorage;
+  }
+
+  /**
+   * Clear all existing databases - call this before init() if you want a fresh start
+   */
+  async clearDatabases(): Promise<void> {
+    const { clearExistingAtmoPlatesDatabases } = await import('../utils');
+    await clearExistingAtmoPlatesDatabases();
   }
 
   /**
    * Initialize the simulation
    * This is separate from the constructor to allow for future async initialization
+   * NOTE: This will NOT clear existing databases - call clearDatabases() first if needed
    */
   async init(): Promise<void> {
     // Initialize the simulation universe if it doesn't exist
     if (!this.multiverse.has(this.universeName)) {
-      await simUniverse(this.multiverse);
+      await simUniverse(this.multiverse, this.#useSharedStorage);
     }
 
     const plateManager = new PlateSimulationPlateManager(this);
@@ -275,7 +287,8 @@ export class PlateSimulation implements PlateSimulationIF {
         maxPlateRadius,
       ).generate();
 
-      for (const plate of plates) {
+      for (let i = 0; i < plates.length; i++) {
+        const plate = plates[i];
         await this.addPlate(plate);
       }
 
@@ -285,9 +298,6 @@ export class PlateSimulation implements PlateSimulationIF {
   }
 
   plateGenerator(plateCount: number, maxPlateRadius?: number) {
-    console.log(
-      `🌍 PlateSimulation planetRadius: ${this.planetRadius} meters (${this.planetRadius / 1000} km)`,
-    );
     return new PlateSpectrumGenerator({
       planetRadius: this.planetRadius, // Convert from meters to kilometers - PlateSpectrumGenerator expects km
       plateCount: plateCount,
@@ -296,7 +306,13 @@ export class PlateSimulation implements PlateSimulationIF {
   }
 
   get simUniv() {
-    return this.multiverse.get(this.universeName)!;
+    const universe = this.multiverse.get(this.universeName);
+    if (!universe) {
+      throw new Error(
+        `Universe '${this.universeName}' not initialized. Call init() first.`,
+      );
+    }
+    return universe;
   }
 
   addSimulation(props: SimProps): string {
@@ -506,7 +522,17 @@ export class PlateSimulation implements PlateSimulationIF {
     }
 
     // Add the plate to the collection
-    await this.simUniv.get(COLLECTIONS.PLATES).set(id, plateData);
+    const platesCollection = this.simUniv.get(COLLECTIONS.PLATES);
+    await platesCollection.set(id, plateData);
+
+    // Verify the plate was actually stored
+    const storedPlate = await platesCollection.get(id);
+    if (!storedPlate) {
+      console.error(
+        `❌ PlateSimulation: Failed to store plate ${id} in database`,
+      );
+    }
+
     return id;
   }
 
@@ -530,7 +556,6 @@ export class PlateSimulation implements PlateSimulationIF {
       throw new Error('planet radii must be >= 1000km');
     }
 
-    console.log(`🌍 Creating planet with radius: ${radius}km`);
     const planet = new Planet({ radius, name });
 
     // Set the planet data in the collection
@@ -713,10 +738,14 @@ export class PlateSimulation implements PlateSimulationIF {
     // Get all platelets as an array for easier processing
     console.time('  🔗 Converting to array');
     const platelets: Platelet[] = [];
-    for await (const [_, platelet] of plateletsCollection.values()) {
+    const gen = await platelets.find('simId', this.simulationId);
+    let result = await gen.next();
+    while (result.value) {
+      const [platelet] = result.value;
       platelets.push(platelet);
+      result = await gen.next();
     }
-    console.timeEnd('  🔗 Converting to array');
+
     console.log(
       `  Processing ${platelets.length} platelets for neighbor relationships`,
     );
@@ -727,9 +756,9 @@ export class PlateSimulation implements PlateSimulationIF {
 
     for (let i = 0; i < platelets.length; i += BATCH_SIZE) {
       const batch = platelets.slice(i, i + BATCH_SIZE);
-      console.log(
+      /* console.log(
         `    Processing batch ${Math.floor(i / BATCH_SIZE) + 1}/${Math.ceil(platelets.length / BATCH_SIZE)} (${batch.length} platelets)`,
-      );
+      );*/
 
       // Process this batch in parallel
       const batchPromises = batch.map(async (platelet) => {
