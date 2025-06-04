@@ -42,6 +42,7 @@ export interface PlateSimulationProps {
   simulationId?: string;
   maxPlateRadius?: number;
   useSharedStorage?: boolean; // Enable shared IndexedDB for master/worker scenarios
+  useWorkers?: boolean; // Enable worker processing for faster platelet generation
 }
 
 export interface PlateSimulationIF {

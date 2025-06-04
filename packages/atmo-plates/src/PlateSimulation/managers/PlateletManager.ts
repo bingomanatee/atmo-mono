@@ -58,7 +58,8 @@ export class PlateletManager {
 
       // Create a custom worker manager that supports module workers
       // This extends the atmo-workers functionality to handle ES6 modules
-      const workerUrl = '/platelet-worker.js';
+      const workerUrl =
+        '/node_modules/@wonderlandlabs/atmo-plates/dist/workers/platelet-worker.js';
       log('🔧 PlateletManager: Setting up worker with URL:', workerUrl);
 
       // Set expected workers count
