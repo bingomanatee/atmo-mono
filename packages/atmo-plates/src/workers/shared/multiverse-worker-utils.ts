@@ -18,6 +18,7 @@ export { DexieSun } from '../../PlateSimulation/sun/DexieSun';
 export {
   getCellsInRange,
   cellToVector,
+  cellToVectorAsync,
   getNeighborsAsync,
   h3HexRadiusAtResolution,
   pointToLatLon,
@@ -131,7 +132,7 @@ export async function createPlateletFromCellWorker(
   resolution: number,
 ) {
   // Implementation using re-exported utilities
-  const position = cellToVector(cell, planetRadius);
+  const position = await cellToVectorAsync(cell, planetRadius);
 
   if (!position) {
     return null;
@@ -166,18 +167,18 @@ export async function createPlateletFromCellWorker(
   };
 }
 
-export function filterCellsByPlateRadiusWorker(
+export async function filterCellsByPlateRadiusWorker(
   cells: string[],
   plate: any,
   planetRadius: number,
-): string[] {
+): Promise<string[]> {
   const plateCenter = new Vector3().copy(plate.position);
   const validCells: string[] = [];
 
   for (const cell of cells) {
     if (!isValidCell(cell)) continue;
 
-    const cellPosition = cellToVector(cell, planetRadius);
+    const cellPosition = await cellToVectorAsync(cell, planetRadius);
     if (!cellPosition) continue;
 
     const distance = cellPosition.distanceTo(plateCenter);
@@ -217,7 +218,7 @@ export async function performGridDiskComputationWorker(
   const candidateCells = getCellsInRange(centralCell, gridDiskRings);
 
   // Filter cells within plate radius
-  const validCells = filterCellsByPlateRadiusWorker(
+  const validCells = await filterCellsByPlateRadiusWorker(
     candidateCells,
     plate,
     planetRadius,

@@ -1,6 +1,7 @@
 import {
   cellToChildren,
   cellToVector,
+  cellToVectorAsync,
   getCellsInRange,
   getH3CellForPosition,
   getNeighborsAsync,
@@ -36,11 +37,11 @@ export function getCellsInH0Cell(h0Cell: string, resolution: number): string[] {
 /**
  * Filters cells to only those within the plate's radius
  */
-export function filterCellsByPlateRadius(
+export async function filterCellsByPlateRadius(
   cells: string[],
   plate: SimPlateIF,
   planetRadius: number,
-): string[] {
+): Promise<string[]> {
   log(
     `🔍🔍🔍🔍 FILTER DEBUG: Checking ${cells.length} cells for plate ${plate.id}
        Plate center: (${plate.position.x.toFixed(1)}, ${plate.position.y.toFixed(1)}, ${plate.position.z.toFixed(1)})
@@ -53,14 +54,14 @@ export function filterCellsByPlateRadius(
   // Both plate position and cell positions are in kilometers
   const platePositionKm = new Vector3().copy(plate.position);
 
-  const cellDistances = cells
-    .map((cell) => {
-      const position = cellToVector(cell, planetRadius);
+  const cellDistances = await Promise.all(
+    cells.map(async (cell) => {
+      const position = await cellToVectorAsync(cell, planetRadius);
       const distanceKm = position.distanceTo(platePositionKm); // Both in km now
 
       return { cell, distance: distanceKm }; // Store distance in kilometers
-    })
-    .filter(Boolean);
+    }),
+  );
 
   // Sort by distance (closest first)
   cellDistances.sort((a, b) => a.distance - b.distance);
@@ -163,7 +164,7 @@ export async function createPlateletFromCell(
   planetRadius: number,
   resolution: number,
 ): Promise<PlateletIF> {
-  const position = cellToVector(cell, planetRadius);
+  const position = await cellToVectorAsync(cell, planetRadius);
 
   // Ensure position is valid
   if (!position) {
@@ -176,16 +177,22 @@ export async function createPlateletFromCell(
   let totalNeighborDistance = 0;
   let validNeighborCount = 0;
 
-  neighborCellIds.forEach((cell) => {
+  for (const neighborCell of neighborCellIds) {
     try {
-      const neighborPosition = cellToVector(cell, planetRadius);
+      const neighborPosition = await cellToVectorAsync(
+        neighborCell,
+        planetRadius,
+      );
       totalNeighborDistance += position.distanceTo(neighborPosition);
       validNeighborCount++;
     } catch (error) {
-      // Handle cases where cellToVector might fail for some reason (e.g., invalid cell ID)
-      console.error(`Error getting position for neighbor cell ${cell}:`, error);
+      // Handle cases where cellToVectorAsync might fail for some reason (e.g., invalid cell ID)
+      console.error(
+        `Error getting position for neighbor cell ${neighborCell}:`,
+        error,
+      );
     }
-  });
+  }
 
   const averageNeighborDistance =
     validNeighborCount > 0 ? totalNeighborDistance / validNeighborCount : 0; // Default to 0 if no valid neighbors
@@ -307,7 +314,7 @@ export async function generateCircularPlatelets(
   console.log(
     `   Performing initial distance-based filtering and queuing valid cells...`,
   );
-  const initiallyValidCells = filterCellsByPlateRadius(
+  const initiallyValidCells = await filterCellsByPlateRadius(
     Array.from(potentialCandidateCells),
     plate,
     planetRadius,
@@ -346,7 +353,10 @@ export async function generateCircularPlatelets(
       if (!processedPlateletCells.has(neighbor)) {
         // Check if neighbor's center is within plate radius
         try {
-          const neighborPosition = cellToVector(neighbor, planetRadius);
+          const neighborPosition = await cellToVectorAsync(
+            neighbor,
+            planetRadius,
+          );
           const distanceToPlate = neighborPosition.distanceTo(plateCenter);
 
           if (distanceToPlate <= plateRadiusKm) {

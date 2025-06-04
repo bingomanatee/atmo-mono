@@ -19,7 +19,7 @@ import type {
   SimPlanetIF,
   SimSimulation,
 } from '../types.atmo-plates';
-import { simUniverse } from '../utils';
+import { simUniverse, clearExistingAtmoPlatesDatabases } from '../utils';
 import { extendPlate, isostaticElevation } from '../utils/plateUtils';
 import { COLLECTIONS } from './constants';
 import { PlateletManager } from './managers/PlateletManager';
@@ -109,7 +109,6 @@ export class PlateSimulation implements PlateSimulationIF {
    * Clear all existing databases - call this before init() if you want a fresh start
    */
   async clearDatabases(): Promise<void> {
-    const { clearExistingAtmoPlatesDatabases } = await import('../utils');
     await clearExistingAtmoPlatesDatabases();
   }
 

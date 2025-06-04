@@ -5,6 +5,7 @@ import { COLLECTIONS } from "../PlateSimulation/constants";
 import { SIM_PLATELETS_SCHEMA, UNIVERSES } from "../schema";
 import {
   cellToVector,
+  cellToVectorAsync,
   getCellsInRange,
   h3HexRadiusAtResolution,
   isValidCell,

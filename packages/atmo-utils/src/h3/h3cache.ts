@@ -130,8 +130,9 @@ class H3Cache {
 
     try {
       const data: H3CellPoint & { id: string } = {
-        id: `${h3Index}-${radius}`,
+        id: h3Index,
         h3Index,
+        radius: point.length(),
         x: point.x,
         y: point.y,
         z: point.z,
@@ -146,14 +147,13 @@ class H3Cache {
   /**
    * Delete cached cell point
    */
-  async deleteCellPoint(h3Index: string, radius: number): Promise<void> {
+  async deleteCellPoint(h3Index: string): Promise<void> {
     if (!(await this.ensureInitialized())) {
       return;
     }
 
     try {
-      const id = `${h3Index}-${radius}`;
-      await this.db!.delete(this.STORE_CELL_POINTS, id);
+      await this.db!.delete(this.STORE_CELL_POINTS, h3Index);
     } catch (error) {
       // Silently fail
     }

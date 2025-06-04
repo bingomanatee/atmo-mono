@@ -1,6 +1,7 @@
 // Platelet Worker - Uses IDBSun for shared IndexedDB access
 import {
   cellToVector,
+  cellToVectorAsync,
   getCellsInRange,
   h3HexRadiusAtResolution,
   isValidCell,
@@ -321,7 +322,7 @@ async function generatePlatelets(plate, planetRadius, resolution) {
     }
 
     try {
-      const cellPosition = cellToVector(cell, planetRadius);
+      const cellPosition = await cellToVectorAsync(cell, planetRadius);
       if (!cellPosition) {
         invalidCellCount++;
         continue;

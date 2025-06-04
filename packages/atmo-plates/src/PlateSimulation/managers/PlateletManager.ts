@@ -1,5 +1,6 @@
 import {
   cellToVector,
+  cellToVectorAsync,
   getCellsInRange,
   h3HexRadiusAtResolution,
   isValidCell,
@@ -673,7 +674,7 @@ export class PlateletManager {
     const plateletCells = getCellsInH0Cell(h0Cell, resolution);
 
     // Filter cells within radius of the plate
-    const validPlateletCells = filterCellsByPlateRadius(
+    const validPlateletCells = await filterCellsByPlateRadius(
       plateletCells,
       plate,
       planetRadius,
