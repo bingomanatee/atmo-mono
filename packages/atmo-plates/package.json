@@ -20,7 +20,8 @@
   "scripts": {
     "build": "vite build",
     "build:workers": "vite build --config vite.config.worker.js",
-    "build:all": "yarn build && yarn build:workers && yarn build:types",
+    "copy:worker": "node scripts/copy-worker.js",
+    "build:all": "yarn build && yarn build:workers && yarn copy:worker && yarn build:types",
     "test": "vitest run",
     "test:watch": "vitest --watch",
     "test:ui": "vitest --ui",
