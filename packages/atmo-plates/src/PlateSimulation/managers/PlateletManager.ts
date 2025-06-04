@@ -46,6 +46,20 @@ export class PlateletManager {
   }
 
   /**
+   * Check if workers are enabled
+   */
+  get workersEnabled(): boolean {
+    return this.useWorkers;
+  }
+
+  /**
+   * Check if workers are available and ready
+   */
+  get workersAvailable(): boolean {
+    return this.workerAvailable;
+  }
+
+  /**
    * Initialize the atmo-workers system for parallel platelet generation
    */
   private async initializeWorkerManager(): Promise<void> {
@@ -760,5 +774,54 @@ export class PlateletManager {
     log(`🔒 DontClear mode: ${testPayload.dontClear} (prevents data clearing)`);
 
     return testPayload;
+  }
+
+  /**
+   * Process neighbors for a plate using workers
+   */
+  async processNeighborsWithWorker(
+    plateId: string,
+    planetRadius: number,
+  ): Promise<{ plateletCount: number }> {
+    if (!this.useWorkers || !this.workerAvailable || !this.taskManager) {
+      throw new Error('Workers not available for neighbor processing');
+    }
+
+    try {
+      log(`🔗 Using worker for neighbor processing: ${plateId}`);
+
+      const result = await this.taskManager
+        .submitRequest(
+          'process-neighbors',
+          {
+            plateId: plateId,
+            planetRadius: planetRadius,
+            universeId: this.sim.simUniv?.name || 'default-universe',
+          },
+          {
+            clientId: 'platelet-manager-neighbors',
+            maxTime: 120000, // 2 minutes timeout for neighbor processing
+          },
+        )
+        .toPromise();
+
+      log(
+        `✅ Worker neighbor processing completed for plate ${plateId}:`,
+        result,
+      );
+
+      if (result && result.result && result.result.success) {
+        return {
+          plateletCount: result.result.plateletCount || 0,
+        };
+      } else {
+        throw new Error(
+          `Worker neighbor processing failed: ${result?.error || 'Unknown error'}`,
+        );
+      }
+    } catch (error) {
+      log(`❌ Worker neighbor processing failed for plate ${plateId}:`, error);
+      throw error;
+    }
   }
 }

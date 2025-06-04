@@ -783,8 +783,41 @@ export class PlateSimulation implements PlateSimulationIF {
     plateId: string,
     plate: any,
   ): Promise<{ plateletCount: number }> {
+    const planet = await this.planet();
+    const planetRadius = planet.radius;
+
+    // Try to use workers for neighbor processing if available
+    const plateletManager = this.managers.get(
+      MANAGERS.PLATELET,
+    ) as PlateletManager;
+    if (plateletManager.workersEnabled && plateletManager.workersAvailable) {
+      try {
+        console.log(`Processing neighbors for plate ${plateId}...`);
+        const result = await plateletManager.processNeighborsWithWorker(
+          plateId,
+          planetRadius,
+        );
+        console.log(
+          `Found ${result.plateletCount} platelets for plate ${plateId}`,
+        );
+        console.log(
+          `Completed neighbors for plate ${plateId} (${result.plateletCount} platelets)`,
+        );
+        return result;
+      } catch (error) {
+        console.warn(
+          `⚠️ Worker neighbor processing failed, falling back to main thread:`,
+          error,
+        );
+        // Fall through to main thread processing
+      }
+    }
+
+    // Fallback to main thread processing
     let plateletCount = 0;
     const plateletsCollection = this.simUniv.get(COLLECTIONS.PLATELETS);
+
+    console.log(`Processing neighbors for plate ${plateId}...`);
 
     // Use real-time find with plateId - no intermediate data structures
     for await (const [
@@ -797,14 +830,18 @@ export class PlateSimulation implements PlateSimulationIF {
       await this.validUnrealizedPlateletNeighbors(currentPlatelet, plate);
     }
 
-    console.log(`  Found ${plateletCount} platelets for plate ${plateId}`);
+    console.log(`Found ${plateletCount} platelets for plate ${plateId}`);
 
     if (plateletCount < 2) {
       console.log(
-        `  Skipping plate ${plateId} - not enough platelets for neighbor relationships`,
+        `Skipping plate ${plateId} - not enough platelets for neighbor relationships`,
       );
       return { plateletCount };
     }
+
+    console.log(
+      `Completed neighbors for plate ${plateId} (${plateletCount} platelets)`,
+    );
 
     // Gap-filling is complete for this plate
     return { plateletCount };
