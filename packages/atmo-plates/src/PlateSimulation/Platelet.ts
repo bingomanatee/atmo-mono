@@ -6,7 +6,7 @@ export class Platelet implements PlateletIF {
   id: string;
   plateId: string;
   planetId: string;
-  private _position: Vector3;
+  private #position: Vector3;
   radius: number;
   thickness: number;
   density: number;
@@ -25,18 +25,13 @@ export class Platelet implements PlateletIF {
       : [];
     this.plateId = data.plateId ?? uuidV4();
     this.planetId = data.planetId ?? uuidV4();
-    this._position = new Vector3().copy(data.position ?? new Vector3(0, 0, 0));
+    this.position = new Vector3().copy(data.position ?? new Vector3(0, 0, 0));
     this.radius = data.radius ?? 1;
     this.thickness = data.thickness ?? 1;
     this.density = data.density ?? 1;
     this.sector = data.sector ?? '';
   }
 
-  get position(): Vector3 {
-    return this._position.clone();
-  }
-
-  set position(value: Vector3) {
-    this._position = new Vector3().copy(value);
-  }
+  readonly KLASS = 'Platelet';
+  position: Vector3;
 }

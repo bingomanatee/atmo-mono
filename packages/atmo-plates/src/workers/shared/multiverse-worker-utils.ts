@@ -18,7 +18,7 @@ export { DexieSun } from '../../PlateSimulation/sun/DexieSun';
 export {
   getCellsInRange,
   cellToVector,
-  getNeighbors,
+  getNeighborsAsync,
   h3HexRadiusAtResolution,
   pointToLatLon,
   latLngToCell,
@@ -124,7 +124,7 @@ export async function initWorkerDexieSun(options: {
 }
 
 // Worker-specific computation helpers
-export function createPlateletFromCellWorker(
+export async function createPlateletFromCellWorker(
   cell: string,
   plate: any,
   planetRadius: number,
@@ -138,7 +138,7 @@ export function createPlateletFromCellWorker(
   }
 
   // Calculate neighbor H3 cell IDs
-  const neighborCellIds = getNeighbors(cell);
+  const neighborCellIds = await getNeighborsAsync(cell);
 
   // Use half the H3 radius for coverage area (consistent with main thread)
   const h3Radius = h3HexRadiusAtResolution(planetRadius, resolution);
@@ -226,7 +226,7 @@ export async function performGridDiskComputationWorker(
   // Create platelets
   const platelets = [];
   for (const cell of validCells) {
-    const platelet = createPlateletFromCellWorker(
+    const platelet = await createPlateletFromCellWorker(
       cell,
       plate,
       planetRadius,

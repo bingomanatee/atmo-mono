@@ -2,7 +2,7 @@ import {
   cellToVector,
   EARTH_RADIUS,
   getCellsInRange,
-  getNeighbors,
+  getNeighborsAsync,
   randomNormal,
 } from '@wonderlandlabs/atmo-utils';
 import { Multiverse } from '@wonderlandlabs/multiverse';
@@ -897,7 +897,7 @@ export class PlateSimulation implements PlateSimulationIF {
     plateId: string,
   ): Promise<string[]> {
     const candidatesWithDistance: Array<{ id: string; distance: number }> = [];
-    const neighborCells = getNeighbors(currentPlatelet.h3Cell);
+    const neighborCells = await getNeighborsAsync(currentPlatelet.h3Cell);
 
     for (const neighborCell of neighborCells) {
       const neighborPosition = cellToVector(neighborCell, planetRadius);
@@ -944,7 +944,8 @@ export class PlateSimulation implements PlateSimulationIF {
   /**
    * Refresh neighbor relationships by validating neighborCellIds
    * This ensures all H3 cell IDs in neighborCellIds correspond to existing platelets
-   * Uses efficient has() checks instead of loading full neighbor objects
+   * and removes references to platelets that have been marked as removed
+   * Uses efficient has() checks and mutate() for updates
    */
   async refreshNeighbors(): Promise<void> {
     const plateletsCollection = this.simUniv.get(COLLECTIONS.PLATELETS);
@@ -967,24 +968,34 @@ export class PlateSimulation implements PlateSimulationIF {
       const batch = allPlatelets.slice(i, i + batchSize);
 
       for (const platelet of batch) {
+        // Skip platelets that are marked as removed
+        if (platelet.removed) {
+          continue;
+        }
+
         if (platelet.neighborCellIds && platelet.neighborCellIds.length > 0) {
           const originalLength = platelet.neighborCellIds.length;
 
-          // Filter out H3 cell IDs that don't have corresponding platelets
-          const validNeighborCells = [];
+          // Filter out H3 cell IDs that don't have corresponding platelets or are marked as removed
+          const validNeighborCells: string[] = [];
           for (const cellId of platelet.neighborCellIds) {
             const neighborPlateletId = `${platelet.plateId}-${cellId}`;
-            // Use has() to check existence - much more efficient than get()
-            if (await plateletsCollection.has(neighborPlateletId)) {
+
+            // Check if neighbor exists and is not removed
+            const neighborPlatelet =
+              await plateletsCollection.get(neighborPlateletId);
+            if (neighborPlatelet && !neighborPlatelet.removed) {
               validNeighborCells.push(cellId);
             }
           }
 
           if (validNeighborCells.length !== originalLength) {
-            // Update the platelet with cleaned neighborCellIds list
-            await plateletsCollection.set(platelet.id, {
-              ...platelet,
-              neighborCellIds: validNeighborCells,
+            // Use mutate to update the platelet with cleaned neighborCellIds list
+            await plateletsCollection.mutate(platelet.id, (draft: any) => {
+              if (draft) {
+                draft.neighborCellIds = validNeighborCells;
+              }
+              return draft;
             });
             totalCleaned++;
             totalNeighborsRemoved += originalLength - validNeighborCells.length;
@@ -992,6 +1003,10 @@ export class PlateSimulation implements PlateSimulationIF {
         }
       }
     }
+
+    console.log(
+      `🔗 Refreshed neighbors: cleaned ${totalCleaned} platelets, removed ${totalNeighborsRemoved} neighbor references`,
+    );
   }
 
   /**
@@ -1157,10 +1172,17 @@ export class PlateSimulation implements PlateSimulationIF {
       allPlateletsToDelete.add(plateletId);
     });
 
-    // Instead of deleting, flag platelets as "deleted" for visualization
-    Array.from(allPlateletsToDelete).forEach((plateletId) => {
+    // Instead of deleting, flag platelets as "removed" in the schema
+    for (const plateletId of allPlateletsToDelete) {
+      await plateletsCollection.mutate(plateletId, (draft: any) => {
+        if (draft) {
+          draft.removed = true;
+        }
+        return draft;
+      });
+      // Also add to the Set for backward compatibility with visualization
       this.deletedPlatelets.add(plateletId);
-    });
+    }
 
     // Return the number of flagged platelets for this plate
     return allPlateletsToDelete.size;
@@ -1168,9 +1190,23 @@ export class PlateSimulation implements PlateSimulationIF {
 
   /**
    * Check if a platelet is flagged as deleted (for visualization)
+   * This checks both the Set (for backward compatibility) and the schema
    */
   public isPlateletDeleted(plateletId: string): boolean {
     return this.deletedPlatelets.has(plateletId);
+  }
+
+  /**
+   * Check if a platelet is marked as removed in the schema
+   */
+  public async isPlateletRemoved(plateletId: string): Promise<boolean> {
+    const plateletsCollection = this.simUniv.get(COLLECTIONS.PLATELETS);
+    if (!plateletsCollection) {
+      return false;
+    }
+
+    const platelet = await plateletsCollection.get(plateletId);
+    return platelet?.removed === true;
   }
 
   /**
@@ -1198,8 +1234,8 @@ export class PlateSimulation implements PlateSimulationIF {
 
     // Check all remaining (non-deleted) platelets
     for (const platelet of platelets) {
-      if (deletedSet.has(platelet.id)) {
-        continue; // Skip already deleted platelets
+      if (deletedSet.has(platelet.id) || platelet.removed) {
+        continue; // Skip already deleted or removed platelets
       }
 
       // Check if this platelet has any non-destroyed neighbors
@@ -1209,8 +1245,17 @@ export class PlateSimulation implements PlateSimulationIF {
         for (const cellId of platelet.neighborCellIds) {
           const neighborPlateletId = `${platelet.plateId}-${cellId}`;
 
-          // If this neighbor exists and is not deleted, platelet is not an island
-          if (!deletedSet.has(neighborPlateletId)) {
+          // Find the neighbor platelet in our local array
+          const neighborPlatelet = platelets.find(
+            (p) => p.id === neighborPlateletId,
+          );
+
+          // If this neighbor exists, is not deleted, and is not removed, platelet is not an island
+          if (
+            neighborPlatelet &&
+            !deletedSet.has(neighborPlateletId) &&
+            !neighborPlatelet.removed
+          ) {
             hasLivingNeighbor = true;
             break;
           }
@@ -1249,10 +1294,15 @@ export class PlateSimulation implements PlateSimulationIF {
       return;
     }
 
-    // Convert H3 cell IDs to platelet IDs and filter out already deleted ones
+    // Convert H3 cell IDs to platelet IDs and filter out already deleted or removed ones
     const neighbors = platelet.neighborCellIds
       .map((cellId: string) => `${platelet.plateId}-${cellId}`)
-      .filter((neighborId: string) => !deletedSet.has(neighborId));
+      .filter((neighborId: string) => {
+        if (deletedSet.has(neighborId)) return false;
+        // Also check if the neighbor is marked as removed in the platelets array
+        const neighborPlatelet = platelets.find((p) => p.id === neighborId);
+        return neighborPlatelet && !neighborPlatelet.removed;
+      });
 
     // Calculate how many more we can delete
     const remainingDeletions = maxAllowedDeletions - deletedSet.size;

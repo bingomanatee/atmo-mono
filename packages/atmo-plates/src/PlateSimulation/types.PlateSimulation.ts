@@ -135,6 +135,7 @@ export interface PlateletIF {
   radius: number;
   sector: string;
   thickness: number;
+  removed?: boolean; // Flag to mark platelets as removed/deleted
 }
 
 // Raw platelet data interface
@@ -149,6 +150,7 @@ export interface RawPlatelet {
   sector?: string;
   h3Index?: string;
   float?: number;
+  removed?: boolean;
 }
 
 // Re-export types that are used in imports

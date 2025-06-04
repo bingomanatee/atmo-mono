@@ -153,7 +153,9 @@ export class PlateletVisualizer extends PlateVisualizerBase {
         );
       }
       // Simple positioning - just use platelet position directly
-      position.copy(platelet.position);
+      if (!platelet.position) {
+        console.warn('platelet has no position', platelet);
+      } else position.copy(platelet.position);
       scale.set(
         platelet.radius * OVERFLOW,
         platelet.thickness,
@@ -168,12 +170,13 @@ export class PlateletVisualizer extends PlateVisualizerBase {
       localMatrix.compose(position, quaternion, scale);
       this.instancedMesh.setMatrixAt(index, localMatrix);
 
-      // Check if this platelet is flagged as deleted
+      // Check if this platelet is flagged as deleted or removed
       const simulation = this.plateletManager['sim'];
       const isDeleted =
-        simulation &&
-        simulation.isPlateletDeleted &&
-        simulation.isPlateletDeleted(platelet.id);
+        (simulation &&
+          simulation.isPlateletDeleted &&
+          simulation.isPlateletDeleted(platelet.id)) ||
+        platelet.removed === true;
 
       let instanceColor: THREE.Color;
 
@@ -321,9 +324,10 @@ export class PlateletVisualizer extends PlateVisualizerBase {
       this.platelets.forEach((platelet, index) => {
         const simulation = this.plateletManager['sim'];
         const isDeleted =
-          simulation &&
-          simulation.isPlateletDeleted &&
-          simulation.isPlateletDeleted(platelet.id);
+          (simulation &&
+            simulation.isPlateletDeleted &&
+            simulation.isPlateletDeleted(platelet.id)) ||
+          platelet.removed === true;
 
         let instanceColor: THREE.Color;
 

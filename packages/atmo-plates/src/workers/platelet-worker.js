@@ -277,7 +277,7 @@ async function generatePlatelets(plate, planetRadius, resolution) {
 
   for (const cell of validCells) {
     try {
-      const platelet = createPlateletFromCell(
+      const platelet = await createPlateletFromCell(
         cell,
         plate,
         planetRadius,

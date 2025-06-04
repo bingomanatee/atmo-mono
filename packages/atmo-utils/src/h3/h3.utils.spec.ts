@@ -99,6 +99,38 @@ describe('H3 Utilities', () => {
     });
   });
 
+  describe('getNeighborsAsync', () => {
+    it('should return the correct number of neighbors asynchronously', async () => {
+      const lat = 37.7749;
+      const lng = -122.4194;
+      const resolution = 9;
+
+      const h3Index = h3Utils.latLngToCell(lat, lng, resolution);
+      const neighbors = await h3Utils.getNeighborsAsync(h3Index);
+
+      // A hexagon should have 6 neighbors
+      expect(neighbors.length).toBe(6);
+
+      // All neighbors should be valid H3 cell indices
+      neighbors.forEach((neighbor) => {
+        expect(h3Utils.isValidCell(neighbor)).toBe(true);
+      });
+    });
+
+    it('should return the same results as the synchronous version', async () => {
+      const lat = 37.7749;
+      const lng = -122.4194;
+      const resolution = 9;
+
+      const h3Index = h3Utils.latLngToCell(lat, lng, resolution);
+      const syncNeighbors = h3Utils.getNeighbors(h3Index);
+      const asyncNeighbors = await h3Utils.getNeighborsAsync(h3Index);
+
+      // Should return identical results
+      expect(asyncNeighbors).toEqual(syncNeighbors);
+    });
+  });
+
   describe('cellToBoundary', () => {
     it('should return the correct number of vertices', () => {
       const lat = 37.7749;

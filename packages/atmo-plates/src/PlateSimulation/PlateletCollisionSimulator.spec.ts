@@ -37,6 +37,7 @@ describe('PlateletCollisionSimulator', () => {
         density: 1,
         sector: sectorId,
         planetId,
+        h3Cell: baseCell + '1', // Add unique h3Cell for each platelet
       }),
       new Platelet({
         position: new Vector3(baseRadius * 1.5, 0, 0), // Should interact with first
@@ -45,6 +46,7 @@ describe('PlateletCollisionSimulator', () => {
         density: 1,
         sector: sectorId,
         planetId,
+        h3Cell: baseCell + '2', // Add unique h3Cell for each platelet
       }),
       new Platelet({
         position: new Vector3(baseRadius * 4, 0, 0), // Should NOT interact with first two
@@ -53,6 +55,7 @@ describe('PlateletCollisionSimulator', () => {
         density: 1,
         sector: sectorId,
         planetId,
+        h3Cell: baseCell + '3', // Add unique h3Cell for each platelet
       }),
       new Platelet({
         position: new Vector3(baseRadius * 6, 0, 0), // Far away
@@ -61,6 +64,7 @@ describe('PlateletCollisionSimulator', () => {
         density: 1,
         sector: sectorId,
         planetId,
+        h3Cell: baseCell + '4', // Add unique h3Cell for each platelet
       }),
       new Platelet({
         position: new Vector3(baseRadius * 8, 0, 0), // Far away
@@ -69,6 +73,7 @@ describe('PlateletCollisionSimulator', () => {
         density: 1,
         sector: sectorId,
         planetId,
+        h3Cell: baseCell + '5', // Add unique h3Cell for each platelet
       }),
     ];
 

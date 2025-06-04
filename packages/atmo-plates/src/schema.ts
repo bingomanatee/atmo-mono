@@ -60,6 +60,10 @@ export const SIM_PLATELETS_SCHEMA = {
   },
   density: { type: FIELD_TYPES.number, meta: { required: true } },
   thickness: { type: FIELD_TYPES.number, meta: { required: true } },
+  removed: {
+    type: FIELD_TYPES.boolean,
+    meta: { optional: true, default: false },
+  },
 };
 
 export const SIM_SIMULATIONS_SCHEMA = {
@@ -167,6 +171,7 @@ export const UNIVERSAL_PLATELETS_SCHEMA = {
       optional: true,
     },
   },
+  removed: FIELD_TYPES.boolean,
 };
 
 export const UNIVERSAL_PLATELET_STEPS_SCHEMA = {

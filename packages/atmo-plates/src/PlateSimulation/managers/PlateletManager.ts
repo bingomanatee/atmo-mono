@@ -583,7 +583,7 @@ export class PlateletManager {
 
       for (const cell of validCells) {
         try {
-          const platelet = createPlateletFromCell(
+          const platelet = await createPlateletFromCell(
             cell,
             plate,
             planetRadius,
@@ -686,9 +686,7 @@ export class PlateletManager {
 
     // Create platelets in parallel
     const plateletPromises = validPlateletCells.map((cell) =>
-      Promise.resolve(
-        createPlateletFromCell(cell, plate, planetRadius, resolution),
-      ),
+      createPlateletFromCell(cell, plate, planetRadius, resolution),
     );
     const platelets = await Promise.all(plateletPromises);
 

@@ -3,7 +3,7 @@ import {
   cellToVector,
   getCellsInRange,
   getH3CellForPosition,
-  getNeighbors,
+  getNeighborsAsync,
   h3HexRadiusAtResolution,
   latLngToCell,
   pointToLatLon,
@@ -157,12 +157,12 @@ export function createCenterPlatelet(
 /**
  * Creates a platelet object from a cell
  */
-export function createPlateletFromCell(
+export async function createPlateletFromCell(
   cell: string,
   plate: SimPlateIF,
   planetRadius: number,
   resolution: number,
-): PlateletIF {
+): Promise<PlateletIF> {
   const position = cellToVector(cell, planetRadius);
 
   // Ensure position is valid
@@ -170,7 +170,7 @@ export function createPlateletFromCell(
     throw new Error(`Failed to get position for H3 cell ${cell}`);
   }
 
-  const neighborCellIds = getNeighbors(cell);
+  const neighborCellIds = await getNeighborsAsync(cell);
 
   // Calculate average distance to neighbor cell positions
   let totalNeighborDistance = 0;
@@ -331,7 +331,7 @@ export async function generateCircularPlatelets(
     cellsProcessedCount++;
 
     // Create platelet for the current cell
-    const platelet = createPlateletFromCell(
+    const platelet = await createPlateletFromCell(
       currentCell,
       plate,
       planetRadius,
@@ -341,7 +341,7 @@ export async function generateCircularPlatelets(
     createdPlateletIds.push(platelet.id);
 
     // Get neighbors and enqueue if valid and not processed
-    const neighbors = getNeighbors(currentCell);
+    const neighbors = await getNeighborsAsync(currentCell);
     for (const neighbor of neighbors) {
       if (!processedPlateletCells.has(neighbor)) {
         // Check if neighbor's center is within plate radius

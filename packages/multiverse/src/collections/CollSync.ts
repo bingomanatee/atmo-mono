@@ -1,19 +1,16 @@
-import memorySunF from '../suns/SunMemory';
-import { CollBase } from './CollBase';
 import { Observable } from 'rxjs';
+import memorySunF from '../suns/SunMemory';
 import type { CollIF, CollSyncIF } from '../types.coll';
 import type {
+  DataKey,
+  DataRecord,
+  MutatorSync,
   SchemaLocalIF,
-  SendProps,
   SunIFSync,
-  TransportResult,
   UniverseIF,
   UniverseName,
-  MutationAction,
-  MutatorSync,
-  DataRecord,
-  DataKey,
 } from '../types.multiverse';
+import { CollBase } from './CollBase';
 
 type CollParms<RecordType, KeyType = string> = {
   name: string;

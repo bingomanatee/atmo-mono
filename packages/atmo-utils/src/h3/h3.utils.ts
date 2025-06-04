@@ -133,6 +133,18 @@ export function getNeighbors(h3Index: string): string[] {
 }
 
 /**
+ * Get the neighbors of an H3 cell (async version)
+ * Currently wraps the synchronous getNeighbors function in an async context
+ * for future extensibility to support async neighbor calculations
+ *
+ * @param h3Index - The H3 cell index as a string
+ * @returns A promise that resolves to an array of neighboring H3 cell indices
+ */
+export async function getNeighborsAsync(h3Index: string): Promise<string[]> {
+  return getNeighbors(h3Index);
+}
+
+/**
  * Get all cells within a given distance of an H3 cell
  *
  * @param h3Index - The H3 cell index as a string

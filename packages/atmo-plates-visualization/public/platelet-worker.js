@@ -6,10 +6,10 @@ import {
   isValidCell,
   latLngToCell,
   pointToLatLon,
-} from '@wonderlandlabs/atmo-utils';
-import { CollAsync, Multiverse, SchemaLocal } from '@wonderlandlabs/multiverse';
-import { Vector3 } from 'three';
-import { createPlateletFromCell } from '../PlateSimulation/utils/plateletUtils';
+} from "@wonderlandlabs/atmo-utils";
+import { CollAsync, Multiverse, SchemaLocal } from "@wonderlandlabs/multiverse";
+import { Vector3 } from "three";
+import { createPlateletFromCell } from "../PlateSimulation/utils/plateletUtils";
 
 // Worker state
 let workerMultiverse;
@@ -22,8 +22,8 @@ self.onmessage = async function (e) {
   try {
     // Handle atmo-workers format
     if (
-      e.data.type === 'execute-task' &&
-      e.data.taskId === 'generate-platelets'
+      e.data.type === "execute-task" &&
+      e.data.taskId === "generate-platelets"
     ) {
       const {
         parameters: {
@@ -37,7 +37,7 @@ self.onmessage = async function (e) {
         timestamp,
       } = e.data;
 
-      console.log('🤖 Platelet Worker: Received atmo-workers task', e.data);
+      console.log("🤖 Platelet Worker: Received atmo-workers task", e.data);
 
       // Process the task
       const result = await handlePlateletGeneration({
@@ -51,8 +51,8 @@ self.onmessage = async function (e) {
 
       // Send response in atmo-workers format
       self.postMessage({
-        type: 'task-complete',
-        taskId: 'generate-platelets',
+        type: "task-complete",
+        taskId: "generate-platelets",
         requestId: requestId,
         success: result.success,
         result: result.success ? result : undefined,
@@ -74,7 +74,7 @@ self.onmessage = async function (e) {
       testMode,
     } = e.data;
 
-    console.log('🤖 Platelet Worker: Received message', e.data);
+    console.log("🤖 Platelet Worker: Received message", e.data);
 
     // Handle legacy format
     const result = await handlePlateletGeneration({
@@ -90,7 +90,7 @@ self.onmessage = async function (e) {
     // Send legacy format response
     self.postMessage(result);
   } catch (error) {
-    console.error('❌ Platelet Worker: Error', error);
+    console.error("❌ Platelet Worker: Error", error);
     self.postMessage({
       success: false,
       error: error.message,
@@ -116,11 +116,11 @@ async function handlePlateletGeneration({
         success: true,
         plateId,
         plateletCount: 0,
-        message: 'Test mode successful',
+        message: "Test mode successful",
         timestamp: Date.now(),
         usedMultiverse: false,
         dontClearMode: dontClear,
-        dataSource: 'IDBSun-IndexedDB',
+        dataSource: "IDBSun-IndexedDB",
       };
     }
 
@@ -135,7 +135,7 @@ async function handlePlateletGeneration({
       try {
         plate = await platesCollection.get(plateId);
       } catch (error) {
-        console.warn('⚠️ Failed to get plate from collection:', error);
+        console.warn("⚠️ Failed to get plate from collection:", error);
       }
     }
 
@@ -163,12 +163,12 @@ async function handlePlateletGeneration({
       timestamp: Date.now(),
       usedMultiverse: true,
       dontClearMode: dontClear,
-      dataSource: 'IDBSun-IndexedDB',
+      dataSource: "IDBSun-IndexedDB",
       cellsProcessed: platelets.length,
       validCells: platelets.length,
     };
   } catch (error) {
-    console.error('❌ Platelet Worker: Generation error', error);
+    console.error("❌ Platelet Worker: Generation error", error);
     return {
       success: false,
       error: error.message,
@@ -179,7 +179,7 @@ async function handlePlateletGeneration({
 
 async function initWorker(universeId, dontClear) {
   try {
-    console.log('🤖 Platelet Worker: Initializing worker');
+    console.log("🤖 Platelet Worker: Initializing worker");
 
     // Create multiverse
     workerMultiverse = new Multiverse();
@@ -187,12 +187,12 @@ async function initWorker(universeId, dontClear) {
     // Create schemas
     const plateletsSchema = new SchemaLocal(
       COLLECTIONS.PLATELETS,
-      SIM_PLATELETS_SCHEMA,
+      SIM_PLATELETS_SCHEMA
     );
 
     // Create IDBSun for worker (connects to existing schema)
     const plateletsSun = await createIDBSun({
-      dbName: 'atmo-plates',
+      dbName: "atmo-plates",
       tableName: COLLECTIONS.PLATELETS,
       schema: plateletsSchema,
       isMaster: false, // Worker connects to existing schema
@@ -214,15 +214,15 @@ async function initWorker(universeId, dontClear) {
     // Also connect to plates collection to get plate data
     // Use a more flexible schema for plates since we only need to read data
     const platesSchema = new SchemaLocal(COLLECTIONS.PLATES, {
-      id: { type: 'string' },
-      position: { type: 'object' },
-      radius: { type: 'number' },
-      plateId: { type: 'string' },
+      id: { type: "string" },
+      position: { type: "object" },
+      radius: { type: "number" },
+      plateId: { type: "string" },
     });
 
     try {
       const platesSun = await createIDBSun({
-        dbName: 'atmo-plates',
+        dbName: "atmo-plates",
         tableName: COLLECTIONS.PLATES,
         schema: platesSchema,
         isMaster: false,
@@ -236,11 +236,11 @@ async function initWorker(universeId, dontClear) {
         sun: platesSun,
       });
 
-      console.log('✅ Platelet Worker: Connected to plates collection');
+      console.log("✅ Platelet Worker: Connected to plates collection");
     } catch (error) {
       console.warn(
-        '⚠️ Platelet Worker: Failed to connect to plates collection:',
-        error,
+        "⚠️ Platelet Worker: Failed to connect to plates collection:",
+        error
       );
       // Continue without plates collection - we'll handle this in the generation function
     }
@@ -251,36 +251,36 @@ async function initWorker(universeId, dontClear) {
     }
 
     isInitialized = true;
-    console.log('✅ Platelet Worker: Initialized successfully');
+    console.log("✅ Platelet Worker: Initialized successfully");
   } catch (error) {
-    console.error('❌ Platelet Worker: Initialization failed', error);
+    console.error("❌ Platelet Worker: Initialization failed", error);
     throw error;
   }
 }
 
 async function generatePlatelets(plate, planetRadius, resolution) {
-  console.log('🤖 Platelet Worker: Generating platelets for plate', plate.id);
+  console.log("🤖 Platelet Worker: Generating platelets for plate", plate.id);
 
   // Get the central H3 cell for the plate position
   const platePosition = new Vector3(
     plate.position.x,
     plate.position.y,
-    plate.position.z,
+    plate.position.z
   );
   const { lat, lon } = pointToLatLon(platePosition, planetRadius);
   const centralCell = latLngToCell(lat, lon, resolution);
 
-  console.log('   Central H3 cell:', centralCell);
-  console.log('   Plate radius:', plate.radius, 'km');
+  console.log("   Central H3 cell:", centralCell);
+  console.log("   Plate radius:", plate.radius, "km");
 
   // Calculate how many H3 cell radii we need to cover the plate
   const h3CellRadius = h3HexRadiusAtResolution(planetRadius, resolution);
   console.log(
-    '   H3 cell radius at resolution',
+    "   H3 cell radius at resolution",
     resolution,
-    ':',
+    ":",
     h3CellRadius,
-    'km',
+    "km"
   );
 
   // Use 133% of plate radius to account for hexagonal geometry
@@ -291,21 +291,21 @@ async function generatePlatelets(plate, planetRadius, resolution) {
   const gridDiskRings = ringsNeeded;
 
   console.log(
-    '   Search radius (133% of plate):',
+    "   Search radius (133% of plate):",
     searchRadius.toFixed(2),
-    'km',
+    "km"
   );
   console.log(
-    '   Rings needed:',
+    "   Rings needed:",
     ringsNeeded,
-    ', using:',
+    ", using:",
     gridDiskRings,
-    'rings (no cap)',
+    "rings (no cap)"
   );
 
   // Get all cells within the gridDisk rings
   const candidateCells = getCellsInRange(centralCell, gridDiskRings);
-  console.log('   Found', candidateCells.length, 'candidate cells');
+  console.log("   Found", candidateCells.length, "candidate cells");
 
   // Filter cells that are actually within the plate radius
   const validCells = [];
@@ -340,13 +340,13 @@ async function generatePlatelets(plate, planetRadius, resolution) {
   }
 
   console.log(
-    '   Filtering results:',
+    "   Filtering results:",
     validCells.length,
-    'valid,',
+    "valid,",
     outOfRangeCount,
-    'out of range,',
+    "out of range,",
     invalidCellCount,
-    'invalid cells',
+    "invalid cells"
   );
 
   // Create platelets for all valid cells
@@ -356,11 +356,11 @@ async function generatePlatelets(plate, planetRadius, resolution) {
 
   for (const cell of validCells) {
     try {
-      const platelet = createPlateletFromCell(
+      const platelet = await createPlateletFromCell(
         cell,
         plate,
         planetRadius,
-        resolution,
+        resolution
       );
       if (platelet && platelet.position) {
         // Store the platelet in the collection
@@ -369,37 +369,37 @@ async function generatePlatelets(plate, planetRadius, resolution) {
         successCount++;
       } else {
         console.log(
-          '   Warning: Platelet creation failed for cell',
+          "   Warning: Platelet creation failed for cell",
           cell,
-          '- position is undefined',
+          "- position is undefined"
         );
         failureCount++;
       }
     } catch (error) {
       console.log(
-        '   Warning: Error creating platelet for cell',
+        "   Warning: Error creating platelet for cell",
         cell,
-        ':',
-        error,
+        ":",
+        error
       );
       failureCount++;
     }
   }
 
   console.log(
-    '   Platelet creation:',
+    "   Platelet creation:",
     successCount,
-    'successful,',
+    "successful,",
     failureCount,
-    'failed',
+    "failed"
   );
   console.log(
-    '   ✅ Created',
+    "   ✅ Created",
     platelets.length,
-    'platelets using gridDisk method',
+    "platelets using gridDisk method"
   );
 
   return platelets;
 }
 
-console.log('🤖 Platelet Worker: Script loaded and ready');
+console.log("🤖 Platelet Worker: Script loaded and ready");

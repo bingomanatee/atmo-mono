@@ -4,6 +4,7 @@ import type {
   SunIfAsync,
 } from '@wonderlandlabs/multiverse';
 import { FIELD_TYPES } from '@wonderlandlabs/multiverse';
+import type { MutationAction } from '@wonderlandlabs/multiverse/dist';
 import { deleteDB, IDBPDatabase, openDB } from 'idb';
 import { Vector3 } from 'three';
 import { log } from '../../utils/utils';
@@ -27,11 +28,13 @@ interface SerializableVector3 {
  * IDB-based AsyncSun with better master/worker support
  * Uses the lightweight 'idb' library instead of Dexie
  */
-export class IDBSun<T extends Record<string, any>> implements SunIfAsync<T> {
+export class IDBSun<RecordType extends Record<string, any>, K extends KeyType>
+  implements SunIfAsync<RecordType>
+{
   private db: IDBPDatabase | null = null;
   private tableName: string;
   private dbName: string;
-  private schema: SchemaLocalIF<T>;
+  private schema: SchemaLocalIF<RecordType>;
   private dontClear: boolean = false;
   private isMaster: boolean = false;
   private version: number = 1;
@@ -342,7 +345,7 @@ export class IDBSun<T extends Record<string, any>> implements SunIfAsync<T> {
     return data;
   }
 
-  async get(key: string): Promise<T | undefined> {
+  async get(key: string): Promise<RecordType | undefined> {
     if (!this.db) {
       throw new Error(`IDBSun not ready for table ${this.tableName}`);
     }
@@ -350,7 +353,7 @@ export class IDBSun<T extends Record<string, any>> implements SunIfAsync<T> {
     const result = await this.db.get(this.tableName, key);
     if (!result) return undefined;
 
-    let deserialized = this.deserialize(result) as T;
+    let deserialized = this.deserialize(result) as RecordType;
 
     if (
       this.schema?.filterRecord &&
@@ -371,7 +374,7 @@ export class IDBSun<T extends Record<string, any>> implements SunIfAsync<T> {
     return deserialized;
   }
 
-  async set(key: string, value: T): Promise<void> {
+  async set(key: string, value: RecordType): Promise<void> {
     if (!this.db) {
       throw new Error(`IDBSun not ready for table ${this.tableName}`);
     }
@@ -418,7 +421,9 @@ export class IDBSun<T extends Record<string, any>> implements SunIfAsync<T> {
     return await this.db.count(this.tableName);
   }
 
-  async *find(...query: any[]): AsyncGenerator<Pair<string, T>, void, unknown> {
+  async *find(
+    ...query: any[]
+  ): AsyncGenerator<Pair<string, RecordType>, void, unknown> {
     if (!this.db) {
       throw new Error(`IDBSun not ready for table ${this.tableName}`);
     }
@@ -428,7 +433,7 @@ export class IDBSun<T extends Record<string, any>> implements SunIfAsync<T> {
     if (!query.length) {
       const allRecords = await this.db.getAll(this.tableName);
       for (const record of allRecords) {
-        yield this.deserialize(record) as T;
+        yield this.deserialize(record) as RecordType;
       }
     } else if (typeof a === 'string') {
       const store = this.db
@@ -476,7 +481,7 @@ export class IDBSun<T extends Record<string, any>> implements SunIfAsync<T> {
     }
   }
 
-  async *values(): AsyncGenerator<[string, T], void, unknown> {
+  async *values(): AsyncGenerator<[string, RecordType], void, unknown> {
     const store = this.db
       ?.transaction(this.tableName)
       ?.objectStore(this.tableName);
@@ -504,5 +509,16 @@ export class IDBSun<T extends Record<string, any>> implements SunIfAsync<T> {
       tableName: this.tableName,
       role: this.isMaster ? 'master' : 'worker',
     };
+  }
+
+  async mutate(key: K, fn: MutationAction) {
+    const record = await this.get(key);
+    if (!record) return;
+    const update = fn(record);
+    if (update) {
+      await this.set(key, update);
+    }
+
+    return update;
   }
 }

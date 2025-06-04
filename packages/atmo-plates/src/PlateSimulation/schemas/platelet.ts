@@ -44,6 +44,7 @@ export interface Platelet {
   stress?: number;
   strain?: number; // Deformation relative to original shape
   material?: string; // Material type for different properties
+  removed?: boolean; // Flag to mark platelets as removed/deleted
 }
 
 // Helper function to create a new platelet
