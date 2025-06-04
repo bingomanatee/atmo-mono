@@ -8,6 +8,7 @@
 
 import * as h3 from 'h3-js';
 import { EARTH_RADIUS } from './constants.ts';
+import { h3Cache } from './h3cache';
 
 // Constants
 const res0CellRadiusOnEarth = 1077.58; // Half of the center-to-center distance at res 0 in km (was 1077580 m)
@@ -141,7 +142,11 @@ export function getNeighbors(h3Index: string): string[] {
  * @returns A promise that resolves to an array of neighboring H3 cell indices
  */
 export async function getNeighborsAsync(h3Index: string): Promise<string[]> {
-  return getNeighbors(h3Index);
+  const cached = await h3Cache.getCellNeighbors(h3Index);
+  if (cached) return cached;
+  const newNeighbors = getNeighbors(h3Index);
+  h3Cache.setCellNeighbors(h3Index, newNeighbors); // not waiting on purpose
+  return newNeighbors;
 }
 
 /**

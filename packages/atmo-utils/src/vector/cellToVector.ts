@@ -1,5 +1,7 @@
 import { Vector3 } from 'three';
+import { EARTH_RADIUS } from '../h3/constants';
 import { cellToLatLng } from '../h3/h3.utils.ts';
+import { h3Cache } from '../h3/h3cache';
 import { latLonToPoint } from './latLonToPoint.ts';
 
 /**
@@ -19,4 +21,28 @@ export function cellToVector(h3Index: string, radius: number = 1): Vector3 {
 
   // Use latLonToPoint to convert to 3D coordinates
   return latLonToPoint(latRad, lngRad, radius);
+}
+
+export async function cellToVectorAsync(
+  h3Index: string,
+  radius: number = 1,
+): Vector3 {
+  // Get the lat/lng of the cell center
+
+  if (h3Cache.canUseIndexedDB) {
+    const storedPoint = await h3Cache.getCellPoint(h3Index);
+    if (storedPoint) {
+      if (radius === EARTH_RADIUS) return storedPoint;
+      storedPoint.setLength(radius);
+      return storedPoint;
+    }
+  }
+
+  // Use latLonToPoint to convert to 3D coordinates
+  const point = cellToVector(h3Index, radius);
+  if (h3Cache.canUseIndexedDB) {
+    const storedPoint = point.clone().setLength(EARTH_RADIUS);
+    h3Cache.setCellPoint(h3Index, storedPoint);
+  }
+  return point;
 }
