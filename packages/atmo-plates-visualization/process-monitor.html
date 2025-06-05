@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Platelet Process Monitor</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background: #000;
+            font-family: 'Courier New', monospace;
+        }
+
+        #viz-title {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            color: white;
+            font-size: 16px;
+            z-index: 1;
+            font-family: sans-serif;
+        }
+
+        #controls {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            z-index: 1000;
+        }
+
+        .control-button {
+            background: rgba(33, 150, 243, 0.8);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            margin: 4px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+        }
+
+        .control-button:hover {
+            background: rgba(33, 150, 243, 1);
+        }
+
+        .control-button:active {
+            background: rgba(25, 118, 210, 1);
+        }
+
+        #status-info {
+            position: absolute;
+            bottom: 10px;
+            right: 10px;
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 12px;
+            z-index: 1000;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+
+        .status-row {
+            display: flex;
+            justify-content: space-between;
+            margin: 4px 0;
+            min-width: 200px;
+        }
+
+        .status-label {
+            font-weight: bold;
+        }
+
+        .status-value {
+            color: #4CAF50;
+        }
+    </style>
+</head>
+<body>
+    <h1 id="viz-title">Platelet Process Monitor</h1>
+
+    <div id="controls">
+        <button class="control-button" onclick="simulateActivity()">Simulate Activity</button>
+        <button class="control-button" onclick="clearAll()">Clear All</button>
+        <button class="control-button" onclick="toggleTable()">Toggle Table</button>
+        <button class="control-button" onclick="exportState()">Export State</button>
+    </div>
+
+    <div id="status-info">
+        <div class="status-row">
+            <span class="status-label">Monitor Status:</span>
+            <span class="status-value" id="monitor-status">Initializing...</span>
+        </div>
+        <div class="status-row">
+            <span class="status-label">Active Processes:</span>
+            <span class="status-value" id="active-processes">0</span>
+        </div>
+        <div class="status-row">
+            <span class="status-label">Pending Tasks:</span>
+            <span class="status-value" id="pending-tasks">0</span>
+        </div>
+        <div class="status-row">
+            <span class="status-label">Total Platelets:</span>
+            <span class="status-value" id="total-platelets">0</span>
+        </div>
+        <div class="status-row">
+            <span class="status-label">Last Updated:</span>
+            <span class="status-value" id="last-updated">Never</span>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeProcessMonitor } from '/src/ProcessMonitor.ts';
+
+        // Initialize the process monitor
+        const processMonitor = initializeProcessMonitor();
+
+        // Update status display
+        function updateStatusDisplay() {
+            const stats = processMonitor.getStatistics();
+            const state = processMonitor.getStateManager().getState();
+
+            document.getElementById('monitor-status').textContent =
+                processMonitor.isReady() ? 'Active' : 'Initializing';
+            document.getElementById('active-processes').textContent = stats.activeProcesses;
+            document.getElementById('pending-tasks').textContent = stats.pendingTasks;
+            document.getElementById('total-platelets').textContent = stats.totalPlatelets;
+            document.getElementById('last-updated').textContent =
+                state.lastUpdated.toLocaleTimeString();
+        }
+
+        // Set up periodic updates
+        setInterval(updateStatusDisplay, 1000);
+
+        // Global functions for buttons
+        window.simulateActivity = () => {
+            processMonitor.simulateActivity();
+
+            // Add some additional test data
+            setTimeout(() => {
+                processMonitor.addProcess('platelet-generation', 'plate-001');
+                processMonitor.addTask('neighbor-processing', 'plate-001', 2);
+            }, 500);
+
+            setTimeout(() => {
+                processMonitor.addProcess('edge-detection');
+                processMonitor.addTask('visualization', 'plate-002', 1);
+            }, 1500);
+        };
+
+        window.clearAll = () => {
+            processMonitor.clear();
+            updateStatusDisplay();
+        };
+
+        window.toggleTable = () => {
+            // React ProcessTable is now used instead of vanilla table
+            console.log('Toggle table functionality moved to React ProcessTable');
+        };
+
+        window.exportState = () => {
+            const state = processMonitor.getStateManager().getState();
+            const dataStr = JSON.stringify(state, null, 2);
+            const dataBlob = new Blob([dataStr], {type: 'application/json'});
+            const url = URL.createObjectURL(dataBlob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `process-state-${new Date().toISOString()}.json`;
+            link.click();
+            URL.revokeObjectURL(url);
+        };
+
+        // Listen for state changes
+        processMonitor.getStateManager().subscribe('statistics', (stats) => {
+            updateStatusDisplay();
+        });
+
+        // Initial update
+        updateStatusDisplay();
+
+        console.log('🔍 Process Monitor Demo initialized');
+        console.log('📊 Use the buttons to simulate activity and test the monitoring system');
+        console.log('🎯 The process table should appear in the top-right corner');
+    </script>
+</body>
+</html>

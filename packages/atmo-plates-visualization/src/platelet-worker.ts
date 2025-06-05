@@ -13,6 +13,14 @@ console.log(
 // Track all messages for debugging
 let messageCount = 0;
 
+// Import message types (note: this might need to be a different import path in worker context)
+// For now, we'll define the constants locally in the worker
+const WORKER_MESSAGE_TYPES = {
+  EXECUTE_TASK: 'execute-task',
+  TASK_PROGRESS: 'task-progress',
+  TASK_COMPLETE: 'task-complete',
+} as const;
+
 // atmo-workers protocol handler
 self.addEventListener('message', async (event) => {
   messageCount++;
@@ -25,9 +33,9 @@ self.addEventListener('message', async (event) => {
   });
 
   // Send immediate acknowledgment that we received the message
-  if (event.data.type === 'execute-task') {
+  if (event.data.type === WORKER_MESSAGE_TYPES.EXECUTE_TASK) {
     self.postMessage({
-      type: 'task-progress',
+      type: WORKER_MESSAGE_TYPES.TASK_PROGRESS,
       taskId: event.data.taskId,
       requestId: event.data.requestId,
       progress: 0,
@@ -38,7 +46,10 @@ self.addEventListener('message', async (event) => {
 
   const { type, taskId, parameters, requestId, timestamp } = event.data;
 
-  if (type === 'execute-task' && taskId === 'generate-platelets') {
+  if (
+    type === WORKER_MESSAGE_TYPES.EXECUTE_TASK &&
+    taskId === 'generate-platelets'
+  ) {
     console.log(
       `🔄 Platelet Worker: Starting execution of task ${taskId} for request ${requestId}`,
     );
@@ -65,7 +76,7 @@ self.addEventListener('message', async (event) => {
 
       // Send progress update to parent
       self.postMessage({
-        type: 'task-progress',
+        type: WORKER_MESSAGE_TYPES.TASK_PROGRESS,
         taskId,
         requestId,
         progress: 0,
@@ -268,7 +279,7 @@ self.addEventListener('message', async (event) => {
 
       // Send success response in atmo-workers format
       const response = {
-        type: 'task-complete',
+        type: WORKER_MESSAGE_TYPES.TASK_COMPLETE,
         taskId,
         requestId,
         success: true,
@@ -301,7 +312,7 @@ self.addEventListener('message', async (event) => {
 
       // Send error response in atmo-workers format
       const errorResponse = {
-        type: 'task-complete',
+        type: WORKER_MESSAGE_TYPES.TASK_COMPLETE,
         taskId,
         requestId,
         success: false,

@@ -1,8 +1,10 @@
 /// <reference types="vitest" />
 import { defineConfig } from 'vite';
 import { resolve } from 'path';
+import react from '@vitejs/plugin-react';
 
 export default defineConfig({
+  plugins: [react()],
   build: {
     rollupOptions: {
       input: {
@@ -33,11 +35,14 @@ export default defineConfig({
           three: ['three'],
           // Separate Three.js examples into their own chunk
           'three-examples': ['three/examples/jsm/controls/OrbitControls.js'],
+          // Separate React into its own chunk
+          react: ['react', 'react-dom'],
           // Separate atmo libraries into their own chunk
           'atmo-libs': [
             '@wonderlandlabs/atmo-plates',
             '@wonderlandlabs/atmo-three-orbit',
             '@wonderlandlabs/atmo-utils',
+            '@wonderlandlabs/forestry',
           ],
           // Separate vendor libraries
           vendor: ['lodash-es'],
