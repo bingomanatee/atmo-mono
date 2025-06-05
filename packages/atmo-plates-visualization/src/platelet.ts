@@ -11,11 +11,6 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { PlateletVisualizer } from './PlateletVisualizer'; // Corrected import path
 
-console.log('🚀 Platelet visualization script starting...');
-console.log('📏 EARTH_RADIUS:', EARTH_RADIUS, 'km (updated from meters)');
-console.log('📏 EARTH_RADIUS value:', EARTH_RADIUS, 'km');
-console.log('🌍 THREE.js version:', THREE.REVISION);
-
 // Scene setup
 console.log('🎬 Setting up Three.js scene...');
 const scene = new THREE.Scene();
@@ -87,7 +82,6 @@ const NUM_PLATES = 60;
 
 // Database cleanup is now handled centrally in the simulation initialization
 
-// Wrap everything in an async function since we need to await sim.init()
 async function generateAndVisualizePlatelets() {
   // Database cleanup is now handled centrally in simulation initialization
 
@@ -213,11 +207,7 @@ async function generateAndVisualizePlatelets() {
     );
   }
 
-  // Create platelet manager with workers DISABLED for debugging
-  console.log(
-    `🔧 Creating PlateletManager with workers DISABLED for debugging...`,
-  );
-  const plateletManager = new PlateletManager(sim, false); // DISABLE workers for debugging
+  const plateletManager = new PlateletManager(sim, true);
 
   // Update worker status in UI
   const workerStatus = plateletManager.getWorkerStatus();
