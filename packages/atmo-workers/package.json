@@ -22,7 +22,8 @@
     "test:ui": "vitest --ui",
     "build:types": "tsc --emitDeclarationOnly",
     "build:all": "yarn build && yarn build:types",
-    "prepublishOnly": "yarn build:all"
+    "prepublishOnly": "yarn build:all",
+    "generate-worker": "node scripts/generate-worker.js"
   },
   "keywords": [
     "workers",

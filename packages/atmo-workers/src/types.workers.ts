@@ -14,39 +14,53 @@ export interface TaskIF extends ITaskParams {
   status: TaskStatusValue;
 }
 
-export type TaskManagerMessage = {
+export interface TaskStatusSummary {
+  failed: string[];
+  working: string[];
+  active: string[];
+  pending: string[];
+}
+
+export interface MessageIF {
   message: string;
   fromTask?: string;
   content?: any;
   taskId?: string;
   workerId?: string;
   managerId?: string;
+  error?: string;
   seq?: number;
-};
+}
 
 export interface BrowserTaskWorkerIF {
   status: WorkerStatusValue;
   tasks: string[];
   id: string;
   claim(task: TaskIF): void;
-  browserWorkerManager: BrowserWorkerManagerIF;
+  browserWorkerManager: BrowserWorkerManagerIF | undefined;
   listenToTaskManager(manager: TaskManagerIF): void;
+  close(): void;
 }
 
 export interface TaskManagerIF {
-  events$: Subject<TaskManagerMessage>;
-  emit(msg: TaskManagerMessage): void;
+  events$: Subject<MessageIF>;
+  emit(msg: MessageIF): void;
 
   addTask(task: ITaskParams): void;
 
   deleteTask(taskId: string): void;
 
   updateTask(taskId: string, props: Partial<ITaskParams>): void;
+
+  status(): TaskStatusSummary;
+
+  close(): void;
 }
 
 export interface BrowserWorkerManagerIF {
   taskManager?: TaskManagerIF;
   assignTaskManager(mgr: TaskManagerIF): void;
+  close(): void;
 }
 
 export type WorkerConfig = {

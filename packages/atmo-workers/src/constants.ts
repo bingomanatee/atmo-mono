@@ -11,12 +11,13 @@ export const TASK_MESSAGES = {
   RELEASE_CLAIM: 'release-claim',
   TASK_AVAILABLE: 'task-available',
   WORKER_WORK: 'worker-work',
-  WORKER_RESPONSE: 'worker-response'
+  WORKER_RESPONSE: 'worker-response',
 };
 export const WORKER_STATUS = {
   AVAILABLE: 'available',
-  LOADING: 'loading',
+  WORKING: 'working',
   OFFLINE: 'offline',
+  CLOSED: 'closed',
 };
 
 export const TASK_STATUS = {

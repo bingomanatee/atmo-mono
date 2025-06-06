@@ -2,13 +2,13 @@ import { ITaskParams, TaskIF } from './types.workers';
 import { v4 as uuidV4 } from 'uuid';
 import { TASK_STATUS } from './constants';
 
-export class TaskToWork implements TaskIF {
+export class TaskRequest implements TaskIF {
   status = TASK_STATUS.NEW;
   id: string;
   name: string;
   params: string;
-  onSuccess: Function;
-  onError: Function;
+  onSuccess?: Function;
+  onError?: Function;
   assignedWorker?: string;
 
   constructor(config: ITaskParams) {

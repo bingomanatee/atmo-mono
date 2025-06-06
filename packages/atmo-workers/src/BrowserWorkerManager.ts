@@ -3,12 +3,13 @@ import {
   BrowserWorkerManagerIF,
   TaskIF,
   TaskManagerIF,
-  TaskManagerMessage,
+  MessageIF,
   WorkerConfig,
 } from './types.workers';
 import { Subscription } from 'rxjs';
 import { BrowserTaskWorker } from './BrowserTaskWorker';
 import { TASK_MESSAGES, WORKER_STATUS } from './constants';
+import { Message } from './Message';
 import { shuffle } from 'lodash-es';
 
 type Props = {
@@ -31,14 +32,15 @@ export class BrowserWorkerManager implements BrowserWorkerManagerIF {
     }
   }
 
-  get workers(): BrowserTaskWorker[] {
+  get workers(): BrowserTaskWorkerIF[] {
     return Array.from(this.#workers.values());
   }
 
   #msub?: Subscription;
 
   assignTaskManager(manager: TaskManagerIF) {
-    if (this.taskManager) throw new Error('browser manager already has manager');
+    if (this.taskManager)
+      throw new Error('browser manager already has manager');
     this.taskManager = manager;
     this.#workers.forEach((w: BrowserTaskWorkerIF) => {
       w.listenToTaskManager(manager);
@@ -49,19 +51,21 @@ export class BrowserWorkerManager implements BrowserWorkerManagerIF {
     );
   }
 
-  #onManagerMessage(msg: TaskManagerMessage) {
+  #onManagerMessage(msg: MessageIF) {
     switch (msg.message) {
       case TASK_MESSAGES.NEW_TASK:
-        console.log('new task = ', msg.taskId);
         this.onTask(msg.content);
         break;
 
       case TASK_MESSAGES.TASK_AVAILABLE:
-        console.log('available task = ', msg.taskId);
         this.onTask(msg.content);
         break;
 
       case TASK_MESSAGES.WORKER_READY:
+        this.#activateWorker(msg.workerId!);
+        break;
+
+      case TASK_MESSAGES.WORKER_RESPONSE:
         this.#activateWorker(msg.workerId!);
         break;
     }
@@ -70,7 +74,9 @@ export class BrowserWorkerManager implements BrowserWorkerManagerIF {
   onTask(task: TaskIF) {
     const capableWorkers = Array.from(this.#workers.values()).filter(
       (w) =>
-        w.tasks.includes(task.name) && w.status === WORKER_STATUS.AVAILABLE,
+        w.tasks.includes(task.name) &&
+        w.status === WORKER_STATUS.AVAILABLE &&
+        w.status !== WORKER_STATUS.CLOSED,
     );
 
     if (capableWorkers.length) {
@@ -85,18 +91,28 @@ export class BrowserWorkerManager implements BrowserWorkerManagerIF {
   }
 
   #activateWorker(id: string) {
-    return this.#updateWorker(id, { status: WORKER_STATUS.AVAILABLE });
+    this.#updateWorker(id, { status: WORKER_STATUS.AVAILABLE });
   }
 
   #updateWorker(id: string, params: Omit<Partial<BrowserTaskWorkerIF>, 'id'>) {
     const worker = this.#workers.get(id);
     if (!worker) return undefined;
     Object.assign(worker, params);
-    this.taskManager?.emit({
-      message: TASK_MESSAGES.WORKER_UPDATED,
-      workerId: worker.id,
-      content: worker,
-    });
+    this.taskManager?.emit(
+      Message.forWorker(TASK_MESSAGES.WORKER_UPDATED, worker.id, worker),
+    );
     return worker;
+  }
+
+  close() {
+    this.#msub?.unsubscribe();
+    this.#msub = undefined;
+
+    this.#workers.forEach((worker) => {
+      worker.close();
+    });
+
+    this.#workers.clear();
+    this.taskManager = undefined;
   }
 }

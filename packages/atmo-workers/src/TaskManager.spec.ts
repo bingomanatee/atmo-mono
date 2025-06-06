@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { TaskManager } from './TaskManager.ts';
-import { type TaskManagerMessage } from './types.workers.ts';
+import { type MessageIF } from './types.workers.ts';
 
 describe('TaskManager', () => {
   describe('constructor', () => {
@@ -18,7 +18,7 @@ describe('TaskManager', () => {
   describe('addTask', () => {
     it('should add a task', () => {
       const mgr = new TaskManager();
-      const msgs: TaskManagerMessage[] = [];
+      const msgs: MessageIF[] = [];
       const sub = mgr.events$.subscribe((msg) => msgs.push(msg));
       const task = mgr.addTask({
         name: 'foo',
