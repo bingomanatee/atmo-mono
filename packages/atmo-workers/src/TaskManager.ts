@@ -1,64 +1,89 @@
+import { Subject, Subscription } from 'rxjs';
+import {
+  ITaskParams,
+  TaskIF,
+  TaskManagerIF,
+  TaskManagerMessage,
+} from './types.workers';
+import { TASK_MESSAGES, TASK_STATUS } from './constants';
+import { TaskToWork } from './TaskToWork';
 import { v4 as uuidV4 } from 'uuid';
-import { Subject } from 'rxjs';
-import {TaskManagerIF, TaskManagerMessage, ITaskParams} from "./types.workers";
-import {TASK_MESSAGES} from "./constants";
-
-const TASK_STATUS = {
-  NEW: 'new',
-  WORKING: 'working',
-  FAILED: 'failed',
-  DONE: 'done',
-};
-
-class PendingTask implements ITaskParams {
-  constructor(config: ITaskParams) {
-    const { name, onError, onSuccess, params } = config;
-    this.name = name;
-    this.params = params;
-    this.onError = onError;
-    this.onSuccess = onSuccess;
-    this.id = uuidV4();
-  }
-
-  status = TASK_STATUS.NEW;
-  id: string;
-  name: string;
-  params: string;
-  onSuccess: Function;
-  onError: Function;
-}
 
 export class TaskManager implements TaskManagerIF {
-  constructor() {}
-
   events$ = new Subject<TaskManagerMessage>();
-  #tasks: Map<string, PendingTask> = new Map();
+  #sub: Subscription;
+  #tasks: Map<string, TaskIF> = new Map();
+  id: string;
+
+  constructor() {
+    this.id = uuidV4();
+    const self = this;
+    this.#sub = this.events$.subscribe((e) => self.#onEvent(e));
+  }
+
+  #seq=0;
+  emit(msg: TaskManagerMessage) {
+    this.events$.next({ ...msg, managerId: this.id, seq: ++this.#seq });
+  }
+
+  task(id: string) {
+    return this.#tasks.get(id);
+  }
+
+  status() {
+    const state = {
+      failed: [],
+      working: [],
+      active: [],
+      pending: [],
+    };
+    this.#tasks.forEach((task: TaskIF) => {
+      switch (task.status) {
+        case TASK_STATUS.WORKING:
+          state.working.push(task.id);
+          break;
+        case TASK_STATUS.FAILED:
+          state.failed.push(task.id);
+          break;
+
+        case TASK_STATUS.ACTIVE:
+          state.active.push(task.id);
+          break;
+
+        default:
+          state.pending.push(task.id);
+      }
+    });
+    return state;
+  }
 
   addTask(task: ITaskParams) {
-    const pendingTask = new PendingTask(task);
+    const pendingTask = new TaskToWork(task);
     this.#tasks.set(pendingTask.id, pendingTask);
-    this.events$.next({
+    this.emit({
       message: TASK_MESSAGES.NEW_TASK,
       content: pendingTask,
+      taskId: pendingTask.id,
     });
+    return pendingTask;
   }
 
   deleteTask(taskId: string) {
     if (this.#tasks.has(taskId)) {
       this.#tasks.delete(taskId);
-      this.events$.next({
+      this.emit({
         message: TASK_MESSAGES.TASK_DELETED,
         taskId,
       });
     }
   }
 
-  updateTask(taskId: string, props: Partial<ITaskParams>) {
+  updateTask(taskId: string, props: Omit<Partial<TaskIF>, 'id'>) {
     if (this.#tasks.has(taskId)) {
       const task = this.#tasks.get(taskId)!;
       const history = { ...task };
       Object.assign(task, props);
-      this.events$.next({
+      this.emit({
         message: TASK_MESSAGES.TASK_UPDATED,
         taskId,
         content: { old: history, new: task },
@@ -66,5 +91,81 @@ export class TaskManager implements TaskManagerIF {
     } else {
       console.warn('cannot get task ', taskId);
     }
+  }
+
+  #onEvent(e: TaskManagerMessage) {
+    switch (e.message) {
+      case TASK_MESSAGES.TASK_CLAIM:
+        this.#resolveClaim(e);
+        break;
+
+      case TASK_MESSAGES.WORKER_READY:
+        this.#workerReady(e);
+        break;
+
+      case TASK_MESSAGES.WORKER_RESPONSE:
+        this.#finishTask(e);
+    }
+  }
+
+  #finishTask(e: TaskManagerMessage) {
+    const task = this.task(e.taskId);
+    if (task) {
+      if (task.onSuccess) {
+        task.onSuccess(e);
+      }
+      this.deleteTask(task.id);
+      console.log('---------- TASK COMPLETE -----------')
+    }
+  }
+
+  #workerReady(e: TaskManagerMessage) {
+    if (Array.isArray(e.content?.tasks)) {
+      const { tasks } = e.content;
+      if (tasks.length) {
+        const openTasks = Array.from(this.#tasks.values()).filter(
+          (task) =>
+            task.status === TASK_STATUS.NEW && tasks.includes(task.name),
+        );
+        if (openTasks.length) {
+          const [openTask] = openTasks;
+          this.emit({
+            message: TASK_MESSAGES.TASK_AVAILABLE,
+            content: openTask,
+          });
+        }
+      }
+    }
+  }
+
+  #resolveClaim(e: TaskManagerMessage) {
+    const { taskId, workerId } = e;
+    if (!(taskId && workerId)) {
+      console.warn(
+        '#rsolveClaim: bad task id',
+        taskId,
+        'for worker id',
+        workerId,
+      );
+      return;
+    }
+    const task = this.task(taskId!);
+    if (task?.assignedWorker) {
+      console.log('resolveClaim: task already working', task);
+      return;
+    }
+    console.log('---- #resolving claim for ', taskId, 'by', workerId);
+    this.updateTask(taskId!, {
+      status: TASK_STATUS.WORKING,
+      assignedWorker: workerId,
+    });
+
+    const workingTask = this.task(taskId);
+    this.emit({
+      message: TASK_MESSAGES.TASK_CLAIM_GRANTED,
+      taskId,
+      workerId,
+      content: workingTask,
+    });
   }
 }

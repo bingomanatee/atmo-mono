@@ -32,7 +32,7 @@ export class PlateletManager {
   private workersReady: number = 0;
   private expectedWorkers: number = 0;
   private taskManager?: TaskManager;
-  private browserWorker?: any; // BrowserWorker type
+  private browserWorker?: any; // BrowserWorkerManager type
 
   constructor(sim: PlateSimulationIF, useWorkers: boolean = false) {
     this.sim = sim;
@@ -273,7 +273,7 @@ export class PlateletManager {
 
   /**
    * Generate platelets using atmo-workers system for parallel processing
-   * Uses TaskManager and BrowserWorker for proper worker management
+   * Uses TaskManager and BrowserWorkerManager for proper worker management
    */
   private async generatePlateletsWithAtmoWorkers(
     plate: SimPlateIF,
