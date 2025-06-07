@@ -6,35 +6,32 @@ export default defineConfig({
     lib: {
       entry: resolve(__dirname, 'src/index.ts'),
       name: 'atmoWorkers',
-      fileName: 'index',
+      fileName: (format) => `index.${format === 'es' ? 'js' : 'cjs'}`,
       formats: ['es'],
     },
     outDir: 'dist',
-    emptyOutDir: true,
+    emptyOutDir: false, // Don't empty since we build types separately
     sourcemap: true,
     target: 'es2020',
     rollupOptions: {
-      external: [
-        '@wonderlandlabs/multiverse',
-        'rxjs',
-        'uuid',
-        'events',
-        'fs',
-        'path',
-        'worker_threads',
-        'os'
-      ],
-      output: {
-        globals: {
-          '@wonderlandlabs/multiverse': 'multiverse',
-          'rxjs': 'rxjs',
-          'uuid': 'uuid',
-          'events': 'events',
-          'fs': 'fs',
-          'path': 'path',
-          'worker_threads': 'worker_threads',
-          'os': 'os'
-        },
+      external: (id) => {
+        // External all dependencies and Node.js built-ins
+        return (
+          id.startsWith('@wonderlandlabs/') ||
+          id.startsWith('node:') ||
+          [
+            'rxjs',
+            'uuid',
+            'events',
+            'fs',
+            'path',
+            'worker_threads',
+            'os',
+            'fsevents',
+            'lodash-es',
+          ].includes(id) ||
+          id.includes('node_modules')
+        );
       },
     },
   },

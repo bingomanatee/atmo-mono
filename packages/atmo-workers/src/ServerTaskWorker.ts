@@ -1,7 +1,8 @@
+import { Worker } from 'worker_threads';
 import { v4 as uuidV4 } from 'uuid';
 import {
-  BrowserTaskWorkerIF,
-  BrowserWorkerManagerIF,
+  ServerTaskWorkerIF,
+  ServerWorkerManagerIF,
   TaskIF,
   TaskManagerIF,
   MessageIF,
@@ -9,40 +10,38 @@ import {
 } from './types.workers';
 import { TASK_MESSAGES, WORKER_STATUS } from './constants';
 import { Message } from './Message';
-import { isObj } from '@wonderlandlabs/atmo-utils';
-import * as console from 'node:console';
-import { WebSocket } from 'vite';
 import { Subscription } from 'rxjs';
-import MessageEvent = WebSocket.MessageEvent;
 
-export class BrowserTaskWorker implements BrowserTaskWorkerIF {
-  tasks: string[] = [];
-  script: string;
+export class ServerTaskWorker implements ServerTaskWorkerIF {
+  readonly tasks: string[] = [];
+  readonly script: string;
   status = WORKER_STATUS.OFFLINE;
-  id: string;
+  readonly id: string;
   readonly error?: string;
   #worker!: Worker;
 
   constructor(
-    browserWorkerManager: BrowserWorkerManagerIF,
+    serverWorkerManager: ServerWorkerManagerIF,
     configs: WorkerConfig,
   ) {
     this.id = uuidV4();
     const { tasks, script } = configs;
     this.script = script;
-    if (tasks) this.tasks = tasks;
+    if (tasks) this.tasks = [...tasks];
     this.#initWorker(script);
-    this.browserWorkerManager = browserWorkerManager;
+    this.serverWorkerManager = serverWorkerManager;
   }
 
   #initWorker(script: string) {
     const self = this;
     this.#worker = new Worker(script);
-    this.#worker.onmessage = (e) => self.#onWorkerMessage(e);
-    this.#worker.onerror = (e) => {
+    this.#worker.on('message', (data) => self.#onWorkerMessage(data));
+    this.#worker.on('error', (e) => {
       console.error('Worker script failed to load:', script, e);
 
-      self.browserWorkerManager?.taskManager?.emit(
+      (self as any).error = `Failed to load worker script: ${script}`;
+
+      self.serverWorkerManager?.taskManager?.emit(
         Message.forWorker(TASK_MESSAGES.WORKER_UPDATED, self.id, {
           new: self,
           error: `Failed to load worker script: ${script}`,
@@ -51,7 +50,8 @@ export class BrowserTaskWorker implements BrowserTaskWorkerIF {
 
       self.status = WORKER_STATUS.CLOSED;
       self.close();
-    };
+    });
+
     this.#worker.postMessage({
       message: TASK_MESSAGES.INIT_WORKER,
       id: this.id,
@@ -59,13 +59,13 @@ export class BrowserTaskWorker implements BrowserTaskWorkerIF {
     });
   }
 
-  private _browserWorkerManager?: BrowserWorkerManagerIF;
-  get browserWorkerManager(): BrowserWorkerManagerIF | undefined {
-    return this._browserWorkerManager;
+  private _serverWorkerManager?: ServerWorkerManagerIF;
+  get serverWorkerManager(): ServerWorkerManagerIF | undefined {
+    return this._serverWorkerManager;
   }
 
-  set browserWorkerManager(value: BrowserWorkerManagerIF | undefined) {
-    this._browserWorkerManager = value;
+  set serverWorkerManager(value: ServerWorkerManagerIF | undefined) {
+    this._serverWorkerManager = value;
     if (value?.taskManager) {
       this.listenToTaskManager(value.taskManager);
     }
@@ -118,7 +118,7 @@ export class BrowserTaskWorker implements BrowserTaskWorkerIF {
         content: e.content,
         workerId: this.id,
       });
-      this.browserWorkerManager?.taskManager?.emit(
+      this.serverWorkerManager?.taskManager?.emit(
         Message.forWorker(TASK_MESSAGES.WORKER_UPDATED, this.id, { new: this }),
       );
     }
@@ -130,17 +130,16 @@ export class BrowserTaskWorker implements BrowserTaskWorkerIF {
       return;
     }
 
-    this.browserWorkerManager?.taskManager?.emit(
+    this.serverWorkerManager?.taskManager?.emit(
       Message.forTask(TASK_MESSAGES.TASK_CLAIM, task.id, undefined, this.id),
     );
   }
 
-  #onWorkerMessage(e: any) {
-    const { data } = e;
-    if (!isObj(data)) {
+  #onWorkerMessage(data: any) {
+    if (typeof data !== 'object' || data === null) {
       return;
     }
-    const output = data as unknown as MessageIF;
+    const output = data as MessageIF;
     switch (output.message) {
       case TASK_MESSAGES.WORKER_READY:
         if (output.workerId === this.id) {
@@ -163,7 +162,7 @@ export class BrowserTaskWorker implements BrowserTaskWorkerIF {
     }
     this.status = WORKER_STATUS.AVAILABLE;
 
-    this.browserWorkerManager?.taskManager?.emit(
+    this.serverWorkerManager?.taskManager?.emit(
       Message.forWorker(TASK_MESSAGES.WORKER_READY, this.id, this),
     );
   }
@@ -173,12 +172,12 @@ export class BrowserTaskWorker implements BrowserTaskWorkerIF {
       return;
     }
 
-    this.browserWorkerManager?.taskManager?.emit(output);
+    this.serverWorkerManager?.taskManager?.emit(output);
     this.status = WORKER_STATUS.AVAILABLE;
-    this.browserWorkerManager?.taskManager?.emit(
+    this.serverWorkerManager?.taskManager?.emit(
       Message.forWorker(TASK_MESSAGES.WORKER_UPDATED, this.id, { new: this }),
     );
-    this.browserWorkerManager?.taskManager?.emit(
+    this.serverWorkerManager?.taskManager?.emit(
       Message.forWorker(TASK_MESSAGES.WORKER_READY, this.id, this),
     );
   }
@@ -194,6 +193,6 @@ export class BrowserTaskWorker implements BrowserTaskWorkerIF {
     this.#worker?.terminate();
 
     this.status = WORKER_STATUS.CLOSED;
-    this._browserWorkerManager = undefined;
+    this._serverWorkerManager = undefined;
   }
 }

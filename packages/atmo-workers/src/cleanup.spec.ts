@@ -94,8 +94,8 @@ describe('Cleanup and Resource Management', () => {
       // Close the worker
       worker.close();
 
-      // Verify worker status changed to offline
-      expect(worker.status).toBe('offline');
+      // Verify worker status changed to closed
+      expect(worker.status).toBe('closed');
     });
   });
 
@@ -130,9 +130,9 @@ describe('Cleanup and Resource Management', () => {
       // Close the worker manager
       workerManager.close();
 
-      // Verify all workers are offline
+      // Verify all workers are closed
       workers.forEach((worker) => {
-        expect(worker.status).toBe('offline');
+        expect(worker.status).toBe('closed');
       });
 
       // Verify workers array is cleared

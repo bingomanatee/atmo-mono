@@ -105,13 +105,13 @@ npm install @wonderlandlabs/atmo-workers
 Use the built-in CLI generator to quickly create sample workers:
 
 ```bash
-# Generate a math worker
-npm run generate-worker math-worker ./public/workers
+# Generate a browser math worker
+npm run generate-worker math-worker ./public/workers browser
 
-# Generate a data processing worker
-npm run generate-worker data-processor ./workers
+# Generate a server data processing worker
+npm run generate-worker data-processor ./workers server
 
-# Generate an image processing worker
+# Generate a browser image processing worker (default)
 npm run generate-worker image-worker
 ```
 
@@ -129,6 +129,11 @@ The generator creates:
   validate, filter
 - **Image workers** (names containing 'image' or 'img'): resize, compress,
   filter, analyze
+
+**Worker Types:**
+
+- **Browser workers** (default): Use Web Workers for browser environments
+- **Server workers**: Use Node.js Worker Threads for server-side multi-processing
 
 ### 3. Create a Worker Script
 
@@ -381,6 +386,51 @@ console.log('Failed tasks:', statusSummary.failed);
 console.log('Working tasks:', statusSummary.working);
 console.log('Pending tasks:', statusSummary.pending);
 ```
+
+## Server Workers (Node.js)
+
+For server-side applications, use `ServerWorkerManager` with Node.js Worker Threads
+for true multi-processing across CPU cores.
+
+### Server Worker Example
+
+```javascript
+const {
+  TaskManager,
+  ServerWorkerManager,
+} = require('@wonderlandlabs/atmo-workers');
+const path = require('path');
+const os = require('os');
+
+const taskManager = new TaskManager();
+
+const workerManager = new ServerWorkerManager({
+  manager: taskManager,
+  configs: Array(os.cpus().length).fill({
+    tasks: ['heavy-computation', 'data-processing'],
+    script: path.join(__dirname, 'workers/server-worker.js'),
+  }),
+});
+
+for (let i = 0; i < 100; i++) {
+  taskManager.addTask({
+    name: 'heavy-computation',
+    params: { iterations: 10000000 },
+    onSuccess: (result) => console.log(`Task ${i} completed`),
+    onError: (error) => console.error(`Task ${i} failed:`, error.error),
+  });
+}
+```
+
+### Server vs Browser Workers
+
+| Feature         | Browser Workers    | Server Workers           |
+| --------------- | ------------------ | ------------------------ |
+| **Environment** | Web browsers       | Node.js                  |
+| **Technology**  | Web Workers        | Worker Threads           |
+| **Isolation**   | Separate context   | Separate thread          |
+| **CPU Cores**   | Limited by browser | Full multi-core support  |
+| **Use Cases**   | UI responsiveness  | CPU-intensive processing |
 
 ## API Reference
 

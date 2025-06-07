@@ -63,6 +63,27 @@ export interface BrowserWorkerManagerIF {
   close(): void;
 }
 
+export interface ServerTaskWorkerIF {
+  readonly id: string;
+  readonly tasks: string[];
+  readonly script: string;
+  status: WorkerStatusValue;
+  readonly error?: string;
+  serverWorkerManager?: ServerWorkerManagerIF;
+  listenToTaskManager(manager: TaskManagerIF): void;
+  canDo(m: MessageIF): boolean | undefined;
+  claim(task: TaskIF): void;
+  close(): void;
+}
+
+export interface ServerWorkerManagerIF {
+  taskManager?: TaskManagerIF;
+  workers: ServerTaskWorkerIF[];
+  assignTaskManager(manager: TaskManagerIF): void;
+  onTask(task: TaskIF): void;
+  close(): void;
+}
+
 export type WorkerConfig = {
   tasks?: string[];
   script: string;

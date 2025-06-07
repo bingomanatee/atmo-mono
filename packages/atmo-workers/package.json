@@ -16,13 +16,14 @@
     "dist"
   ],
   "scripts": {
-    "build": "vite build",
+    "build": "npm run build:clean && npm run build:js && npm run build:types",
+    "build:clean": "rm -rf dist",
+    "build:js": "vite build",
+    "build:types": "tsc --emitDeclarationOnly --outDir dist/types",
     "test": "vitest run",
     "test:watch": "vitest --watch",
     "test:ui": "vitest --ui",
-    "build:types": "tsc --emitDeclarationOnly",
-    "build:all": "yarn build && yarn build:types",
-    "prepublishOnly": "yarn build:all",
+    "prepublishOnly": "npm run build",
     "generate-worker": "node scripts/generate-worker.js"
   },
   "keywords": [
@@ -37,6 +38,7 @@
   "author": "Wonderland Labs",
   "license": "MIT",
   "dependencies": {
+    "@wonderlandlabs/atmo-utils": "workspace:*",
     "@wonderlandlabs/multiverse": "workspace:*",
     "events": "^3.3.0",
     "lodash-es": "^4.17.21",
