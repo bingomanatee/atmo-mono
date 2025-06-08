@@ -151,36 +151,27 @@ export abstract class SunBase<
   validate(input: any) {
     if (isObj(input)) {
       const inputObj = input as Record<string, any>;
-      try {
-        this.eachField((field, fieldName) => {
-          if (field.meta?.optional && inputObj[fieldName] === undefined) {
-            return;
-          }
 
-          const value = get(input, fieldName);
+      for (const [fieldName, field] of Object.entries(
+        this.coll.schema.fields,
+      )) {
+        if (field.meta?.optional && inputObj[fieldName] === undefined) {
+          return;
+        }
 
-          const result = validateField(
-            value,
-            fieldName,
-            this.coll.schema,
-            input,
-          );
-          if (result) {
-            throw new Error(`\`validation error: ${fieldName}, ${result}`);
-          }
-        });
-      } catch (err) {
-        if (false)
-          console.error(
-            'SunFBase validation error:',
-            input,
-            err.message,
-            'for schema',
-            this.coll.schema,
-            'of',
-            this.coll.name,
-          );
-        throw err;
+        const value = fieldName.includes('.')
+          ? get(input, fieldName)
+          : inputObj[fieldName];
+
+        const result = validateField(
+          value,
+          fieldName,
+          this.coll.schema,
+          input,
+        );
+        if (result) {
+          throw new Error(`\`validation error: ${fieldName}, ${result}`);
+        }
       }
     }
   }

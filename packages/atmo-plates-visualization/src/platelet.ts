@@ -1,7 +1,6 @@
 import './style.css';
 import {
   PlateletManager,
-  PlateSimulation,
   PlateSpectrumGenerator,
   type SimPlateIF,
 } from '@wonderlandlabs/atmo-plates';
@@ -238,7 +237,7 @@ async function generateAndVisualizePlatelets() {
     '🔴 Applying edge detection to flag platelets for visualization...',
   );
   console.time('⏱️ Edge Detection');
-  // await sim.createIrregularPlateEdges();
+  await sim.createIrregularPlateEdges();
   console.timeEnd('⏱️ Edge Detection');
 
   const deletedCount = sim.getDeletedPlateletCount();

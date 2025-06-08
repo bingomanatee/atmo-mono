@@ -6,6 +6,7 @@ import {
 import { PlateSimulation, simUniverse } from '@wonderlandlabs/atmo-plates';
 import { Universe } from '@wonderlandlabs/multiverse';
 import { Multiverse } from '@wonderlandlabs/multiverse';
+import { COLLECTIONS } from '@wonderlandlabs/atmo-plates';
 
 
 
@@ -19,18 +20,21 @@ export async function createSimulationUniverse(
   } = {},
 ): Promise<Universe> {
   const { clearDatabases = true } = options;
-
-  // 1. Clear database tables if requested (before creating IDBSun instances)
-  if (clearDatabases) {
-    //@TODO wipe records
-  }
-
-  // 2. Create universe
+  console.log('creating universe data');
   const db = await initDBConnection('atmo-plates', schemaIndex);
-  return simUniverse(
+  const univ = await simUniverse(
     new Multiverse(),
     db
-  )
+  );
+  console.log('univ got:', univ);
+  if (clearDatabases) {
+    await univ.get(COLLECTIONS.SIMULATIONS).clear();
+    await univ.get(COLLECTIONS.PLATES).clear();
+    await univ.get(COLLECTIONS.PLATELETS).clear();
+    await univ.get(COLLECTIONS.PLANETS).clear();
+  }
+
+  return univ;
 }
 
 /**
