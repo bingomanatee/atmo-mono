@@ -1,55 +1,47 @@
+import { Universe } from '@wonderlandlabs/multiverse';
 import { latLngToCell, randomNormal, varyP } from '@wonderlandlabs/atmo-utils';
 import { Object3D, Vector3 } from 'three';
 import { v4 as uuidV4 } from 'uuid';
 import { COLLECTIONS } from '../../PlateSimulation/constants';
 import { varySpeedByRadius } from '../../utils';
-import { MANAGERS } from '../PlateSimulation';
+import { ContextProvider, MANAGER_TYPES } from '../interfaces/ContextProvider';
 import type { Platelet } from '../schemas/platelet';
 import type {
   PlateletStepIF,
-  PlateSimulationIF,
   SimPlateIF,
   SimStepIF,
 } from '../types.PlateSimulation';
 import { createOrbitalFrame, movePlate } from '../utils/plateMovement';
 import { PlateletManager } from './PlateletManager';
 
-export type PSPMProps = {
-  sim: PlateSimulationIF;
-};
-
 export default class PlateSimulationPlateManager {
-  #sim: PlateSimulationIF;
+  #universe: Universe;
 
   /**
-   * Get the steps collection from the simulation universe
+   * Get the steps collection from the universe
    */
   get stepsCollection() {
-    const collection = this.#sim.simUniv.get(COLLECTIONS.STEPS);
+    const collection = this.#universe.get(COLLECTIONS.STEPS);
     if (!collection) throw new Error('steps collection not found');
     return collection;
   }
 
-  constructor(sim: PlateSimulationIF) {
-    this.#sim = sim;
+  constructor(universe: Universe) {
+    this.#universe = universe;
   }
 
   // Method to initialize steps for a specific plate
-  initPlateSteps(plateId: string) {
+  async initPlateSteps(plateId: string, context: ContextProvider) {
     const steps = this.stepsCollection.find('plateId', plateId);
     if (!steps?.length) {
-      const plateStepId = this.#addFirstStep(plateId);
+      const plateStepId = await this.#addFirstStep(plateId);
 
-      // Get the PlateletManager instance
-      const plateletManager = this.#sim.managers.get(
-        MANAGERS.PLATELET,
-      ) as PlateletManager;
-      if (!plateletManager)
-        throw new Error('PlateletManager not found in sim.managers');
-
-      // Generate initial platelet steps
-      const platelets = plateletManager.generatePlatelets(plateId);
-      const plateletStepsCollection = this.#sim.simUniv.get(
+      // Get PlateletManager from context and generate platelets
+      const plateletManager = context.getManager<PlateletManager>(
+        MANAGER_TYPES.PLATELET,
+      );
+      const platelets = await plateletManager.generatePlatelets(plateId);
+      const plateletStepsCollection = this.#universe.get(
         COLLECTIONS.PLATELET_STEPS,
       );
 
@@ -94,10 +86,15 @@ export default class PlateSimulationPlateManager {
   }
 
   // Method to add the first step for a specific plate
-  #addFirstStep(plateId: string) {
-    // @ts-ignore
-    const plate: SimPlateIF = this.#sim.getPlate(plateId);
-    const planet = this.#sim.getPlanet(plate.planetId);
+  async #addFirstStep(plateId: string) {
+    const platesCollection = this.#universe.get(COLLECTIONS.PLATES);
+    const planetsCollection = this.#universe.get(COLLECTIONS.PLANETS);
+
+    const plate = await platesCollection.get(plateId);
+    if (!plate) throw new Error(`Plate ${plateId} not found`);
+
+    const planet = await planetsCollection.get(plate.planetId);
+    if (!planet) throw new Error(`Planet ${plate.planetId} not found`);
 
     const stepId = uuidV4();
 
@@ -149,17 +146,18 @@ export default class PlateSimulationPlateManager {
    * Move a specific plate to its next position
    * Uses ThreeOrbitalFrame to calculate the next position
    */
-  movePlate(plateId: string) {
-    if (!this.#sim.simulation) throw new Error('simulation required');
-
+  async movePlate(plateId: string) {
     // Get the current step
     const currentStep = this.#getCurrentStep(plateId);
 
-    // Get the planet for radius
-    const plate = this.#sim.getPlate(plateId);
-    if (!plate) throw new Error(`Plate ${plateId} not found in simulation`);
+    // Get the plate and planet data
+    const platesCollection = this.#universe.get(COLLECTIONS.PLATES);
+    const planetsCollection = this.#universe.get(COLLECTIONS.PLANETS);
 
-    const planet = this.#sim.getPlanet(plate.planetId);
+    const plate = await platesCollection.get(plateId);
+    if (!plate) throw new Error(`Plate ${plateId} not found`);
+
+    const planet = await planetsCollection.get(plate.planetId);
     if (!planet) throw new Error(`Planet ${plate.planetId} not found`);
 
     // Create and configure the orbital frame at origin
@@ -202,13 +200,13 @@ export default class PlateSimulationPlateManager {
     this.stepsCollection.set(currentStep.id, newStep as SimStepIF);
 
     // Update platelet steps
-    const plateletStepsCollection = this.#sim.simUniv.get(
+    const plateletStepsCollection = this.#universe.get(
       COLLECTIONS.PLATELET_STEPS,
     );
     if (!plateletStepsCollection)
       throw new Error('platelet_steps collection not found');
 
-    const platelets = this.#sim.simUniv.get(COLLECTIONS.PLATELETS);
+    const platelets = this.#universe.get(COLLECTIONS.PLATELETS);
     if (!platelets) throw new Error('platelets collection not found');
 
     const platePlatelets = platelets.find({ plateId });

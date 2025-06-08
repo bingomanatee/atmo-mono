@@ -1,0 +1,48 @@
+{
+  "name": "@wonderlandlabs/atmo-workers-core",
+  "version": "1.0.0",
+  "description": "Core types and utilities for atmo-workers ecosystem",
+  "main": "dist/index.js",
+  "module": "dist/index.js",
+  "types": "dist/types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/types/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "npm run build:clean && npm run build:js && npm run build:types",
+    "build:clean": "rm -rf dist",
+    "build:js": "vite build",
+    "build:types": "tsc --emitDeclarationOnly --outDir dist/types",
+    "test": "vitest run",
+    "test:watch": "vitest --watch",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "workers",
+    "types",
+    "core",
+    "typescript"
+  ],
+  "author": "Wonderland Labs",
+  "license": "MIT",
+  "dependencies": {
+    "rxjs": "^7.8.0",
+    "uuid": "^11.1.0"
+  },
+  "devDependencies": {
+    "@types/uuid": "^10.0.0",
+    "typescript": "^5.0.0",
+    "vite": "^5.0.0",
+    "vitest": "^3.1.3"
+  },
+  "peerDependencies": {
+    "typescript": ">=4.5.0"
+  }
+}

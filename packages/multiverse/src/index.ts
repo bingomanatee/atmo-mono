@@ -32,6 +32,7 @@ export * from './type.schema';
 // Utility functions
 export * from './typeguards.multiverse';
 export * from './utils/validateField';
+export { generatorToMap, asyncIterToMap } from './utils.sun';
 
 // Additional exports for compatibility
 export type { PostParams } from './type.schema';

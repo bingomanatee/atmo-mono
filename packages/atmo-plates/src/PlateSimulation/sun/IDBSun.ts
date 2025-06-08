@@ -122,15 +122,8 @@ export class IDBSun<RecordType extends Record<string, any>, K extends KeyType>
 
       // IDB library is now imported directly
 
-      // Clear database if requested (master only)
-      if (!this.dontClear && this.isMaster) {
-        try {
-          await deleteDB(this.dbName);
-          log(`✅ Database destroyed: ${this.dbName}`);
-        } catch (error) {
-          log(`⚠️ Failed to destroy database ${this.dbName}:`, error);
-        }
-      }
+      // Database clearing is now handled externally by the application
+      // IDBSun only lazy-creates tables/databases as needed
 
       this.db = await openDB(this.dbName, this.version, {
         upgrade: (

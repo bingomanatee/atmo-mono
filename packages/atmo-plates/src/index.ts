@@ -11,9 +11,8 @@ export { PlateSpectrumGenerator } from './generator/PlateSpectrumGenerator';
 
 // Export storage classes
 export {
-  DexieSun,
   IndexedSun,
-  createDexieSun,
+  IDBSun,
   createIDBSun,
   createMemoryAsyncSun,
   getStorageCapabilities,
@@ -22,4 +21,3 @@ export {
 // Export types
 export type { Plate } from './PlateSimulation/PlateSimulation';
 export type { SimPlateIF } from './PlateSimulation/types.PlateSimulation';
-export * from './workers/platelet-worker';

@@ -1,10 +1,17 @@
 import { EARTH_RADIUS } from '@wonderlandlabs/atmo-utils';
+import { Multiverse } from '@wonderlandlabs/multiverse';
+import { simUniverse } from '../utils';
 import { COLLECTIONS } from './constants';
 import { PlateletManager } from './managers/PlateletManager';
 import { PlateSimulation } from './PlateSimulation';
 
 export async function setupTestSimulation() {
-  const sim = new PlateSimulation({});
+  // Create multiverse and universe with proper collections
+  const mv = new Multiverse(new Map());
+  const universe = await simUniverse(mv);
+
+  // Create simulation with injected universe
+  const sim = new PlateSimulation(universe);
   await sim.init();
 
   // Create Earth planet using the simulation's makePlanet method

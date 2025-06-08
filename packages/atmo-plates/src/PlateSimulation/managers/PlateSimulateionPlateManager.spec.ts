@@ -1,24 +1,35 @@
+import {
+  Multiverse,
+  Universe,
+  asyncIterToMap,
+} from '@wonderlandlabs/multiverse';
 import { beforeEach, describe, expect, it } from 'vitest';
+import { simUniverse } from '../../utils';
 import { COLLECTIONS } from '../constants';
-import { MANAGERS, PlateSimulation } from '../PlateSimulation';
+import { MANAGER_TYPES } from '../interfaces/ContextProvider';
+import { PlateSimulation } from '../PlateSimulation';
 import PlateSimulationPlateManager from './PlateSimulationPlateManager';
 
 describe('PlateSimulationPlateManager', () => {
   let sim: PlateSimulation;
+  let universe: Universe;
   let manager: PlateSimulationPlateManager;
   let testPlateId: string;
 
-  beforeEach(() => {
-    sim = new PlateSimulation();
-    sim.init(); // Ensure init is called
+  beforeEach(async () => {
+    // Create multiverse and universe with proper collections
+    const mv = new Multiverse(new Map());
+    universe = await simUniverse(mv);
+    sim = new PlateSimulation(universe);
+    await sim.init(); // Ensure init is called
 
     // Create Earth planet
     const earthPlanet = sim.makePlanet(6371000, 'earth'); // Earth radius in meters
-    const planetsCollection = sim.simUniv.get(COLLECTIONS.PLANETS);
+    const planetsCollection = universe.get(COLLECTIONS.PLANETS);
     planetsCollection.set(earthPlanet.id, earthPlanet);
 
     // Create test plate
-    testPlateId = sim.addPlate({
+    testPlateId = await sim.addPlate({
       id: 'test-plate',
       name: 'Test Plate',
       radius: 637100, // 10% of Earth radius
@@ -28,27 +39,29 @@ describe('PlateSimulationPlateManager', () => {
     });
 
     // Get the actual plate from the simulation
-    const plate = sim.getPlate(testPlateId);
+    const plate = await sim.getPlate(testPlateId);
     if (!plate) throw new Error('Test plate not found');
 
-    manager = sim.managers.get(MANAGERS.PLATE) as PlateSimulationPlateManager;
+    manager = sim.getManager(
+      MANAGER_TYPES.PLATE,
+    ) as PlateSimulationPlateManager;
   });
 
-  it('should initialize steps for a plate when initPlateSteps is called', () => {
-    manager.initPlateSteps(testPlateId);
-    const stepsCollection = sim.simUniv.get(COLLECTIONS.PLATELET_STEPS);
-    const steps = new Map(stepsCollection.values());
+  it('should initialize steps for a plate when initPlateSteps is called', async () => {
+    await manager.initPlateSteps(testPlateId, sim); // Pass simulation as ContextProvider
+    const stepsCollection = universe.get(COLLECTIONS.PLATELET_STEPS);
+    const steps = await asyncIterToMap(stepsCollection.values());
     expect(steps.size).toBeGreaterThan(0);
   });
 
   it('should not throw in constructor even if plate not found initially', () => {
-    expect(() => new PlateSimulationPlateManager(sim)).not.toThrow();
+    expect(() => new PlateSimulationPlateManager(universe)).not.toThrow();
   });
 
-  it('should throw in initPlateSteps if plate not found', () => {
-    const nonExistentManager = new PlateSimulationPlateManager(sim);
-    expect(() => nonExistentManager.initPlateSteps('non-existent')).toThrow(
-      'cannot find plate non-existent',
-    );
+  it('should throw in initPlateSteps if plate not found', async () => {
+    const nonExistentManager = new PlateSimulationPlateManager(universe);
+    await expect(
+      async () => await nonExistentManager.initPlateSteps('non-existent', sim),
+    ).rejects.toThrow('Plate non-existent not found');
   });
 });

@@ -5,13 +5,12 @@ import {
   getNeighborsAsync,
   randomNormal,
 } from '@wonderlandlabs/atmo-utils';
-import { Multiverse } from '@wonderlandlabs/multiverse';
+import { Universe } from '@wonderlandlabs/multiverse';
 import { shuffle } from 'lodash-es';
 import type { Vector3Like } from 'three';
 import { Vector3 } from 'three';
 import { v4 as uuidV4 } from 'uuid';
 import { PlateSpectrumGenerator } from '../generator/PlateSpectrumGenerator';
-import { UNIVERSAL_SCHEMA, UNIVERSES } from '../schema';
 import { isPlateExtendedIF } from '../typeGuards';
 import type {
   PlateExtendedIF,
@@ -19,11 +18,12 @@ import type {
   SimPlanetIF,
   SimSimulation,
 } from '../types.atmo-plates';
-import { simUniverse, clearExistingAtmoPlatesDatabases } from '../utils';
 import { extendPlate, isostaticElevation } from '../utils/plateUtils';
 import { COLLECTIONS } from './constants';
+import { ContextProvider, MANAGER_TYPES } from './interfaces/ContextProvider';
 import { PlateletManager } from './managers/PlateletManager';
 import PlateSimulationPlateManager from './managers/PlateSimulationPlateManager';
+import { PlateletCollisionManager } from './managers/PlateletCollisionManager';
 import { Planet } from './Planet';
 import { Plate } from './Plate';
 import type {
@@ -47,44 +47,41 @@ export interface Plate extends PlateIF {
   position: Vector3Like; // 3D position
 }
 
-export class PlateSimulation implements PlateSimulationIF {
+export class PlateSimulation implements PlateSimulationIF, ContextProvider {
   // Static property to control force-directed layout strength (0-1 scale)
   public static fdStrength: number = 0.33;
 
-  readonly multiverse: Multiverse;
-  readonly universeName: string;
-  public planetRadius: number;
+  readonly simUniv: Universe;
+
+  // ContextProvider implementation
+  get universe(): Universe {
+    return this.simUniv;
+  }
   public simulationId?: string;
   #defaultSimId: string | undefined;
   readonly managers: Map<string, any>; // Map to store manager instances
   #l0NeighborCache: Map<string, string[]> = new Map(); // Cache for L0 cell neighbors
   #step: number = 0;
   #maxPlateRadius: number | undefined;
-  #useSharedStorage: boolean = false; // Flag for shared IndexedDB storage
   public deletedPlatelets: Set<string> = new Set(); // Track platelets flagged as "deleted" for visualization
 
   /**
-   * Create a new plate simulation
+   * Create a new plate simulation with an injected universe
+   * @param simUniv - The universe instance to operate on
    * @param props - Configuration properties for the simulation
    */
   #initPlateCount: number;
 
-  constructor(props: PlateSimulationProps = {}) {
+  constructor(simUniv: Universe, props: PlateSimulationProps = {}) {
     // Extract properties with defaults
     const {
-      planetRadius = EARTH_RADIUS,
-      multiverse: multiverseFromProps,
-      universeName = UNIVERSES.SIM,
       simulationId,
       plateCount = 0,
       maxPlateRadius, // Extract maxPlateRadius
-      useSharedStorage = false, // Extract useSharedStorage flag
     } = props;
 
     // Initialize basic properties
-    this.planetRadius = planetRadius;
-    this.multiverse = multiverseFromProps || new Multiverse(UNIVERSAL_SCHEMA);
-    this.universeName = universeName;
+    this.simUniv = simUniv;
     this.simulationId = simulationId;
     this.#initPlateCount = plateCount;
 
@@ -93,43 +90,38 @@ export class PlateSimulation implements PlateSimulationIF {
       this.#defaultSimId = simulationId;
     }
 
-    // Note: Universe initialization will be handled in init() method
-
-    // Initialize managers
+    // Initialize managers with injected universe
     this.managers = new Map<string, any>();
-    this.managers.set(MANAGERS.PLATE, new PlateSimulationPlateManager(this));
-    this.managers.set(MANAGERS.PLATELET, new PlateletManager(this, false)); // Workers disabled by default
+    this.managers.set(
+      MANAGER_TYPES.PLATE,
+      new PlateSimulationPlateManager(simUniv),
+    );
+    this.managers.set(MANAGER_TYPES.PLATELET, new PlateletManager(simUniv));
 
-    // Store maxPlateRadius and useSharedStorage
+    // Store maxPlateRadius
     this.#maxPlateRadius = maxPlateRadius;
-    this.#useSharedStorage = useSharedStorage;
   }
 
+  // Database clearing is now handled externally by the application
+  // PlateSimulation only lazy-creates tables/databases as needed
+
   /**
-   * Clear all existing databases - call this before init() if you want a fresh start
+   * ContextProvider implementation - get a manager by name
    */
-  async clearDatabases(): Promise<void> {
-    await clearExistingAtmoPlatesDatabases();
+  getManager<T = any>(managerName: string): T {
+    const manager = this.managers.get(managerName);
+    if (!manager) {
+      throw new Error(`Manager '${managerName}' not found in PlateSimulation`);
+    }
+    return manager as T;
   }
 
   /**
    * Initialize the simulation
-   * This is separate from the constructor to allow for future async initialization
-   * NOTE: This will NOT clear existing databases - call clearDatabases() first if needed
+   * Universe is already injected, so this just sets up the simulation data
    */
   async init(): Promise<void> {
-    // Initialize the simulation universe if it doesn't exist
-    if (!this.multiverse.has(this.universeName)) {
-      await simUniverse(this.multiverse, this.#useSharedStorage);
-    }
-
-    const plateManager = new PlateSimulationPlateManager(this);
-    this.managers.set(MANAGERS.PLATE, plateManager);
-
-    const plateletManager = new PlateletManager(this, false); // Workers disabled by default
-    this.managers.set(MANAGERS.PLATELET, plateletManager);
-
-    // The basic properties are already initialized in the constructor
+    // Universe is already injected, managers are already created
 
     // If simulationId is provided, load that specific simulation
     if (this.simulationId) {
@@ -194,10 +186,8 @@ export class PlateSimulation implements PlateSimulationIF {
       // Only generate plates if there are none for this planet
       if (!hasPlatesForPlanet) {
         // Pass maxPlateRadius to plateGenerator
-        const { plates } = this.plateGenerator(
-          plateCount,
-          maxPlateRadius,
-        ).generate();
+        const generator = await this.plateGenerator(plateCount, maxPlateRadius);
+        const { plates } = generator.generate();
 
         // Add plates in parallel for better performance
         const platePromises = plates.map((plate) =>
@@ -250,7 +240,7 @@ export class PlateSimulation implements PlateSimulationIF {
           console.warn(
             `Planet ${simulation.planetId} referenced in simulation ${this.#defaultSimId} not found. Creating a new planet.`,
           );
-          const newPlanet = this.makePlanet(this.planetRadius);
+          const newPlanet = this.makePlanet();
 
           // Update the simulation with the new planet ID
           await simulationsCollection.mutate(this.#defaultSimId, (sim) => {
@@ -259,7 +249,7 @@ export class PlateSimulation implements PlateSimulationIF {
         }
       } else {
         // If the simulation doesn't have a planetId, create a planet and update the simulation
-        const planet = this.makePlanet(this.planetRadius);
+        const planet = this.makePlanet();
 
         simulationsCollection.set(this.#defaultSimId, {
           ...simulation,
@@ -271,7 +261,7 @@ export class PlateSimulation implements PlateSimulationIF {
       }
     } else {
       // If no simulation exists, create a new planet
-      const planet = await this.makePlanet(this.planetRadius);
+      const planet = await this.makePlanet();
 
       // Create a new simulation with the plateCount and maxPlateRadius
       await this.addSimulation({
@@ -288,10 +278,8 @@ export class PlateSimulation implements PlateSimulationIF {
     // Generate plates if the simulation has a plateCount and there are none already
     if (plateCount > 0 && existingPlatesCount === 0) {
       // Pass maxPlateRadius to plateGenerator
-      const { plates } = this.plateGenerator(
-        plateCount,
-        maxPlateRadius,
-      ).generate();
+      const generator = await this.plateGenerator(plateCount, maxPlateRadius);
+      const { plates } = generator.generate();
 
       for (let i = 0; i < plates.length; i++) {
         const plate = plates[i];
@@ -303,23 +291,16 @@ export class PlateSimulation implements PlateSimulationIF {
     }
   }
 
-  plateGenerator(plateCount: number, maxPlateRadius?: number) {
+  async plateGenerator(plateCount: number, maxPlateRadius?: number) {
+    const planet = await this.planet();
     return new PlateSpectrumGenerator({
-      planetRadius: this.planetRadius, // Convert from meters to kilometers - PlateSpectrumGenerator expects km
+      planetRadius: planet.radius, // Planet radius is already in kilometers
       plateCount: plateCount,
       maxPlateRadius: maxPlateRadius, // Pass maxPlateRadius to the generator
     });
   }
 
-  get simUniv() {
-    const universe = this.multiverse.get(this.universeName);
-    if (!universe) {
-      throw new Error(
-        `Universe '${this.universeName}' not initialized. Call init() first.`,
-      );
-    }
-    return universe;
-  }
+  // simUniv is now a direct property injected in constructor
 
   async planet(): Promise<Planet> {
     const planetId = this.simulation?.planetId;
@@ -551,7 +532,7 @@ export class PlateSimulation implements PlateSimulationIF {
     return Planet.fromJSON(planetData);
   }
 
-  makePlanet(radius = this.planetRadius, name?: string): SimPlanetIF {
+  makePlanet(radius = EARTH_RADIUS, name?: string): SimPlanetIF {
     // radius is already in kilometers from EARTH_RADIUS constant
     if (radius < 1000) {
       throw new Error('planet radii must be >= 1000km');
@@ -704,9 +685,10 @@ export class PlateSimulation implements PlateSimulationIF {
         ).add(dampenedForce.multiplyScalar(deltaTime));
 
         // Normalize position to maintain sphere surface constraint
+        const planet = await this.planet();
         const normalizedPosition = newPosition
           .normalize()
-          .multiplyScalar(this.planetRadius);
+          .multiplyScalar(planet.radius);
 
         // Update the plate position in the collection
         await platesCollection.set(id, {

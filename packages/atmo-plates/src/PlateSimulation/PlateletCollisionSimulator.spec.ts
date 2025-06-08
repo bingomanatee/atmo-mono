@@ -1,5 +1,7 @@
+import { Multiverse, Universe } from '@wonderlandlabs/multiverse';
 import { Vector3 } from 'three';
 import { v4 as uuidV4 } from 'uuid';
+import { simUniverse } from '../utils';
 import { COLLECTIONS } from './constants';
 import { Platelet } from './Platelet';
 import { PlateletCollisionSimulator } from './PlateletCollisionSimulator';
@@ -7,19 +9,22 @@ import { PlateSimulation } from './PlateSimulation';
 
 describe('PlateletCollisionSimulator', () => {
   let sim: PlateSimulation;
+  let universe: Universe;
   let simulator: PlateletCollisionSimulator;
   const sectorId = '8928308280fffff'; // Example L0 H3 cell
   let platelets: Platelet[];
   let planetId: string;
 
   beforeEach(async () => {
-    // Create a new simulation with a planet
-    sim = new PlateSimulation();
+    // Create universe and simulation with proper context
+    const mv = new Multiverse(new Map());
+    universe = await simUniverse(mv);
+    sim = new PlateSimulation(universe);
     await sim.init();
     planetId = uuidV4();
 
     // Create test platelets in the sector with specific interaction patterns
-    const plateletsCollection = sim.simUniv.get(COLLECTIONS.PLATELETS);
+    const plateletsCollection = universe.get(COLLECTIONS.PLATELETS);
 
     // Create 5 platelets:
     // 1-2-3 form a chain of interactions (1 interacts with 2, 2 interacts with 3)

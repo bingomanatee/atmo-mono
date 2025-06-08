@@ -1,11 +1,14 @@
 import { EARTH_RADIUS, randomNormal } from '@wonderlandlabs/atmo-utils';
+import { Universe, Multiverse } from '@wonderlandlabs/multiverse';
 import * as fs from 'fs';
 import * as path from 'path';
 import { Vector3 } from 'three';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { COLLECTIONS } from '../constants';
+import { LazyContextProvider } from '../providers/LazyManagerProvider';
 import { PlateSimulation } from '../PlateSimulation';
 import { createTestPlate, setupTestSimulation } from '../test-setup';
+import { simUniverse } from '../../utils';
 import { PlateletManager } from './PlateletManager';
 
 // Helper to generate a random plate
@@ -132,6 +135,7 @@ const SAMPLE_SIMULATION = {
 describe('PlateletManager', () => {
   let manager: PlateletManager;
   let sim: PlateSimulation;
+  let universe: Universe;
   let testPlateId: string;
 
   beforeAll(async () => {
@@ -149,12 +153,13 @@ describe('PlateletManager', () => {
       // Initialize simulation with shared setup
       const { sim: testSim, earthPlanet } = await setupTestSimulation();
       sim = testSim;
+      universe = sim.universe; // Get universe from simulation
 
       // Create test plate
       testPlateId = await createTestPlate(sim, earthPlanet.id);
 
-      // Initialize the stateless PlateletManager with the simulation instance
-      manager = new PlateletManager(sim);
+      // Initialize the PlateletManager with injected universe
+      manager = new PlateletManager(universe);
     } catch (err) {
       console.log('----error in setup:', err);
     }
@@ -183,8 +188,8 @@ describe('PlateletManager', () => {
   });
 
   it('should store platelets in the collection', async () => {
-    // Check that platelets are stored in the simulation's collection
-    const plateletsCollection = sim.simUniv.get('platelets');
+    // Check that platelets are stored in the universe collection
+    const plateletsCollection = universe.get('platelets');
     expect(plateletsCollection).toBeDefined();
 
     // Generate platelets
@@ -214,10 +219,14 @@ describe('PlateletManager', () => {
     expect(testPlate).toBeDefined();
 
     platelets.forEach((platelet, index) => {
+      // Always convert to Vector3 using copy() for safety
+      const plateletPos = new Vector3().copy(platelet.position);
+      const platePos = new Vector3().copy(testPlate!.position);
+
       // Check position is within plate's radius
-      expect(
-        platelet.position.distanceTo(testPlate!.position),
-      ).toBeLessThanOrEqual(testPlate!.radius * 1.1); // Allow 10% margin for floating point errors
+      expect(plateletPos.distanceTo(platePos)).toBeLessThanOrEqual(
+        testPlate!.radius * 1.1,
+      ); // Allow 10% margin for floating point errors
 
       // Check radius is reasonable (based on H3 level 2 cell size ~154km)
       expect(platelet.radius).toBeGreaterThan(0);
@@ -238,8 +247,10 @@ describe('PlateletManager', () => {
     );
     const savedData = JSON.parse(fs.readFileSync(testDataPath, 'utf-8'));
 
-    // Create a new simulation and load the saved data
-    const newSim = new PlateSimulation({});
+    // Create a new universe and simulation with proper setup
+    const mv = new Multiverse(new Map());
+    const testUniverse = await simUniverse(mv);
+    const newSim = new PlateSimulation(testUniverse, {});
     await newSim.init();
 
     // Create Earth planet
@@ -258,8 +269,8 @@ describe('PlateletManager', () => {
       });
     }
 
-    // Create and register PlateletManager
-    const newManager = new PlateletManager(newSim);
+    // Create PlateletManager with injected universe
+    const newManager = new PlateletManager(testUniverse);
 
     // Generate platelets for each plate
     for (const p of savedData.plates) {
@@ -276,15 +287,20 @@ describe('PlateletManager', () => {
 
     // Assert all platelets are within the plate's radius
     platelets.forEach((platelet) => {
-      expect(platelet.position.distanceTo(plate.position)).toBeLessThanOrEqual(
+      // Always convert to Vector3 using copy() for safety
+      const plateletPos = new Vector3().copy(platelet.position);
+      const platePos = new Vector3().copy(plate.position);
+
+      expect(plateletPos.distanceTo(platePos)).toBeLessThanOrEqual(
         plate.radius,
       );
     });
 
-    // Check for reasonable platelet count with H3 resolution 2 (~154km cells)
-    // Actual test results show 1 platelet for test plate, so adjust expectations
-    // Allow range 1-100 to accommodate different plate sizes and H3 filtering
+    // Check for reasonable platelet count with H3 resolution 3 (~58km cells)
+    // Test plate is Math.PI/8 radians (22.5°) ≈ 2,800km radius
+    // Expected platelets: ~2,300 for such a large plate
+    // Allow range 1-3000 to accommodate large test plate with H3 resolution 3
     expect(platelets.length).toBeGreaterThan(0);
-    expect(platelets.length).toBeLessThan(100);
+    expect(platelets.length).toBeLessThan(3000);
   });
 });

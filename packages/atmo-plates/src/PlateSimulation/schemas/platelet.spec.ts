@@ -6,7 +6,10 @@ describe('platelet', () => {
   it('should create a platelet with default values', () => {
     const plateId = 'test-plate';
     const position = new Vector3(1, 2, 3);
-    const platelet = createPlatelet(plateId, position);
+    const platelet = createPlatelet(plateId, position, {
+      planetId: 'test-planet',
+      h3Cell: '8928308280fffff',
+    });
 
     expect(platelet.id).toBeDefined();
     expect(platelet.plateId).toBe(plateId);
@@ -23,6 +26,8 @@ describe('platelet', () => {
     const position = new Vector3(1, 2, 3);
     const velocity = new Vector3(4, 5, 6);
     const platelet = createPlatelet(plateId, position, {
+      planetId: 'test-planet',
+      h3Cell: '8928308280fffff',
       mass: 2.0,
       elasticity: 0.8,
       velocity,

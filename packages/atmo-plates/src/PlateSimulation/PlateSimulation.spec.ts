@@ -23,14 +23,17 @@ const DEFAULT_PLATE_COUNT = 10;
 
 describe('PlateSimulation:class', () => {
   let sim: PlateSimulation;
+  let universe: Universe;
   let platesCollection: any;
   let planetsCollection: CollAsyncIF;
   let simulationsCollection: CollAsyncIF;
   let simId: string;
 
   beforeEach(async () => {
-    // Create a fresh simulation for each test
-    sim = new PlateSimulation();
+    // Create a fresh multiverse and universe with proper collections for each test
+    const mv = new Multiverse(new Map());
+    universe = await simUniverse(mv);
+    sim = new PlateSimulation(universe);
 
     // Initialize the simulation
     await sim.init();
@@ -50,8 +53,9 @@ describe('PlateSimulation:class', () => {
       radians: DEFAULT_PLATE_RADIANS,
     });
 
-    // Calculate expected radius in km (radians * planet radius)
-    const expectedRadiusKm = DEFAULT_PLATE_RADIANS * sim.planetRadius;
+    // Get the actual planet from the simulation to calculate expected radius
+    const planet = await sim.planet();
+    const expectedRadiusKm = DEFAULT_PLATE_RADIANS * planet.radius;
 
     // Retrieve the plate using the shared collection
     const retrievedPlate = await platesCollection.get(plateId);
@@ -112,8 +116,9 @@ describe('PlateSimulation:class', () => {
     // Retrieve the plate using the getPlate method
     const retrievedPlate = await sim.getPlate(plateId);
 
-    // Calculate expected radius in km (radians * planet radius)
-    const expectedRadiusKm = customRadiusRadians * sim.planetRadius;
+    // Get the actual planet from the simulation to calculate expected radius
+    const planet = await sim.planet();
+    const expectedRadiusKm = customRadiusRadians * planet.radius;
 
     // Verify the plate was retrieved correctly
     expect(retrievedPlate).toBeDefined();
@@ -132,9 +137,10 @@ describe('PlateSimulation:class', () => {
   });
 
   it('should automatically generate plates in the constructor', async () => {
-    // Create a new simulation with auto-generated plates using shared constants
-    const autoSim = new PlateSimulation({
-      planetRadius: EARTH_RADIUS,
+    // Create a new multiverse and universe with auto-generated plates using shared constants
+    const autoMv = new Multiverse(new Map());
+    const autoUniverse = await simUniverse(autoMv);
+    const autoSim = new PlateSimulation(autoUniverse, {
       plateCount: DEFAULT_PLATE_COUNT,
     });
 
@@ -222,11 +228,8 @@ describe('PlateSimulation:class', () => {
       .get(COLLECTIONS.SIMULATIONS)
       .set(simId, preExistingSimulation);
 
-    // Create a simulation with the pre-populated multiverse
-    const simWithInjectedMv = new PlateSimulation({
-      planetRadius: EARTH_RADIUS,
-      multiverse: mv,
-      universeName: UNIVERSES.SIM,
+    // Create a simulation with the pre-populated universe
+    const simWithInjectedMv = new PlateSimulation(simUniv, {
       simulationId: simId,
     });
 
@@ -255,9 +258,9 @@ describe('PlateSimulation:class', () => {
       planetId,
     });
 
-    // Calculate expected radius in km (radians * planet radius)
-    const expectedRadiusKm =
-      DEFAULT_PLATE_RADIANS * simWithInjectedMv.planetRadius;
+    // Get the actual planet to calculate expected radius
+    const actualPlanet = await simWithInjectedMv.getPlanet(planetId);
+    const expectedRadiusKm = DEFAULT_PLATE_RADIANS * actualPlanet.radius;
 
     // Verify that the plate was added to the pre-existing multiverse
     const plate = await mv
@@ -330,26 +333,20 @@ describe('PlateSimulation:class', () => {
     customUniv.add(planetsCollection);
     customUniv.add(simulationsCollection);
 
-    // Create a simulation with the custom universe name using props object
-    const customSim = new PlateSimulation({
-      planetRadius: EARTH_RADIUS,
-      multiverse: mv,
-      universeName: customUniverseName,
-    });
+    // Create a simulation with the custom universe
+    const customSim = new PlateSimulation(customUniv, {});
 
     // Initialize the simulation
     await customSim.init();
 
     // Verify that the simulation uses the custom universe
-    expect(customSim.universeName).toBe(customUniverseName);
-    expect(customSim.simUniv).toBe(customUniv);
+    expect(customSim.universe.name).toBe(customUniverseName);
+    expect(customSim.universe).toBe(customUniv);
 
     // Add a planet and verify it's in the custom universe
-    const planetId = customSim.planet.id;
-    const planet = await mv
-      .get(customUniverseName)
-      .get(COLLECTIONS.PLANETS)
-      .get(planetId);
+    const currentPlanet = await customSim.planet();
+    const planetId = currentPlanet.id;
+    const planet = await customUniv.get(COLLECTIONS.PLANETS).get(planetId);
     expect(planet).toBeDefined();
     expect(planet.radius).toBe(EARTH_RADIUS);
   });
@@ -717,8 +714,9 @@ describe('PlateSimulation', () => {
   describe('createIrregularPlateEdges', () => {
     it('should not delete platelets when there are 30 or fewer', async () => {
       // Create a simulation with a small number of platelets
-      const sim = new PlateSimulation({
-        planetRadius: EARTH_RADIUS,
+      const mv = new Multiverse(new Map());
+      const testUniverse = await simUniverse(mv);
+      const sim = new PlateSimulation(testUniverse, {
         plateCount: 0,
       });
       await sim.init();
@@ -754,8 +752,9 @@ describe('PlateSimulation', () => {
 
     it('should delete edge platelets when there are more than 30', async () => {
       // Create a simulation with a larger plate to generate more platelets
-      const sim = new PlateSimulation({
-        planetRadius: EARTH_RADIUS,
+      const mv = new Multiverse(new Map());
+      const testUniverse = await simUniverse(mv);
+      const sim = new PlateSimulation(testUniverse, {
         plateCount: 0,
       });
       await sim.init();
@@ -799,8 +798,9 @@ describe('PlateSimulation', () => {
       { timeout: 10000 },
       async () => {
         // Create a simulation with an even larger plate
-        const sim = new PlateSimulation({
-          planetRadius: EARTH_RADIUS,
+        const mv = new Multiverse(new Map());
+        const testUniverse = await simUniverse(mv);
+        const sim = new PlateSimulation(testUniverse, {
           plateCount: 0,
         });
         await sim.init();

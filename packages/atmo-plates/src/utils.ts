@@ -1,4 +1,4 @@
-import { EARTH_RADIUS } from '@wonderlandlabs/atmo-utils';
+import { asError, EARTH_RADIUS } from '@wonderlandlabs/atmo-utils';
 import { log } from './utils/utils';
 import { openDB, deleteDB } from 'idb';
 import {
@@ -61,106 +61,8 @@ async function requestPersistentStorage(): Promise<boolean> {
   }
 }
 
-/**
- * Force close all IndexedDB connections to prepare for database deletion
- */
-async function forceCloseAllConnections(): Promise<void> {
-  // Close any global database connections that might be open
-  if (typeof window !== 'undefined' && (window as any).__dbConnections) {
-    const connections = (window as any).__dbConnections;
-    for (const [dbName, db] of Object.entries(connections)) {
-      try {
-        (db as any).close();
-        delete connections[dbName];
-      } catch (error) {
-        // Ignore errors during connection closing
-      }
-    }
-  }
-
-  // Give connections time to close
-  await new Promise((resolve) => setTimeout(resolve, 100));
-}
-
-/**
- * Clear any existing atmo-plates databases to prevent conflicts
- */
-export async function clearExistingAtmoPlatesDatabases(): Promise<void> {
-  // First, force close all existing connections
-  await forceCloseAllConnections();
-
-  // Get all databases
-  const databases = await indexedDB.databases();
-
-  // Filter atmo-plates related databases
-  const databasesToDelete = databases.filter(
-    (db) =>
-      db.name && (db.name.includes('atmo-plates') || db.name === 'atmo-plates'),
-  );
-
-  if (databasesToDelete.length === 0) {
-    return;
-  }
-
-  // Delete all databases in parallel
-  const deletionPromises = databasesToDelete.map((db) => {
-    return new Promise<void>((resolve, reject) => {
-      const deleteReq = indexedDB.deleteDatabase(db.name!);
-      let isResolved = false;
-
-      // Single timeout that throws failure after 10 seconds
-      const timeoutId = setTimeout(() => {
-        if (!isResolved) {
-          isResolved = true;
-          reject(
-            new Error(
-              `Database deletion timeout for ${db.name} after 10 seconds`,
-            ),
-          );
-        }
-      }, 10000);
-
-      const cleanup = () => {
-        clearTimeout(timeoutId);
-      };
-
-      deleteReq.onsuccess = () => {
-        if (!isResolved) {
-          isResolved = true;
-          cleanup();
-          resolve();
-        }
-      };
-
-      deleteReq.onerror = (err) => {
-        if (!isResolved) {
-          isResolved = true;
-          cleanup();
-          reject(deleteReq.error);
-        }
-      };
-
-      deleteReq.onblocked = () => {
-        // Try to force close connections and retry
-        setTimeout(async () => {
-          if (!isResolved) {
-            try {
-              await forceCloseAllConnections();
-              // The original delete request should now succeed
-            } catch (error) {
-              // Ignore errors during retry
-            }
-          }
-        }, 500); // Wait 500ms then try to force close
-
-        // Don't resolve immediately - let the timeout handle it if retry fails
-      };
-    });
-  });
-
-  // Wait for all deletions to complete - will throw if any fail
-  await Promise.all(deletionPromises);
-}
+// Database clearing functions have been moved to the application level
+// atmo-plates now only lazy-creates tables/databases as needed
 
 /**
  * Extract fields marked with index: true from the schema
@@ -317,7 +219,7 @@ export async function simUniverse(
     plateletsSun;
 
   if (useSharedStorage) {
-    // Use IDBSun for master/worker data sharing
+    // Use IDBSun for shared data storage
     const dbName = 'atmo-plates';
     const isMaster = true; // Main thread is the master
 
@@ -378,9 +280,7 @@ export async function simUniverse(
       isMaster,
     });
 
-    console.log(
-      '🌌 Created shared multiverse with IDBSun storage for better worker support',
-    );
+    console.log('🌌 Created shared multiverse with IDBSun storage');
   } else {
     // Use separate IDBSun instances
     platesSun = await createIDBSun({

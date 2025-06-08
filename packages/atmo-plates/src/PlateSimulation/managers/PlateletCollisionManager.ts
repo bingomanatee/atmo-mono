@@ -1,16 +1,14 @@
+import { Universe } from '@wonderlandlabs/multiverse';
 import { Vector3 } from 'three';
 import { COLLECTIONS } from '../constants';
-import type {
-  PlateletStepIF,
-  PlateSimulationIF,
-} from '../types.PlateSimulation';
+import type { PlateletStepIF } from '../types.PlateSimulation';
 
 export class PlateletCollisionManager {
-  readonly #sim: PlateSimulationIF;
+  readonly #universe: Universe;
   readonly #EPSILON = 5; // More practical epsilon for geological-scale objects
 
-  constructor(sim: PlateSimulationIF) {
-    this.#sim = sim;
+  constructor(universe: Universe) {
+    this.#universe = universe;
   }
 
   /**
@@ -21,7 +19,7 @@ export class PlateletCollisionManager {
    */
   findInteractions(sectorId: string, step: number): Map<string, Set<string>> {
     const interactions = new Map<string, Set<string>>();
-    const plateletStepsCollection = this.#sim.simUniv.get(
+    const plateletStepsCollection = this.#universe.get(
       COLLECTIONS.PLATELET_STEPS,
     );
     if (!plateletStepsCollection)

@@ -4,26 +4,12 @@ import {
   SchemaLocalIF,
 } from '@wonderlandlabs/multiverse';
 import { log } from '../../utils/utils';
-import { DexieSun } from './DexieSun';
 import { IDBSun } from './IDBSun';
-import { SharedDexieSun } from './SharedDexieSun';
-import { VersionedDexieSun } from './VersionedDexieSun';
 
-interface SunFactoryOptions {
+interface IDBSunFactoryOptions {
   dbName: string;
   tableName: string;
   schema: SchemaLocalIF<any>;
-}
-
-interface SharedSunFactoryOptions extends SunFactoryOptions {
-  allSchemas: Record<string, SchemaLocalIF<any>>; // All table schemas for shared database
-}
-
-interface VersionedSunFactoryOptions extends SunFactoryOptions {
-  version?: number; // Database version for this table
-}
-
-interface IDBSunFactoryOptions extends SunFactoryOptions {
   isMaster?: boolean; // Flag to indicate if this is the master instance
 }
 
@@ -41,58 +27,6 @@ function isIndexedDBAvailable(): boolean {
   } catch {
     return false;
   }
-}
-
-/**
- * Create a SharedDexieSun for multiple simulation instances sharing one database
- * This prevents schema conflicts by managing all tables in a centralized way
- */
-export async function createSharedDexieSun<T extends Record<string, any>>(
-  options: SharedSunFactoryOptions,
-): Promise<AsyncSunIF<T>> {
-  const { dbName, tableName, schema, allSchemas } = options;
-
-  // Check if IndexedDB is available
-  if (!isIndexedDBAvailable()) {
-    return memoryAsyncSunF({ schema });
-  }
-
-  log(`🔧 Creating SharedDexieSun for ${tableName}`);
-  const sharedDexieSun = new SharedDexieSun<T>({
-    dbName,
-    tableName,
-    schema,
-    allSchemas,
-    dontClear: false, // Clear data each run for fresh experiments
-  });
-
-  return sharedDexieSun;
-}
-
-/**
- * Create a VersionedDexieSun where each Sun only knows its own schema
- * Multiple Suns can share the same database with proper versioning
- */
-export async function createVersionedDexieSun<T extends Record<string, any>>(
-  options: VersionedSunFactoryOptions,
-): Promise<AsyncSunIF<T>> {
-  const { dbName, tableName, schema, version } = options;
-
-  // Check if IndexedDB is available
-  if (!isIndexedDBAvailable()) {
-    return memoryAsyncSunF({ schema });
-  }
-
-  log(`🔧 Creating VersionedDexieSun for ${tableName} v${version || 1}`);
-  const versionedDexieSun = new VersionedDexieSun<T>({
-    dbName,
-    tableName,
-    schema,
-    version,
-    dontClear: false, // Clear data each run for fresh experiments
-  });
-
-  return versionedDexieSun;
 }
 
 /**
@@ -140,20 +74,11 @@ export async function createIDBSun<T extends Record<string, any>>(
 }
 
 /**
- * Create a DexieSun specifically (for cases where you want to force IndexedDB)
- */
-export function createDexieSun<T extends Record<string, any>>(
-  options: SunFactoryOptions,
-): DexieSun<T> {
-  return new DexieSun<T>(options);
-}
-
-/**
  * Create a memory AsyncSun specifically (for cases where you want to force memory storage)
  */
-export function createMemoryAsyncSun<T extends Record<string, any>>(
-  options: SunFactoryOptions,
-): AsyncSunIF<T> {
+export function createMemoryAsyncSun<T extends Record<string, any>>(options: {
+  schema: SchemaLocalIF<any>;
+}): AsyncSunIF<T> {
   return memoryAsyncSunF({ schema: options.schema });
 }
 

@@ -6,9 +6,10 @@ import {
   TaskManagerIF,
   MessageIF,
   WorkerConfig,
-} from './types.workers';
-import { TASK_MESSAGES, WORKER_STATUS } from './constants';
-import { Message } from './Message';
+  TASK_MESSAGES,
+  WORKER_STATUS,
+  Message,
+} from '@wonderlandlabs/atmo-workers';
 import { isObj } from '@wonderlandlabs/atmo-utils';
 import { Subscription } from 'rxjs';
 

@@ -200,3 +200,20 @@ export function generatorToMap<KeyType, ValueType>(
 
   return map;
 }
+
+/**
+ * Convert an async iterator to a Map
+ * @param asyncIterator The async iterator to convert
+ * @returns A Promise that resolves to a Map containing the iterator's values
+ */
+export async function asyncIterToMap<KeyType, ValueType>(
+  asyncIterator: AsyncGenerator<[KeyType, ValueType], void, any>,
+): Promise<Map<KeyType, ValueType>> {
+  const map = new Map<KeyType, ValueType>();
+
+  for await (const [key, value] of asyncIterator) {
+    map.set(key, value);
+  }
+
+  return map;
+}

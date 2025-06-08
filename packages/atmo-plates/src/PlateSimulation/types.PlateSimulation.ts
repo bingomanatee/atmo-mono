@@ -35,31 +35,24 @@ export type AddPlateProps = (PlateExtendedIF | PlateIF) & {
 };
 
 export interface PlateSimulationProps {
-  planetRadius?: number;
   plateCount?: number;
-  multiverse?: Multiverse;
-  universeName?: string;
   simulationId?: string;
   maxPlateRadius?: number;
-  useSharedStorage?: boolean; // Enable shared IndexedDB for master/worker scenarios
 }
 
 export interface PlateSimulationIF {
   // Properties
-  planetRadius: number;
-  universeName: string;
   simulationId?: string;
   readonly managers: Map<string, any>;
 
-  // Multiverse and Universe access
-  readonly multiverse: Multiverse;
+  // Universe access (injected)
   readonly simUniv: Universe;
 
   // Initialization
   init(): Promise<void>;
 
   // Plate management
-  plateGenerator(plateCount: number): PlateSpectrumGenerator;
+  plateGenerator(plateCount: number): Promise<PlateSpectrumGenerator>;
   addPlate(props: AddPlateProps, simId?: string): Promise<string>;
   getPlate(id: string): Promise<import('./Plate').Plate>;
 

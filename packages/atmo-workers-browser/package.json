@@ -1,7 +1,7 @@
 {
-  "name": "@wonderlandlabs/atmo-workers",
+  "name": "@wonderlandlabs/atmo-workers-browser",
   "version": "1.0.0",
-  "description": "Core types and utilities for atmo-workers ecosystem",
+  "description": "Browser worker management system",
   "main": "dist/index.js",
   "module": "dist/index.js",
   "types": "dist/types/index.d.ts",
@@ -22,56 +22,32 @@
     "build:types": "tsc --emitDeclarationOnly --outDir dist/types",
     "test": "vitest run",
     "test:watch": "vitest --watch",
-    "test:ui": "vitest --ui",
-    "prepublishOnly": "npm run build",
-    "generate-worker": "node scripts/generate-worker.js"
+    "prepublishOnly": "npm run build"
   },
   "keywords": [
     "workers",
     "web-workers",
-    "node-workers",
+    "browser",
     "worker-management",
-    "manifest",
-    "load-balancing",
     "typescript"
   ],
   "author": "Wonderland Labs",
   "license": "MIT",
   "dependencies": {
     "@wonderlandlabs/atmo-utils": "workspace:*",
-    "@wonderlandlabs/multiverse": "workspace:*",
-    "events": "^3.3.0",
+    "@wonderlandlabs/atmo-workers": "workspace:*",
     "lodash-es": "^4.17.21",
     "rxjs": "^7.8.0",
     "uuid": "^11.1.0"
   },
   "devDependencies": {
     "@types/lodash-es": "^4",
-    "@types/node": "^20.0.0",
     "@types/uuid": "^10.0.0",
     "typescript": "^5.0.0",
     "vite": "^5.0.0",
     "vitest": "^3.1.3"
   },
   "peerDependencies": {
-    "typescript": ">=4.5.0",
-    "worker_threads": "*"
-  },
-  "peerDependenciesMeta": {
-    "worker_threads": {
-      "optional": true
-    }
-  },
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/wonderlandlabs/atmo-mono.git",
-    "directory": "packages/atmo-workers"
-  },
-  "bugs": {
-    "url": "https://github.com/wonderlandlabs/atmo-mono/issues"
-  },
-  "homepage": "https://github.com/wonderlandlabs/atmo-mono/tree/main/packages/atmo-workers#readme",
-  "publishConfig": {
-    "access": "public"
+    "typescript": ">=4.5.0"
   }
 }

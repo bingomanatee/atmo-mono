@@ -13,7 +13,13 @@ export default defineConfig({
     emptyOutDir: true,
     sourcemap: true,
     rollupOptions: {
-      external: ['@wonderlandlabs/multiverse', 'h3-js', 'lodash-es', 'three'],
+      external: [
+        '@wonderlandlabs/multiverse',
+        '@wonderlandlabs/atmo-workers',
+        'h3-js',
+        'lodash-es',
+        'three',
+      ],
       output: {
         globals: {
           '@wonderlandlabs/multiverse': 'multiverse',

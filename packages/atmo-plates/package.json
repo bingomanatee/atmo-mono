@@ -10,17 +10,14 @@
     ".": {
       "import": "./dist/index.js",
       "types": "./dist/types/index.d.ts"
-    },
-    "./workers/*": "./dist/workers/*"
+    }
   },
   "files": [
-    "dist",
-    "dist/workers"
+    "dist"
   ],
   "scripts": {
     "build": "vite build",
-    "build:workers": "vite build --config vite.config.worker.js",
-    "build:all": "yarn build && yarn build:workers && yarn build:types",
+    "build:all": "yarn build && yarn build:types",
     "test": "vitest run",
     "test:watch": "vitest --watch",
     "test:ui": "vitest --ui",
@@ -36,7 +33,6 @@
   },
   "dependencies": {
     "@wonderlandlabs/atmo-utils": "workspace:*",
-    "@wonderlandlabs/atmo-workers": "workspace:*",
     "@wonderlandlabs/multiverse": "workspace:*",
     "dexie": "^4.0.11",
     "h3-js": "^4.2.1",

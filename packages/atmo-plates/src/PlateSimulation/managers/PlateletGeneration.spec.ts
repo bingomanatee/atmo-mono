@@ -1,7 +1,9 @@
+import { Multiverse, Universe } from '@wonderlandlabs/multiverse';
 import * as fs from 'fs';
 import * as path from 'path';
 import { Vector3 } from 'three';
 import { beforeAll, describe, expect, it } from 'vitest';
+import { simUniverse } from '../../utils';
 import { PlateSimulation } from '../PlateSimulation';
 import { PlateletManager } from './PlateletManager';
 
@@ -152,9 +154,10 @@ const SAMPLE_SIMULATION = {
 describe('Large Scale Platelet Generation', () => {
   let manager: PlateletManager;
   let sim: PlateSimulation;
+  let universe: Universe;
   let samplePlates: Plate[];
 
-  beforeAll(() => {
+  beforeAll(async () => {
     // Save sample simulation to file
     const testDataPath = path.join(__dirname, 'test-data');
     if (!fs.existsSync(testDataPath)) {
@@ -165,43 +168,50 @@ describe('Large Scale Platelet Generation', () => {
       JSON.stringify(SAMPLE_SIMULATION, null, 2),
     );
 
-    // Initialize simulation and manager
-    sim = new PlateSimulation({});
-    sim.init();
+    // Initialize universe and simulation with proper context
+    const mv = new Multiverse(new Map());
+    universe = await simUniverse(mv);
+    sim = new PlateSimulation(universe);
+    await sim.init();
 
     // Create Earth planet first using makePlanet and capture the ID
     const EARTH_RADIUS = 6371000; // meters
     const earthPlanet = sim.makePlanet(EARTH_RADIUS, 'Earth');
 
-    manager = new PlateletManager(sim);
+    manager = new PlateletManager(universe);
 
     // Add plates to simulation, ensuring they use the generated planet ID
-    samplePlates = SAMPLE_SIMULATION.plates.map((plate) => {
-      const plateId = sim.addPlate({
+    samplePlates = [];
+    for (const plate of SAMPLE_SIMULATION.plates) {
+      const plateId = await sim.addPlate({
         ...plate,
         planetId: earthPlanet.id, // Use the actual planet ID
       });
-      return sim.getPlate(plateId)!;
-    });
+      const addedPlate = await sim.getPlate(plateId);
+      if (addedPlate) {
+        samplePlates.push(addedPlate);
+      }
+    }
   });
 
-  it('should generate platelets for each plate', () => {
-    samplePlates.forEach((plate) => {
-      const platelets = manager.generatePlatelets(plate.id);
+  it('should generate platelets for each plate', async () => {
+    for (const plate of samplePlates) {
+      const platelets = await manager.generatePlatelets(plate.id);
       expect(platelets.length).toBeGreaterThan(0);
       expect(platelets.every((p) => p.plateId === plate.id)).toBe(true);
-    });
-  });
+    }
+  }, 60000); // 60 second timeout for 50 plates
 
-  it('should have a reasonable number of platelets per plate', () => {
-    const plateletCounts = samplePlates.map((plate) => {
-      const platelets = manager.generatePlatelets(plate.id);
-      return {
+  it('should have a reasonable number of platelets per plate', async () => {
+    const plateletCounts = [];
+    for (const plate of samplePlates) {
+      const platelets = await manager.generatePlatelets(plate.id);
+      plateletCounts.push({
         plateId: plate.id,
         count: platelets.length,
         radius: plate.radius,
-      };
-    });
+      });
+    }
 
     // Verify each plate has a reasonable number of platelets
     plateletCounts.forEach(({ count, radius }) => {
@@ -211,9 +221,9 @@ describe('Large Scale Platelet Generation', () => {
       );
       expect(count).toBeGreaterThanOrEqual(minExpected);
     });
-  });
+  }, 60000); // 60 second timeout for 50 plates
 
-  it('should load and generate platelets from saved simulation', () => {
+  it('should load and generate platelets from saved simulation', async () => {
     // Load saved simulation
     const testDataPath = path.join(
       __dirname,
@@ -226,43 +236,50 @@ describe('Large Scale Platelet Generation', () => {
       position: new Vector3(p.position.x, p.position.y, p.position.z),
     }));
 
+    // Get planet for planetId
+    const planet = await sim.planet();
+
     // Add loaded plates to the simulation
-    const addedPlates = loadedPlates.map((plate) => {
-      const plateId = sim.addPlate({
+    const addedPlates = [];
+    for (const plate of loadedPlates) {
+      const plateId = await sim.addPlate({
         ...plate,
-        planetId: sim.planet!.id, // Use the current planet ID
+        planetId: planet.id, // Use the current planet ID
       });
-      return sim.getPlate(plateId)!;
-    });
+      const addedPlate = await sim.getPlate(plateId);
+      addedPlates.push(addedPlate);
+    }
 
     // Generate platelets for loaded plates
-    addedPlates.forEach((plate) => {
-      const platelets = manager.generatePlatelets(plate.id);
+    for (const plate of addedPlates) {
+      const platelets = await manager.generatePlatelets(plate.id);
       expect(platelets.length).toBeGreaterThan(0);
       expect(platelets.every((p) => p.plateId === plate.id)).toBe(true);
-    });
-  });
+    }
+  }, 30000); // 30 second timeout for large-scale platelet generation
 
-  it.skip('should maintain consistent platelet generation across runs', () => {
-    const firstRunCounts = samplePlates.map((plate) => {
-      const platelets = manager.generatePlatelets(plate.id);
-      return {
+  it.skip('should maintain consistent platelet generation across runs', async () => {
+    const firstRunCounts = [];
+    for (const plate of samplePlates) {
+      const platelets = await manager.generatePlatelets(plate.id);
+      firstRunCounts.push({
         plateId: plate.id,
         count: platelets.length,
         positions: platelets.map((p) => p.position.toArray()),
-      };
-    });
+      });
+    }
 
     // Clear cache and regenerate
     manager.clearCache();
-    const secondRunCounts = samplePlates.map((plate) => {
-      const platelets = manager.generatePlatelets(plate.id);
-      return {
+    const secondRunCounts = [];
+    for (const plate of samplePlates) {
+      const platelets = await manager.generatePlatelets(plate.id);
+      secondRunCounts.push({
         plateId: plate.id,
         count: platelets.length,
         positions: platelets.map((p) => p.position.toArray()),
-      };
-    });
+      });
+    }
 
     // Compare results
     firstRunCounts.forEach((first, index) => {
@@ -281,17 +298,17 @@ describe('Large Scale Platelet Generation', () => {
     });
   });
 
-  it.skip('should generate a reasonable number of platelets for a plate', () => {
-    samplePlates.forEach((plate) => {
-      const platelets = manager.generatePlatelets(plate.id);
+  it('should generate a reasonable number of platelets for a plate', async () => {
+    for (const plate of samplePlates) {
+      const platelets = await manager.generatePlatelets(plate.id);
       // For plates between 2000-6000km radius, expect 2000-7000 platelets
       console.log('---- plate', plate.id, 'count', platelets.length);
       expect(platelets.length).toBeGreaterThan(80);
       expect(platelets.length).toBeLessThan(8000);
-    });
-  });
+    }
+  }, 60000); // 60 second timeout for 50 plates
 
-  it.skip('should generate similar platelet counts for plates with the same radius', () => {
+  it.skip('should generate similar platelet counts for plates with the same radius', async () => {
     // Group plates by radius (rounded to nearest 100,000 meters)
     const radiusGroups = new Map();
     samplePlates.forEach((plate) => {
@@ -302,11 +319,13 @@ describe('Large Scale Platelet Generation', () => {
       radiusGroups.get(roundedRadius).push(plate);
     });
 
-    radiusGroups.forEach((plates, roundedRadius) => {
+    for (const [roundedRadius, plates] of radiusGroups) {
       if (plates.length > 1) {
-        const counts = plates.map(
-          (plate) => manager.generatePlatelets(plate.id).length,
-        );
+        const counts = [];
+        for (const plate of plates) {
+          const platelets = await manager.generatePlatelets(plate.id);
+          counts.push(platelets.length);
+        }
         const min = Math.min(...counts);
         const max = Math.max(...counts);
         //a  console.log('min, max', min, max);
@@ -314,6 +333,6 @@ describe('Large Scale Platelet Generation', () => {
           expect(max).toBeLessThanOrEqual(min * 5);
         }
       }
-    });
+    }
   });
 });

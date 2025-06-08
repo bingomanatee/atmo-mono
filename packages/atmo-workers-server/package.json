@@ -1,7 +1,7 @@
 {
-  "name": "@wonderlandlabs/atmo-workers",
+  "name": "@wonderlandlabs/atmo-workers-server",
   "version": "1.0.0",
-  "description": "Core types and utilities for atmo-workers ecosystem",
+  "description": "Node.js server worker management system",
   "main": "dist/index.js",
   "module": "dist/index.js",
   "types": "dist/types/index.d.ts",
@@ -22,25 +22,19 @@
     "build:types": "tsc --emitDeclarationOnly --outDir dist/types",
     "test": "vitest run",
     "test:watch": "vitest --watch",
-    "test:ui": "vitest --ui",
-    "prepublishOnly": "npm run build",
-    "generate-worker": "node scripts/generate-worker.js"
+    "prepublishOnly": "npm run build"
   },
   "keywords": [
     "workers",
-    "web-workers",
     "node-workers",
+    "server",
     "worker-management",
-    "manifest",
-    "load-balancing",
     "typescript"
   ],
   "author": "Wonderland Labs",
   "license": "MIT",
   "dependencies": {
-    "@wonderlandlabs/atmo-utils": "workspace:*",
-    "@wonderlandlabs/multiverse": "workspace:*",
-    "events": "^3.3.0",
+    "@wonderlandlabs/atmo-workers": "workspace:*",
     "lodash-es": "^4.17.21",
     "rxjs": "^7.8.0",
     "uuid": "^11.1.0"
@@ -61,17 +55,5 @@
     "worker_threads": {
       "optional": true
     }
-  },
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/wonderlandlabs/atmo-mono.git",
-    "directory": "packages/atmo-workers"
-  },
-  "bugs": {
-    "url": "https://github.com/wonderlandlabs/atmo-mono/issues"
-  },
-  "homepage": "https://github.com/wonderlandlabs/atmo-mono/tree/main/packages/atmo-workers#readme",
-  "publishConfig": {
-    "access": "public"
   }
 }

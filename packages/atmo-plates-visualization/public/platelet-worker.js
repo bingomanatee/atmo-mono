@@ -18,87 +18,96 @@ let plateletsCollection;
 let platesCollection;
 let isInitialized = false;
 
-// Worker message handler for atmo-workers system
+// New atmo-workers message handler
+let myWorkerId = null;
+
 self.onmessage = async function (e) {
-  try {
-    // Handle atmo-workers format
-    if (
-      e.data.type === "execute-task" &&
-      e.data.taskId === "generate-platelets"
-    ) {
-      const {
-        parameters: {
-          plateId,
-          planetRadius,
-          resolution,
-          universeId,
-          dontClear,
-        },
-        requestId,
-        timestamp,
-      } = e.data;
+  const { message, taskId, content, workerId } = e.data;
 
-      console.log("🤖 Platelet Worker: Received atmo-workers task", e.data);
-
-      // Process the task
-      const result = await handlePlateletGeneration({
-        plateId,
-        planetRadius,
-        resolution,
-        universeId,
-        dontClear,
-        timestamp,
-      });
-
-      // Send response in atmo-workers format
+  switch (message) {
+    case "init-worker":
+      myWorkerId = e.data.id;
       self.postMessage({
-        type: "task-complete",
-        taskId: "generate-platelets",
-        requestId: requestId,
-        success: result.success,
-        result: result.success ? result : undefined,
-        error: result.success ? undefined : result.error,
+        message: "worker-ready",
+        workerId: myWorkerId,
+        content: { tasks: e.data.content },
+      });
+      break;
+
+    case "worker-work":
+      await handleWorkerTask(taskId, content);
+      break;
+
+    default:
+      // Handle legacy format for backward compatibility
+      await handleLegacyMessage(e.data);
+      break;
+  }
+};
+
+async function handleWorkerTask(taskId, content) {
+  try {
+    const { name, params } = content;
+
+    if (name === "generate-platelets") {
+      console.log(
+        "🤖 Platelet Worker: Processing generate-platelets task",
+        params
+      );
+
+      const result = await handlePlateletGeneration({
+        plateId: params.plateId,
+        planetRadius: params.planetRadius,
+        resolution: params.resolution,
+        universeId: params.universeId,
+        dontClear: params.dontClear,
         timestamp: Date.now(),
       });
 
-      return;
+      self.postMessage({
+        message: "worker-response",
+        taskId,
+        workerId: myWorkerId,
+        content: result,
+      });
+    } else {
+      throw new Error(`Unknown task: ${name}`);
     }
+  } catch (error) {
+    console.error("❌ Platelet Worker: Task error", error);
+    self.postMessage({
+      message: "worker-response",
+      taskId,
+      workerId: myWorkerId,
+      error: error.message,
+    });
+  }
+}
 
-    // Legacy format support (for backward compatibility)
-    const {
-      plateId,
-      planetRadius,
-      resolution,
-      universeId,
-      dontClear,
-      timestamp,
-      testMode,
-    } = e.data;
+async function handleLegacyMessage(data) {
+  try {
+    console.log("🤖 Platelet Worker: Handling legacy message", data);
 
-    console.log("🤖 Platelet Worker: Received message", e.data);
-
-    // Handle legacy format
     const result = await handlePlateletGeneration({
-      plateId,
-      planetRadius,
-      resolution,
-      universeId,
-      dontClear,
-      timestamp,
-      testMode,
+      plateId: data.plateId,
+      planetRadius: data.planetRadius,
+      resolution: data.resolution,
+      universeId: data.universeId,
+      dontClear: data.dontClear,
+      timestamp: data.timestamp,
+      testMode: data.testMode,
     });
 
-    // Send legacy format response
     self.postMessage(result);
   } catch (error) {
-    console.error("❌ Platelet Worker: Error", error);
+    console.error("❌ Platelet Worker: Legacy error", error);
     self.postMessage({
       success: false,
       error: error.message,
       timestamp: Date.now(),
     });
   }
-};
+}
 
 // Main platelet generation handler (works for both atmo-workers and legacy formats)
 async function handlePlateletGeneration({

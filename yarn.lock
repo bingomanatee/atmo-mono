@@ -822,7 +822,7 @@ __metadata:
     "@types/lodash-es": "npm:^4"
     "@types/three": "npm:^0"
     "@wonderlandlabs/atmo-utils": "workspace:*"
-    "@wonderlandlabs/atmo-workers": "workspace:*"
+    "@wonderlandlabs/atmo-workers-browser": "workspace:*"
     "@wonderlandlabs/multiverse": "workspace:*"
     dexie: "npm:^4.0.11"
     h3-js: "npm:^4.2.1"
@@ -866,6 +866,63 @@ __metadata:
   languageName: unknown
   linkType: soft
 
+"@wonderlandlabs/atmo-workers-browser@workspace:*, @wonderlandlabs/atmo-workers-browser@workspace:packages/atmo-workers-browser":
+  version: 0.0.0-use.local
+  resolution: "@wonderlandlabs/atmo-workers-browser@workspace:packages/atmo-workers-browser"
+  dependencies:
+    "@types/lodash-es": "npm:^4"
+    "@types/uuid": "npm:^10.0.0"
+    "@wonderlandlabs/atmo-utils": "workspace:*"
+    "@wonderlandlabs/atmo-workers": "workspace:*"
+    lodash-es: "npm:^4.17.21"
+    rxjs: "npm:^7.8.0"
+    typescript: "npm:^5.0.0"
+    uuid: "npm:^11.1.0"
+    vite: "npm:^5.0.0"
+    vitest: "npm:^3.1.3"
+  peerDependencies:
+    typescript: ">=4.5.0"
+  languageName: unknown
+  linkType: soft
+
+"@wonderlandlabs/atmo-workers-core@workspace:packages/atmo-workers-core":
+  version: 0.0.0-use.local
+  resolution: "@wonderlandlabs/atmo-workers-core@workspace:packages/atmo-workers-core"
+  dependencies:
+    "@types/uuid": "npm:^10.0.0"
+    rxjs: "npm:^7.8.0"
+    typescript: "npm:^5.0.0"
+    uuid: "npm:^11.1.0"
+    vite: "npm:^5.0.0"
+    vitest: "npm:^3.1.3"
+  peerDependencies:
+    typescript: ">=4.5.0"
+  languageName: unknown
+  linkType: soft
+
+"@wonderlandlabs/atmo-workers-server@workspace:packages/atmo-workers-server":
+  version: 0.0.0-use.local
+  resolution: "@wonderlandlabs/atmo-workers-server@workspace:packages/atmo-workers-server"
+  dependencies:
+    "@types/lodash-es": "npm:^4"
+    "@types/node": "npm:^20.0.0"
+    "@types/uuid": "npm:^10.0.0"
+    "@wonderlandlabs/atmo-workers": "workspace:*"
+    lodash-es: "npm:^4.17.21"
+    rxjs: "npm:^7.8.0"
+    typescript: "npm:^5.0.0"
+    uuid: "npm:^11.1.0"
+    vite: "npm:^5.0.0"
+    vitest: "npm:^3.1.3"
+  peerDependencies:
+    typescript: ">=4.5.0"
+    worker_threads: "*"
+  peerDependenciesMeta:
+    worker_threads:
+      optional: true
+  languageName: unknown
+  linkType: soft
+
 "@wonderlandlabs/atmo-workers@workspace:*, @wonderlandlabs/atmo-workers@workspace:packages/atmo-workers":
   version: 0.0.0-use.local
   resolution: "@wonderlandlabs/atmo-workers@workspace:packages/atmo-workers"
@@ -873,6 +930,7 @@ __metadata:
     "@types/lodash-es": "npm:^4"
     "@types/node": "npm:^20.0.0"
     "@types/uuid": "npm:^10.0.0"
+    "@wonderlandlabs/atmo-utils": "workspace:*"
     "@wonderlandlabs/multiverse": "workspace:*"
     events: "npm:^3.3.0"
     lodash-es: "npm:^4.17.21"
@@ -883,6 +941,10 @@ __metadata:
     vitest: "npm:^3.1.3"
   peerDependencies:
     typescript: ">=4.5.0"
+    worker_threads: "*"
+  peerDependenciesMeta:
+    worker_threads:
+      optional: true
   languageName: unknown
   linkType: soft
 
