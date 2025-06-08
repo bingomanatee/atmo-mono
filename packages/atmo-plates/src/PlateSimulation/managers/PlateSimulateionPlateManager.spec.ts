@@ -4,7 +4,7 @@ import {
   asyncIterToMap,
 } from '@wonderlandlabs/multiverse';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { simUniverse } from '../../utils';
+import { simUniverse } from '../../utilities.ts';
 import { COLLECTIONS } from '../constants';
 import { MANAGER_TYPES } from '../interfaces/ContextProvider';
 import { PlateSimulation } from '../PlateSimulation';

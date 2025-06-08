@@ -1,8 +1,11 @@
 // ─── Imports ─────────────────────────────────────────────────────
-import { FIELD_TYPES, SchemaUniversal } from '@wonderlandlabs/multiverse';
+import { FIELD_TYPES, SchemaLocal, SchemaUniversal } from '@wonderlandlabs/multiverse';
 import { COLLECTIONS } from './PlateSimulation/constants';
-import type { Plate } from './PlateSimulation/PlateSimulation';
-import { coord } from './utils';
+import { coord } from './utilities';
+import { Platelet } from './PlateSimulation/Platelet';
+import { PlateIF } from './types.atmo-plates';
+import { PlateletIF, PlateletStepIF, PlateSimulationIF, SimStepIF } from './PlateSimulation/types.PlateSimulation';
+import { Plate } from './PlateSimulation/Plate';
 
 // ─── Constants: Collections & Universes ───────────────────────────
 export const UNIVERSES = {
@@ -211,36 +214,36 @@ export const UNIVERSAL_SCHEMA = new Map([
     new Map([
       [
         COLLECTIONS.PLATES,
-        new SchemaUniversal<Plate>(COLLECTIONS.PLATES, UNIVERSAL_PLATES_SCHEMA),
+        new SchemaUniversal<PlateIF>(COLLECTIONS.PLATES, UNIVERSAL_PLATES_SCHEMA),
       ],
       [
         COLLECTIONS.PLANETS,
-        new SchemaUniversal<Plate>(
+        new SchemaUniversal<PlateIF>(
           COLLECTIONS.PLANETS,
           UNIVERSAL_PLANETS_SCHEMA,
         ),
       ],
       [
         COLLECTIONS.PLATELETS,
-        new SchemaUniversal<Plate>(
+        new SchemaUniversal<PlateletIF>(
           COLLECTIONS.PLATELETS,
           UNIVERSAL_PLATELETS_SCHEMA,
         ),
       ],
       [
         COLLECTIONS.SIMULATIONS,
-        new SchemaUniversal<Plate>(
+        new SchemaUniversal<PlateSimulationIF>(
           COLLECTIONS.SIMULATIONS,
           UNIVERSAL_SIMULATIONS_SCHEMA,
         ),
       ],
       [
         COLLECTIONS.STEPS,
-        new SchemaUniversal<Plate>('plate_step', UNIVERSAL_PLATE_STEPS_SCHEMA),
+        new SchemaUniversal<SimStepIF>('plate_step', UNIVERSAL_PLATE_STEPS_SCHEMA),
       ],
       [
         COLLECTIONS.PLATELET_STEPS,
-        new SchemaUniversal<Plate>(
+        new SchemaUniversal<PlateletStepIF>( // @TODO: these interfaces don't actually alignn with universal interfaces.
           COLLECTIONS.PLATELET_STEPS,
           UNIVERSAL_PLATELET_STEPS_SCHEMA,
         ),
@@ -248,3 +251,62 @@ export const UNIVERSAL_SCHEMA = new Map([
     ]),
   ],
 ]);
+
+
+// Create schemas
+export const platesSchema = new SchemaLocal<PlateIF>(
+  COLLECTIONS.PLATES,
+  SIM_PLATES_SCHEMA,
+  ({ inputRecord }): PlateIF => {
+    // Convert plain objects to Plate instances
+    if (
+      inputRecord &&
+      typeof inputRecord === 'object' &&
+      !(inputRecord instanceof Plate)
+    ) {
+      return Plate.fromJSON(inputRecord as any);
+    }
+    return inputRecord;
+  },
+);
+
+export const planetsSchema = new SchemaLocal(
+  COLLECTIONS.PLANETS,
+  SIM_PLANETS_SCHEMA,
+);
+export const simulationsSchema = new SchemaLocal(
+  COLLECTIONS.SIMULATIONS,
+  SIM_SIMULATIONS_SCHEMA,
+);
+export const plateStepsSchema = new SchemaLocal(
+  COLLECTIONS.STEPS,
+  SIM_PLATE_STEPS_SCHEMA,
+);
+export const plateletStepsSchema = new SchemaLocal(
+  COLLECTIONS.PLATELET_STEPS,
+  SIM_PLATELET_STEPS_SCHEMA,
+);
+export const plateletsSchema = new SchemaLocal(
+  COLLECTIONS.PLATELETS,
+  SIM_PLATELETS_SCHEMA,
+  ({ inputRecord }) => {
+    // Convert plain objects to Platelet instances
+    if (
+      inputRecord &&
+      typeof inputRecord === 'object' &&
+      !(inputRecord instanceof Platelet)
+    ) {
+      return new Platelet(inputRecord as any);
+    }
+    return inputRecord;
+  },
+);
+
+export const schemaIndex = {
+  [COLLECTIONS.PLATES]: platesSchema,
+  [COLLECTIONS.PLANETS]: planetsSchema,
+  [COLLECTIONS.SIMULATIONS]: simulationsSchema,
+  [COLLECTIONS.STEPS]: plateStepsSchema,
+  [COLLECTIONS.PLATELET_STEPS]: plateletStepsSchema,
+  [COLLECTIONS.PLATELETS]: plateletsSchema,
+}

@@ -20,6 +20,8 @@ export interface PlateIF {
   radius: number; // kilometers
   density: number; // g/cm³
   thickness: number; // kilometers
+  id: string;
+  position: Vector3Like
 }
 
 export interface PlanetLocal {

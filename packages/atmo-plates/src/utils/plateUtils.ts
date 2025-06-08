@@ -101,7 +101,7 @@ export function floatElevation(
  * @returns Extended plate with derived properties
  */
 export function extendPlate(
-  plate: PlateIF & { id?: string },
+  plate: PlateIF,
   planetRadius: number,
   rank?: number,
 ): PlateExtendedIF {
@@ -125,7 +125,7 @@ export function extendPlate(
 
   // Create extended plate
   return {
-    id: plate.id || uuidV4(),
+    id: uuidV4(),
     ...plate,
     area,
     coveragePercent,

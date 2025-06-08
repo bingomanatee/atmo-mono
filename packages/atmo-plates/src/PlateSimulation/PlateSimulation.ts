@@ -42,11 +42,6 @@ export const MANAGERS = {
   PLATELET: 'plateletManager',
 };
 
-// @deprecated Use SimPlateIF instead
-export interface Plate extends PlateIF {
-  position: Vector3Like; // 3D position
-}
-
 export class PlateSimulation implements PlateSimulationIF, ContextProvider {
   // Static property to control force-directed layout strength (0-1 scale)
   public static fdStrength: number = 0.33;

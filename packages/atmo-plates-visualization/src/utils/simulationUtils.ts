@@ -1,54 +1,13 @@
-/**
- * Simulation utilities for the visualizer
- * Shows how to use the new injectable PlateSimulation architecture
- */
+import { initDBConnection } from './initDB'; // Adjust relative path as needed
+import {
+  schemaIndex
+} from '@wonderlandlabs/atmo-plates';
 
-import { PlateSimulation, createIDBSun } from '@wonderlandlabs/atmo-plates';
+import { PlateSimulation, simUniverse } from '@wonderlandlabs/atmo-plates';
 import { Universe } from '@wonderlandlabs/multiverse';
-import { initializeDatabases } from './databaseUtils';
+import { Multiverse } from '@wonderlandlabs/multiverse';
 
-// Schema definitions for the simulation universe
-const SIMULATION_SCHEMA = {
-  planets: {
-    fields: {
-      id: { type: 'string', meta: { index: true } },
-      name: { type: 'string' },
-      radius: { type: 'number' },
-    },
-  },
-  plates: {
-    fields: {
-      id: { type: 'string', meta: { index: true } },
-      name: { type: 'string' },
-      planetId: { type: 'string', meta: { index: true } },
-      position: { type: 'object' },
-      radius: { type: 'number' },
-      density: { type: 'number' },
-      thickness: { type: 'number' },
-    },
-  },
-  platelets: {
-    fields: {
-      id: { type: 'string', meta: { index: true } },
-      plateId: { type: 'string', meta: { index: true } },
-      planetId: { type: 'string', meta: { index: true } },
-      position: { type: 'object' },
-      h3Cell: { type: 'string', meta: { index: true } },
-      radius: { type: 'number' },
-      thickness: { type: 'number' },
-      density: { type: 'number' },
-    },
-  },
-  simulations: {
-    fields: {
-      id: { type: 'string', meta: { index: true } },
-      name: { type: 'string' },
-      planetId: { type: 'string', meta: { index: true } },
-      plateCount: { type: 'number' },
-      maxPlateRadius: { type: 'number' },
-    },
-  },
-};
+
 
 /**
  * Create a simulation universe with proper database setup
@@ -59,32 +18,19 @@ export async function createSimulationUniverse(
     dbName?: string;
   } = {},
 ): Promise<Universe> {
-  const { clearDatabases = true, dbName = 'atmo-plates' } = options;
+  const { clearDatabases = true } = options;
 
-  // 1. Initialize databases (clear if requested)
+  // 1. Clear database tables if requested (before creating IDBSun instances)
   if (clearDatabases) {
-    console.log('🔧 Clearing databases before creating universe...');
-    await initializeDatabases({ clearExisting: true, dbName });
+    //@TODO wipe records
   }
 
   // 2. Create universe
-  const universe = new Universe();
-
-  // 3. Create collections with IDBSun storage
-  for (const [collectionName, schema] of Object.entries(SIMULATION_SCHEMA)) {
-    const sun = await createIDBSun({
-      dbName,
-      tableName: collectionName,
-      schema: schema as any,
-      isMaster: true, // First instance is master
-    });
-
-    universe.set(collectionName, sun);
-    console.log(`📦 Created collection: ${collectionName}`);
-  }
-
-  console.log('✅ Simulation universe created');
-  return universe;
+  const db = await initDBConnection('atmo-plates', schemaIndex);
+  return simUniverse(
+    new Multiverse(),
+    db
+  )
 }
 
 /**

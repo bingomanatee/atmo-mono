@@ -5,77 +5,17 @@ import {
   PlateSpectrumGenerator,
   type SimPlateIF,
 } from '@wonderlandlabs/atmo-plates';
-import { EARTH_RADIUS } from '@wonderlandlabs/atmo-utils'; // Use the correct Earth radius in meters
+import {EARTH_RADIUS} from '@wonderlandlabs/atmo-utils';
 import * as THREE from 'three';
+import { createPlateSimulation } from './utils/simulationUtils';
 
-import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import { PlateletVisualizer } from './PlateletVisualizer'; // Corrected import path
+import {PlateletVisualizer} from './PlateletVisualizer';
+import {createThreeScene} from './threeSetup';
 
-// Scene setup
+// Setup Three.js scene, camera, renderer, controls, planet, etc.
 console.log('🎬 Setting up Three.js scene...');
-const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x111122);
-console.log('✅ Scene created');
-
-// Camera setup
-console.log('📷 Setting up camera...');
-const camera = new THREE.PerspectiveCamera(
-  75,
-  window.innerWidth / window.innerHeight,
-  1, // Adjusted near clipping plane
-  EARTH_RADIUS * 3, // Increased far clipping plane
-);
-camera.position.set(EARTH_RADIUS * 2, EARTH_RADIUS * 1.5, EARTH_RADIUS * 2); // Adjusted camera position
-console.log('✅ Camera created at position:', camera.position);
-
-// Renderer setup
-console.log('🖥️ Setting up renderer...');
-const renderer = new THREE.WebGLRenderer({ antialias: true });
-renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.setPixelRatio(window.devicePixelRatio);
-document.body.appendChild(renderer.domElement);
-console.log('✅ Renderer created and added to DOM');
-
-// Controls
-const controls = new OrbitControls(camera, renderer.domElement);
-controls.enableDamping = true;
-
-// Enhanced lighting
-const ambientLight = new THREE.AmbientLight(0x404040, 1.5); // Increased intensity
-scene.add(ambientLight);
-
-const directionalLight = new THREE.DirectionalLight(0xffffff, 2); // Increased intensity
-directionalLight.position.set(
-  EARTH_RADIUS * 2,
-  EARTH_RADIUS * 2,
-  EARTH_RADIUS * 2,
-); // Adjusted position
-scene.add(directionalLight);
-
-// Add a second directional light from the opposite side
-const backLight = new THREE.DirectionalLight(0xffffff, 1);
-backLight.position.set(-EARTH_RADIUS * 5, -EARTH_RADIUS * 5, -EARTH_RADIUS * 5); // Adjusted position
-scene.add(backLight);
-
-// Add a helper to visualize the lights (optional, but good for debugging)
-const lightHelper = new THREE.DirectionalLightHelper(
-  directionalLight,
-  EARTH_RADIUS / 2,
-); // Adjusted helper size
-scene.add(lightHelper);
-
-// Add planet sphere (Earth representation)
-const planetGeometry = new THREE.SphereGeometry(EARTH_RADIUS, 32, 32); // Use full Earth radius
-const planetMaterial = new THREE.MeshPhongMaterial({
-  color: 0x2233ff,
-  transparent: true,
-  opacity: 0.3,
-  wireframe: true,
-  wireframeLinewidth: 50, // Increased wireframe thickness
-});
-const planet = new THREE.Mesh(planetGeometry, planetMaterial);
-planet.position.set(0, 0, 0); // Set position to origin
-scene.add(planet);
+const {scene, camera, renderer, controls} = createThreeScene();
+console.log('✅ Three.js scene setup complete');
 
 // --- Simulation Setup ---
 const NUM_PLATES = 60;
@@ -83,36 +23,19 @@ const NUM_PLATES = 60;
 // Database cleanup is now handled centrally in the simulation initialization
 
 async function generateAndVisualizePlatelets() {
-  // Database cleanup is now handled centrally in simulation initialization
-
-  // Initialize simulation with 60 plates and shared storage (IDBSun)
-  // Using IDBSun for shared IndexedDB access enables:
-  // 1. Better performance with Web Workers for platelet generation
-  // 2. Shared data access between main thread and workers
-  // 3. Consistent data storage across browser tabs/sessions
-  const sim = new PlateSimulation({
-    planetRadius: EARTH_RADIUS,
+  // Create simulation using visualization utilities with proper database clearing
+  console.log('🔧 Creating simulation with database clearing...');
+  const sim = await createPlateSimulation({
     plateCount: NUM_PLATES,
-    useSharedStorage: true, // Enable shared storage using IDBSun
+    clearDatabases: true, // This uses the visualization layer's database utilities
   });
+  console.log('✅ Simulation created and initialized successfully');
 
-  console.log('🔧 Initializing simulation...');
-  try {
-    console.log('🧹 Clearing existing databases for fresh start...');
-    await sim.clearDatabases();
-    console.log('✅ Database clearing completed');
-    await sim.init();
-    console.log('✅ Simulation initialized successfully');
-
-    if (!sim.simUniv) {
-      throw new Error('Simulation universe not initialized properly');
-    }
-
-    console.log('🎯 Simulation ready - proceeding to platelet generation...');
-  } catch (error) {
-    console.error('❌ Simulation initialization failed:', error);
-    throw error;
+  if (!sim.simUniv) {
+    throw new Error('Simulation universe not initialized properly');
   }
+
+  console.log('🎯 Simulation ready - proceeding to platelet generation...');
 
   // Update storage info in UI
   const storageTypeElement = document.getElementById('storage-type');
@@ -122,9 +45,10 @@ async function generateAndVisualizePlatelets() {
   }
 
   // --- Add 20 Large Plates ---
-  // Generate 20 large plates using the simulation's planet radius
+  // Generate 20 large plates using Earth radius
+  const planet = await sim.planet();
   const largePlates = PlateSpectrumGenerator.generateLargePlates({
-    planetRadius: sim.planetRadius, // sim.planetRadius is already in km
+    planetRadius: planet.radius, // Get radius from planet object
     count: 20,
     minRadius: Math.PI / 12, // Reduced size by 1/3
     maxRadius: Math.PI / 6, // Reduced size by 1/3
@@ -207,23 +131,14 @@ async function generateAndVisualizePlatelets() {
     );
   }
 
-  const plateletManager = new PlateletManager(sim, true);
+  // Create PlateletManager with injectable architecture
+  const plateletManager = new PlateletManager(sim.universe);
 
-  // Update worker status in UI
-  const workerStatus = plateletManager.getWorkerStatus();
+  // Update worker status in UI - workers will be handled in visualization layer
   const workerStatusElement = document.getElementById('worker-status');
   if (workerStatusElement) {
-    if (workerStatus.enabled && workerStatus.available) {
-      workerStatusElement.textContent = 'Enabled (IDBSun Worker Engine)';
-      workerStatusElement.style.color = '#4CAF50'; // Green color to indicate success
-    } else if (workerStatus.enabled && !workerStatus.available) {
-      workerStatusElement.textContent =
-        'Enabled but unavailable (Fallback to main thread)';
-      workerStatusElement.style.color = '#FFC107'; // Yellow/amber color to indicate warning
-    } else {
-      workerStatusElement.textContent = 'Disabled (Using main thread only)';
-      workerStatusElement.style.color = '#9E9E9E'; // Gray color to indicate disabled
-    }
+    workerStatusElement.textContent = 'Core Module (No Workers)';
+    workerStatusElement.style.color = '#2196F3'; // Blue color to indicate core module
   }
 
   // Generate platelets for all plates first
@@ -233,7 +148,7 @@ async function generateAndVisualizePlatelets() {
   // Track start time for more precise measurement
   const startTime = performance.now();
 
-  // Use the new parallel processing method for true parallelization
+  // Generate platelets for each plate using core injectable architecture
   const plateIds = allPlates.map((plate) => plate.id);
   console.log('🔍 Plate IDs for platelet generation:', plateIds);
   console.log(
@@ -267,11 +182,16 @@ async function generateAndVisualizePlatelets() {
     );
   }
 
-  const plateletsByPlate =
-    await plateletManager.generatePlateletsForMultiplePlates(plateIds);
-
-  // Convert Map to array format for compatibility
-  const allPlatelets = Array.from(plateletsByPlate.values());
+  // Generate platelets for each plate individually (core architecture)
+  const allPlatelets: any[][] = [];
+  for (const plateId of plateIds) {
+    console.log(`🔧 Generating platelets for plate ${plateId}...`);
+    const platelets = await plateletManager.generatePlatelets(plateId);
+    allPlatelets.push(platelets);
+    console.log(
+      `✅ Generated ${platelets.length} platelets for plate ${plateId}`,
+    );
+  }
 
   // Calculate total platelets and time
   const endTime = performance.now();

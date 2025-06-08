@@ -20,13 +20,15 @@ import {
 import { Plate } from './PlateSimulation/Plate';
 import { Platelet } from './PlateSimulation/Platelet';
 import {
+  planetsSchema, plateletsSchema, plateletStepsSchema,
+  platesSchema, plateStepsSchema, schemaIndex,
   SIM_PLANETS_SCHEMA,
   SIM_PLATE_STEPS_SCHEMA,
   SIM_PLATELET_STEPS_SCHEMA,
   SIM_PLATELETS_SCHEMA,
   SIM_PLATES_SCHEMA,
-  SIM_SIMULATIONS_SCHEMA,
-  UNIVERSES,
+  SIM_SIMULATIONS_SCHEMA, simulationsSchema,
+  UNIVERSES
 } from './schema';
 
 export function coord(prefix = '') {
@@ -67,24 +69,13 @@ async function requestPersistentStorage(): Promise<boolean> {
 /**
  * Extract fields marked with index: true from the schema
  */
-function extractIndexedFields(schema: SchemaLocalIF<any>): string[] {
+export function extractIndexedFields(schema: SchemaLocalIF<any>): string[] {
   const indexedFields: string[] = [];
-
-  console.log(`🔍 Extracting indexes from schema:`, schema.name);
-  console.log(`🔍 Schema fields:`, Object.keys(schema.fields));
-
   for (const [fieldName, field] of Object.entries(schema.fields)) {
-    console.log(`🔍 Field ${fieldName}:`, field);
-    console.log(`🔍 Field ${fieldName} meta:`, field.meta);
-    console.log(`🔍 Field ${fieldName} index:`, field.meta?.index);
-
     if (field.meta?.index === true) {
       indexedFields.push(fieldName);
-      console.log(`✅ Added index for field: ${fieldName}`);
     }
   }
-
-  console.log(`🔍 Final indexed fields:`, indexedFields);
   return indexedFields;
 }
 
@@ -98,11 +89,6 @@ async function initializeSharedDatabase(
   skipDeletion: boolean = false,
 ): Promise<void> {
   try {
-    if (!skipDeletion) {
-      // Only clear databases if explicitly requested
-      await clearExistingAtmoPlatesDatabases();
-    }
-
     // Create database with all object stores and indexes
     const db = await openDB(dbName, 1, {
       upgrade: (db, oldVersion, newVersion, transaction) => {
@@ -157,58 +143,10 @@ async function initializeSharedDatabase(
 
 export async function simUniverse(
   mv: Multiverse,
-  useSharedStorage = false,
+  db?: IDBDatabase
 ): Promise<Universe> {
   const simUniv = new Universe(UNIVERSES.SIM, mv);
 
-  // Create schemas
-  const platesSchema = new SchemaLocal(
-    COLLECTIONS.PLATES,
-    SIM_PLATES_SCHEMA,
-    ({ inputRecord }) => {
-      // Convert plain objects to Plate instances
-      if (
-        inputRecord &&
-        typeof inputRecord === 'object' &&
-        !(inputRecord instanceof Plate)
-      ) {
-        return Plate.fromJSON(inputRecord as any);
-      }
-      return inputRecord;
-    },
-  );
-
-  const planetsSchema = new SchemaLocal(
-    COLLECTIONS.PLANETS,
-    SIM_PLANETS_SCHEMA,
-  );
-  const simulationsSchema = new SchemaLocal(
-    COLLECTIONS.SIMULATIONS,
-    SIM_SIMULATIONS_SCHEMA,
-  );
-  const plateStepsSchema = new SchemaLocal(
-    COLLECTIONS.STEPS,
-    SIM_PLATE_STEPS_SCHEMA,
-  );
-  const plateletStepsSchema = new SchemaLocal(
-    COLLECTIONS.PLATELET_STEPS,
-    SIM_PLATELET_STEPS_SCHEMA,
-  );
-  const plateletsSchema = new SchemaLocal(
-    COLLECTIONS.PLATELETS,
-    SIM_PLATELETS_SCHEMA,
-    ({ inputRecord }) => {
-      // Convert plain objects to Platelet instances
-      if (
-        inputRecord &&
-        typeof inputRecord === 'object' &&
-        !(inputRecord instanceof Platelet)
-      ) {
-        return new Platelet(inputRecord as any);
-      }
-      return inputRecord;
-    },
-  );
 
   // Create adaptive suns using factory - shared or separate based on flag
   let platesSun,
@@ -218,115 +156,50 @@ export async function simUniverse(
     plateletStepsSun,
     plateletsSun;
 
-  if (useSharedStorage) {
-    // Use IDBSun for shared data storage
-    const dbName = 'atmo-plates';
-    const isMaster = true; // Main thread is the master
-
-    // Initialize the database once for all collections with their schemas
-    // Skip database deletion for shared storage to avoid conflicts
-    await initializeSharedDatabase(
-      dbName,
-      {
-        [COLLECTIONS.PLATES]: platesSchema,
-        [COLLECTIONS.PLANETS]: planetsSchema,
-        [COLLECTIONS.SIMULATIONS]: simulationsSchema,
-        [COLLECTIONS.STEPS]: plateStepsSchema,
-        [COLLECTIONS.PLATELET_STEPS]: plateletStepsSchema,
-        [COLLECTIONS.PLATELETS]: plateletsSchema,
-      },
-      true, // Always skip deletion for shared storage - let caller decide when to clear
-    );
-
-    platesSun = await createIDBSun({
-      dbName,
-      tableName: COLLECTIONS.PLATES,
-      schema: platesSchema,
-      isMaster,
-    });
-
-    planetsSun = await createIDBSun({
-      dbName,
-      tableName: COLLECTIONS.PLANETS,
-      schema: planetsSchema,
-      isMaster,
-    });
-
-    simulationsSun = await createIDBSun({
-      dbName,
-      tableName: COLLECTIONS.SIMULATIONS,
-      schema: simulationsSchema,
-      isMaster,
-    });
-
-    plateStepsSun = await createIDBSun({
-      dbName,
-      tableName: COLLECTIONS.STEPS,
-      schema: plateStepsSchema,
-      isMaster,
-    });
-
-    plateletStepsSun = await createIDBSun({
-      dbName,
-      tableName: COLLECTIONS.PLATELET_STEPS,
-      schema: plateletStepsSchema,
-      isMaster,
-    });
-
-    plateletsSun = await createIDBSun({
-      dbName,
-      tableName: COLLECTIONS.PLATELETS,
-      schema: plateletsSchema,
-      isMaster,
-    });
-
-    console.log('🌌 Created shared multiverse with IDBSun storage');
-  } else {
     // Use separate IDBSun instances
     platesSun = await createIDBSun({
-      dbName: 'atmo-plates',
+      db,
       tableName: COLLECTIONS.PLATES,
       schema: platesSchema,
       isMaster: true,
     });
 
     planetsSun = await createIDBSun({
-      dbName: 'atmo-plates',
+      db,
       tableName: COLLECTIONS.PLANETS,
       schema: planetsSchema,
       isMaster: true,
     });
 
     simulationsSun = await createIDBSun({
-      dbName: 'atmo-plates',
+      db,
       tableName: COLLECTIONS.SIMULATIONS,
       schema: simulationsSchema,
       isMaster: true,
     });
 
     plateStepsSun = await createIDBSun({
-      dbName: 'atmo-plates',
+      db,
       tableName: COLLECTIONS.STEPS,
       schema: plateStepsSchema,
       isMaster: true,
     });
 
     plateletStepsSun = await createIDBSun({
-      dbName: 'atmo-plates',
+      db,
       tableName: COLLECTIONS.PLATELET_STEPS,
       schema: plateletStepsSchema,
       isMaster: true,
     });
 
     plateletsSun = await createIDBSun({
-      dbName: 'atmo-plates',
+      db,
       tableName: COLLECTIONS.PLATELETS,
       schema: plateletsSchema,
       isMaster: true,
     });
 
-    log('🔧 Created multiverse with separate IDBSun storage');
-  }
+
 
   // Create collections with adaptive suns
   const platesCollection = new CollAsync({

@@ -4,20 +4,13 @@
  */
 
 // Export main classes
-export { PlateSimulation } from './PlateSimulation/PlateSimulation';
+export * from './PlateSimulation/PlateSimulation';
 export { PlateletManager } from './PlateSimulation/managers/PlateletManager';
-export { ThreeOrbitalFrame } from '@wonderlandlabs/atmo-three-orbit';
 export { PlateSpectrumGenerator } from './generator/PlateSpectrumGenerator';
-
-// Export storage classes
-export {
-  IndexedSun,
-  IDBSun,
-  createIDBSun,
-  createMemoryAsyncSun,
-  getStorageCapabilities,
-} from './PlateSimulation/sun';
-
+export * from './constants';
+export * from './PlateSimulation/constants';
+export * from './PlateSimulation/sun';
+export * from './schema';
+export * from './utilities'
 // Export types
-export type { Plate } from './PlateSimulation/PlateSimulation';
-export type { SimPlateIF } from './PlateSimulation/types.PlateSimulation';
+export * from './PlateSimulation/types.PlateSimulation';

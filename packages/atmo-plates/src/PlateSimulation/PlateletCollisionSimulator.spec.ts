@@ -1,7 +1,7 @@
 import { Multiverse, Universe } from '@wonderlandlabs/multiverse';
 import { Vector3 } from 'three';
 import { v4 as uuidV4 } from 'uuid';
-import { simUniverse } from '../utils';
+import { simUniverse } from '../utilities.ts';
 import { COLLECTIONS } from './constants';
 import { Platelet } from './Platelet';
 import { PlateletCollisionSimulator } from './PlateletCollisionSimulator';

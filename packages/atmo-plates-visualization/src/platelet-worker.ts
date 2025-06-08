@@ -3,11 +3,10 @@
 
 console.log('🚀 Platelet Worker: Script starting to load...');
 
-// Import the worker functionality from the published atmo-plates package
-import { handlePlateletGeneration } from '@wonderlandlabs/atmo-plates';
-
+// Note: Worker functionality has been removed from atmo-plates core
+// This worker file is now a placeholder for future worker implementation
 console.log(
-  '📦 Platelet Worker: Successfully imported handlePlateletGeneration from @wonderlandlabs/atmo-plates',
+  '📦 Platelet Worker: Worker functionality will be implemented in visualization layer',
 );
 
 // Track all messages for debugging
@@ -219,14 +218,13 @@ self.addEventListener('message', async (event) => {
         }, 30000);
       });
 
-      const generationPromise = handlePlateletGeneration({
-        plateId: parameters.plateId,
-        planetRadius: parameters.planetRadius,
-        resolution: parameters.resolution,
-        universeId: parameters.universeId,
-        dontClear: parameters.dontClear,
-        timestamp: timestamp,
-      });
+      // Worker functionality has been removed from atmo-plates core
+      // This would need to be implemented in the visualization layer
+      const generationPromise = Promise.reject(
+        new Error(
+          'Worker functionality not implemented in core module - use main thread PlateletManager instead',
+        ),
+      );
 
       console.log(
         '🔧 Platelet Worker: handlePlateletGeneration promise created, racing with timeout...',

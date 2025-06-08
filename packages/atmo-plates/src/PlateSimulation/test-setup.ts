@@ -1,6 +1,6 @@
 import { EARTH_RADIUS } from '@wonderlandlabs/atmo-utils';
 import { Multiverse } from '@wonderlandlabs/multiverse';
-import { simUniverse } from '../utils';
+import { simUniverse } from '../utilities';
 import { COLLECTIONS } from './constants';
 import { PlateletManager } from './managers/PlateletManager';
 import { PlateSimulation } from './PlateSimulation';

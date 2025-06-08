@@ -8,6 +8,7 @@ import {
   determineBehavioralType,
   extendPlate,
 } from './plateUtils';
+import { Vector3 } from 'three';
 
 describe('plateUtils', () => {
   describe('calculateSphereSurfaceArea', () => {
@@ -84,7 +85,7 @@ describe('plateUtils', () => {
 
   describe('extendPlate', () => {
     it('should extend a basic plate with derived properties', () => {
-      const basicPlate: PlateIF & { id?: string } = {
+      const basicPlate: PlateIF = {
         id: 'test-plate',
         radius: 1000,
         density: 2.7,
@@ -129,11 +130,12 @@ describe('plateUtils', () => {
     });
 
     it('should use default rank if not provided', () => {
-      const basicPlate: PlateIF & { id: string } = {
+      const basicPlate: PlateIF = {
         id: 'test-plate',
         radius: 1000,
         density: 2.7,
         thickness: 30,
+        position: new Vector3()
       };
 
       const extendedPlate = extendPlate(basicPlate, 6371);

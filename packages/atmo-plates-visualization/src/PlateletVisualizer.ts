@@ -171,12 +171,9 @@ export class PlateletVisualizer extends PlateVisualizerBase {
       this.instancedMesh.setMatrixAt(index, localMatrix);
 
       // Check if this platelet is flagged as deleted or removed
-      const simulation = this.plateletManager['sim'];
-      const isDeleted =
-        (simulation &&
-          simulation.isPlateletDeleted &&
-          simulation.isPlateletDeleted(platelet.id)) ||
-        platelet.removed === true;
+      // Note: In the new injectable architecture, we'll need to pass simulation separately
+      // For now, just check the platelet's removed property
+      const isDeleted = platelet.removed === true;
 
       let instanceColor: THREE.Color;
 
@@ -322,12 +319,8 @@ export class PlateletVisualizer extends PlateVisualizerBase {
 
       // Re-run the color logic from updateMeshInstances
       this.platelets.forEach((platelet, index) => {
-        const simulation = this.plateletManager['sim'];
-        const isDeleted =
-          (simulation &&
-            simulation.isPlateletDeleted &&
-            simulation.isPlateletDeleted(platelet.id)) ||
-          platelet.removed === true;
+        // Check if platelet is flagged as deleted
+        const isDeleted = platelet.removed === true;
 
         let instanceColor: THREE.Color;
 
@@ -397,20 +390,8 @@ export class PlateletVisualizer extends PlateVisualizerBase {
    * Get existing platelets for this plate from the simulation
    */
   private async getExistingPlatelets(): Promise<any[]> {
-    const platelets: any[] = [];
-    const plateletsCollection =
-      this.plateletManager['sim'].simUniv.get('platelets');
-
-    if (plateletsCollection) {
-      // Use the find method to get platelets for this specific plate
-      for await (const [id, platelet] of plateletsCollection.find(
-        'plateId',
-        this.plate.id,
-      )) {
-        platelets.push(platelet);
-      }
-    }
-
-    return platelets;
+    // Use the PlateletManager to generate platelets for this plate
+    // This follows the new injectable architecture
+    return await this.plateletManager.generatePlatelets(this.plate.id);
   }
 }

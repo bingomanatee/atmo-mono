@@ -9,6 +9,7 @@ import type {
   SimSimulation,
 } from '../types.atmo-plates';
 import { Planet } from './Planet';
+import { Plate } from './Plate';
 
 // Simulation plate interface with identity and relational links
 export interface SimPlateIF extends PlateExtendedIF, Identifiable {
@@ -54,7 +55,7 @@ export interface PlateSimulationIF {
   // Plate management
   plateGenerator(plateCount: number): Promise<PlateSpectrumGenerator>;
   addPlate(props: AddPlateProps, simId?: string): Promise<string>;
-  getPlate(id: string): Promise<import('./Plate').Plate>;
+  getPlate(id: string): Promise<Plate>;
 
   // Simulation management
   addSimulation(props: SimProps): string;
@@ -69,7 +70,6 @@ export interface PlateSimulationIF {
   // Platelet neighbor management
   populatePlateletNeighbors(): Promise<void>;
   refreshNeighbors(): Promise<void>;
-  cleanupNeighborLists(): Promise<void>;
   createIrregularPlateEdges(): Promise<void>;
 }
 

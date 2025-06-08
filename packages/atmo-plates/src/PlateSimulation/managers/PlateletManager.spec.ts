@@ -8,7 +8,7 @@ import { COLLECTIONS } from '../constants';
 import { LazyContextProvider } from '../providers/LazyManagerProvider';
 import { PlateSimulation } from '../PlateSimulation';
 import { createTestPlate, setupTestSimulation } from '../test-setup';
-import { simUniverse } from '../../utils';
+import { simUniverse } from '../../utilities.ts';
 import { PlateletManager } from './PlateletManager';
 
 // Helper to generate a random plate

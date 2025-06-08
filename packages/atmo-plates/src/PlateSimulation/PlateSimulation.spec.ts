@@ -11,7 +11,7 @@ import { Vector3 } from 'three';
 import { v4 as uuidV4 } from 'uuid';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { UNIVERSES } from '../schema';
-import { simUniverse } from '../utils';
+import { simUniverse } from '../utilities.ts';
 import { COLLECTIONS } from './constants';
 import { PlateSimulation } from './PlateSimulation';
 import type { SimPlateIF } from './types.PlateSimulation';

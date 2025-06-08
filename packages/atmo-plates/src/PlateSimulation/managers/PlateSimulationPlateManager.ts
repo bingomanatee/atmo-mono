@@ -2,8 +2,8 @@ import { Universe } from '@wonderlandlabs/multiverse';
 import { latLngToCell, randomNormal, varyP } from '@wonderlandlabs/atmo-utils';
 import { Object3D, Vector3 } from 'three';
 import { v4 as uuidV4 } from 'uuid';
-import { COLLECTIONS } from '../../PlateSimulation/constants';
-import { varySpeedByRadius } from '../../utils';
+import { COLLECTIONS } from '../constants';
+import { varySpeedByRadius } from '../../utilities';
 import { ContextProvider, MANAGER_TYPES } from '../interfaces/ContextProvider';
 import type { Platelet } from '../schemas/platelet';
 import type {
@@ -34,7 +34,7 @@ export default class PlateSimulationPlateManager {
   async initPlateSteps(plateId: string, context: ContextProvider) {
     const steps = this.stepsCollection.find('plateId', plateId);
     if (!steps?.length) {
-      const plateStepId = await this.#addFirstStep(plateId);
+      await this.#addFirstStep(plateId);
 
       // Get PlateletManager from context and generate platelets
       const plateletManager = context.getManager<PlateletManager>(

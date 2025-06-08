@@ -3,7 +3,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { Vector3 } from 'three';
 import { beforeAll, describe, expect, it } from 'vitest';
-import { simUniverse } from '../../utils';
+import { simUniverse } from '../../utilities.ts';
 import { PlateSimulation } from '../PlateSimulation';
 import { PlateletManager } from './PlateletManager';
 

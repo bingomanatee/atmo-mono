@@ -108,24 +108,3 @@ export async function clearDatabaseTables(
     console.warn(`⚠️ Failed to clear tables in ${dbName}:`, error);
   }
 }
-
-/**
- * Initialize databases for the visualizer
- * Call this at the start of your application before using atmo-plates
- */
-export async function initializeDatabases(options: {
-  clearExisting?: boolean;
-  dbName?: string;
-} = {}): Promise<void> {
-  const { clearExisting = true, dbName = 'atmo-plates' } = options;
-
-  if (clearExisting) {
-    console.log('🔧 Initializing databases with clearing...');
-    await clearExistingAtmoPlatesDatabase(dbName);
-  } else {
-    console.log('🔧 Initializing databases without clearing...');
-  }
-
-  console.log('✅ Database initialization complete');
-  console.log('📦 atmo-plates will lazy-create tables as needed');
-}

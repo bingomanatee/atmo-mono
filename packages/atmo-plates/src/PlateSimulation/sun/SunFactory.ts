@@ -7,7 +7,7 @@ import { log } from '../../utils/utils';
 import { IDBSun } from './IDBSun';
 
 interface IDBSunFactoryOptions {
-  dbName: string;
+  db?: IDBDatabase,
   tableName: string;
   schema: SchemaLocalIF<any>;
   isMaster?: boolean; // Flag to indicate if this is the master instance
@@ -36,20 +36,10 @@ function isIndexedDBAvailable(): boolean {
 export async function createIDBSun<T extends Record<string, any>>(
   options: IDBSunFactoryOptions,
 ): Promise<AsyncSunIF<T>> {
-  const { dbName, tableName, schema, isMaster } = options;
+  const { db, tableName, schema, isMaster } = options;
 
   // Check if IndexedDB is available
   const indexedDBAvailable = isIndexedDBAvailable();
-  log(
-    `🔍 IndexedDB availability check for ${tableName}: ${indexedDBAvailable}`,
-  );
-  log(`🔍 Window object: ${typeof window !== 'undefined'}`);
-  log(
-    `🔍 IndexedDB in window: ${typeof window !== 'undefined' && 'indexedDB' in window}`,
-  );
-  log(
-    `🔍 IndexedDB value: ${typeof window !== 'undefined' ? window.indexedDB : 'no window'}`,
-  );
 
   if (!indexedDBAvailable) {
     const memorySun = memoryAsyncSunF({ schema });
@@ -57,9 +47,11 @@ export async function createIDBSun<T extends Record<string, any>>(
   }
 
   const role = isMaster ? 'Master' : 'Worker';
-
+  if (!db) {
+    throw new Error('IDBSun requires injected db');
+  }
   const idbSun = new IDBSun<T>({
-    dbName,
+    db,
     tableName,
     schema,
     isMaster,
