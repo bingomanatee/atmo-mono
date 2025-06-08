@@ -239,7 +239,7 @@ describe('PlateletManager', () => {
     });
   });
 
-  it.skip('should load and generate platelets from saved simulation', async () => {
+  it('should load and generate platelets from saved simulation', async () => {
     const testDataPath = path.join(
       __dirname,
       'test-data',
@@ -277,7 +277,7 @@ describe('PlateletManager', () => {
       const platelets = await newManager.generatePlatelets(p.id);
       expect(platelets.length).toBeGreaterThan(0);
     }
-  });
+  }, 60000); // 60 second timeout for loading 50 plates
 
   it('should have all platelets within the plate radius and match brute-force H3 cell set', async () => {
     const platelets = await manager.generatePlatelets(testPlateId);
