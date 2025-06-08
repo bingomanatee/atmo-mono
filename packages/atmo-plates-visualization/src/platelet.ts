@@ -238,7 +238,7 @@ async function generateAndVisualizePlatelets() {
     '🔴 Applying edge detection to flag platelets for visualization...',
   );
   console.time('⏱️ Edge Detection');
-  await sim.createIrregularPlateEdges();
+  // await sim.createIrregularPlateEdges();
   console.timeEnd('⏱️ Edge Detection');
 
   const deletedCount = sim.getDeletedPlateletCount();

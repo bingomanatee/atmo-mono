@@ -1,14 +1,15 @@
 import { Vector3 } from 'three';
-import { latLngToCell, isValidCell } from 'h3-js';
+import { isValidCell, latLngToCell } from 'h3-js';
 import {
-  pointToLatLon,
   cellToVector,
-  getCellsInRange,
+  getCellsInRange, getNeighborsAsync,
   h3HexRadiusAtResolution,
+  pointToLatLon
 } from '@wonderlandlabs/atmo-utils';
 import { Universe } from '@wonderlandlabs/multiverse';
 
 import { COLLECTIONS } from '../constants';
+import { PlateletIF, SimPlateIF } from '../types.PlateSimulation';
 
 const log = console.log;
 
@@ -51,10 +52,12 @@ export class PlateletManager {
   async generatePlatelets(plateId: string): Promise<Platelet[]> {
     // Get the plates collection
     const platesCollection = this.universe.get(COLLECTIONS.PLATES);
-    if (!platesCollection) throw new Error('plates collection not found');
+    if (!platesCollection) {
+      throw new Error('plates collection not found');
+    }
 
     // Get the plate data
-    const plate = await platesCollection.get(plateId);
+    const plate: SimPlateIF = await platesCollection.get(plateId);
     if (!plate) {
       console.warn(`Plate ${plateId} not found. Cannot generate platelets.`);
       return [];
@@ -62,11 +65,15 @@ export class PlateletManager {
 
     // Get the planets collection
     const planetsCollection = this.universe.get(COLLECTIONS.PLANETS);
-    if (!planetsCollection) throw new Error('planets collection not found');
+    if (!planetsCollection) {
+      throw new Error('planets collection not found');
+    }
 
     // Get planet radius
     const planet = await planetsCollection.get(plate.planetId);
-    if (!planet) throw new Error(`Planet ${plate.planetId} not found`);
+    if (!planet) {
+      throw new Error(`Planet ${plate.planetId} not found`);
+    }
     const planetRadius = planet.radius;
 
     // Check H3 cell radius calculation (for validation)
@@ -74,7 +81,9 @@ export class PlateletManager {
 
     // Get the platelets collection
     const plateletsCollection = this.universe.get(COLLECTIONS.PLATELETS);
-    if (!plateletsCollection) throw new Error('platelets collection not found');
+    if (!plateletsCollection) {
+      throw new Error('platelets collection not found');
+    }
 
     // Generate platelets using main thread (core version)
     const generatedPlatelets = await this.generatePlateletsWithGridDisk(
@@ -130,34 +139,25 @@ export class PlateletManager {
     const { lat, lon } = pointToLatLon(platePosition, planetRadius);
     const centralCell = latLngToCell(lat, lon, resolution);
 
-    // Smart unit detection for plate radius
     let plateRadiusKm = plate.radius;
 
-    // Calculate how many H3 cell radii we need to cover the plate
     const h3CellRadius = h3HexRadiusAtResolution(planetRadius, resolution);
 
-    // Use 133% of plate radius to account for hexagonal geometry
     const searchRadius = plateRadiusKm * 1.33;
 
-    // Calculate how many H3 cell "rings" we need to cover the search radius
-    // Each ring is approximately one H3 cell radius away from the previous ring
     const ringsNeeded = Math.ceil(searchRadius / h3CellRadius);
 
-    // SAFETY CHECK: Cap the rings to prevent H3 overflow
-    const maxSafeRings = 50; // H3 gridDisk can handle up to ~50 rings safely
+    const maxSafeRings = 50;
     const gridDiskRings = Math.min(ringsNeeded, maxSafeRings);
 
-    // Get all cells within the gridDisk rings using atmo-utils helper
     const candidateCells = getCellsInRange(centralCell, gridDiskRings);
 
-    // Filter cells that are actually within the plate radius
     const validCells: string[] = [];
     const plateCenter = platePosition;
     let invalidCellCount = 0;
     let outOfRangeCount = 0;
 
     for (const cell of candidateCells) {
-      // First check if the H3 cell is valid
       if (!isValidCell(cell)) {
         invalidCellCount++;
         continue;
@@ -182,20 +182,18 @@ export class PlateletManager {
       }
     }
 
-    // Create platelets for all valid cells
     const platelets: Platelet[] = [];
 
     if (validCells.length === 0) {
-      // Fallback: create center platelet if no valid cells found
-      const centerPlatelet = this.createSimplePlatelet(
+      const centerPlatelet = await this.createSimplePlatelet(
         `${plate.id}-center`,
         plate,
         new Vector3().copy(plate.position),
         centralCell,
+        planetRadius
       );
       platelets.push(centerPlatelet);
     } else {
-      // Create platelets for all valid cells
       let successCount = 0;
       let failureCount = 0;
 
@@ -203,11 +201,12 @@ export class PlateletManager {
         try {
           const cellPosition = cellToVector(cell, planetRadius);
           if (cellPosition) {
-            const platelet = this.createSimplePlatelet(
+            const platelet = await this.createSimplePlatelet(
               `${plate.id}-${cell}`,
               plate,
               cellPosition,
               cell,
+              planetRadius
             );
             platelets.push(platelet);
             successCount++;
@@ -226,23 +225,27 @@ export class PlateletManager {
   /**
    * Create a simple platelet for the core version
    */
-  private createSimplePlatelet(
+  private async createSimplePlatelet(
     id: string,
-    plate: Plate,
+    plate: SimPlateIF,
     position: Vector3,
     h3Cell: string,
-  ): Platelet {
+    planetRadius,
+  ): Promise<PlateletIF> {
+
+    const neighborCellIds = h3Cell ? await getNeighborsAsync(h3Cell) : []
+
     return {
       id,
       plateId: plate.id,
       planetId: plate.planetId,
-      position: { x: position.x, y: position.y, z: position.z },
+      position: new Vector3().copy(position),
       h3Cell,
-      radius: 1000, // Default 1km radius
-      thickness: 100, // Default 100m thickness
-      density: 2700, // Default rock density kg/m³
-      mass: 0, // Will be calculated
-      elasticity: 0.3, // Default elasticity
+      radius: h3HexRadiusAtResolution(planetRadius, PlateletManager.PLATELET_CELL_LEVEL),
+      thickness: plate.thickness,
+      density: plate.density,
+      elasticity: 0.3,
+      neighborCellIds
     };
   }
 

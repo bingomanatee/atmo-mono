@@ -84,7 +84,7 @@ export interface SimStepIF {
   start: Vector3Like; // Starting position of the step
 }
 
-// Interface for the stateless PlateSimulationPlateManager
+// Interface for the stateless PlateManager
 export interface PlateSimulationPlateManagerIF {
   new (sim: PlateSimulationIF): PlateSimulationPlateManagerIF;
   initPlateSteps(plate: SimPlateIF): void;

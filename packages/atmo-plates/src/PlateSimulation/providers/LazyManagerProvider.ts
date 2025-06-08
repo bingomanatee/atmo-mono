@@ -1,7 +1,7 @@
 import { Universe } from '@wonderlandlabs/multiverse';
 import { ContextProvider, MANAGER_TYPES } from '../interfaces/ContextProvider';
 import { PlateletManager } from '../managers/PlateletManager';
-import PlateSimulationPlateManager from '../managers/PlateSimulationPlateManager';
+import PlateManager from '../managers/PlateManager';
 import { PlateletCollisionManager } from '../managers/PlateletCollisionManager';
 
 /**
@@ -35,7 +35,7 @@ export class LazyContextProvider implements ContextProvider {
         break;
 
       case MANAGER_TYPES.PLATE:
-        manager = new PlateSimulationPlateManager(this.universe);
+        manager = new PlateManager(this.universe);
         break;
 
       case MANAGER_TYPES.COLLISION:

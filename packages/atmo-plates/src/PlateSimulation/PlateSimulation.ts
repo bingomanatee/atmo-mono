@@ -22,7 +22,7 @@ import { extendPlate, isostaticElevation } from '../utils/plateUtils';
 import { COLLECTIONS } from './constants';
 import { ContextProvider, MANAGER_TYPES } from './interfaces/ContextProvider';
 import { PlateletManager } from './managers/PlateletManager';
-import PlateSimulationPlateManager from './managers/PlateSimulationPlateManager';
+import PlateManager from './managers/PlateManager';
 import { PlateletCollisionManager } from './managers/PlateletCollisionManager';
 import { Planet } from './Planet';
 import { Plate } from './Plate';
@@ -89,7 +89,7 @@ export class PlateSimulation implements PlateSimulationIF, ContextProvider {
     this.managers = new Map<string, any>();
     this.managers.set(
       MANAGER_TYPES.PLATE,
-      new PlateSimulationPlateManager(simUniv),
+      new PlateManager(simUniv),
     );
     this.managers.set(MANAGER_TYPES.PLATELET, new PlateletManager(simUniv));
 

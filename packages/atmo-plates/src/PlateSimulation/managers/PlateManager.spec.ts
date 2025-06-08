@@ -8,12 +8,12 @@ import { simUniverse } from '../../utilities.ts';
 import { COLLECTIONS } from '../constants';
 import { MANAGER_TYPES } from '../interfaces/ContextProvider';
 import { PlateSimulation } from '../PlateSimulation';
-import PlateSimulationPlateManager from './PlateSimulationPlateManager';
+import PlateManager from './PlateManager.ts';
 
-describe('PlateSimulationPlateManager', () => {
+describe('PlateManager', () => {
   let sim: PlateSimulation;
   let universe: Universe;
-  let manager: PlateSimulationPlateManager;
+  let manager: PlateManager;
   let testPlateId: string;
 
   beforeEach(async () => {
@@ -44,7 +44,7 @@ describe('PlateSimulationPlateManager', () => {
 
     manager = sim.getManager(
       MANAGER_TYPES.PLATE,
-    ) as PlateSimulationPlateManager;
+    ) as PlateManager;
   });
 
   it('should initialize steps for a plate when initPlateSteps is called', async () => {
@@ -55,11 +55,11 @@ describe('PlateSimulationPlateManager', () => {
   });
 
   it('should not throw in constructor even if plate not found initially', () => {
-    expect(() => new PlateSimulationPlateManager(universe)).not.toThrow();
+    expect(() => new PlateManager(universe)).not.toThrow();
   });
 
   it('should throw in initPlateSteps if plate not found', async () => {
-    const nonExistentManager = new PlateSimulationPlateManager(universe);
+    const nonExistentManager = new PlateManager(universe);
     await expect(
       async () => await nonExistentManager.initPlateSteps('non-existent', sim),
     ).rejects.toThrow('Plate non-existent not found');

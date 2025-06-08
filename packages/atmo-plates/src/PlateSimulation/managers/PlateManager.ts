@@ -14,7 +14,7 @@ import type {
 import { createOrbitalFrame, movePlate } from '../utils/plateMovement';
 import { PlateletManager } from './PlateletManager';
 
-export default class PlateSimulationPlateManager {
+export default class PlateManager {
   #universe: Universe;
 
   /**
