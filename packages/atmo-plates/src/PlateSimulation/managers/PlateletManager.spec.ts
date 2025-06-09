@@ -168,12 +168,13 @@ describe('PlateletManager', () => {
   it('should generate consistent platelets', async () => {
     // First generation
     const firstGen = await manager.generatePlatelets(testPlateId);
-    expect(firstGen.length).toBeGreaterThan(0);
+    expect(firstGen).toBeGreaterThan(0);
 
     // Second generation should be consistent (same count and properties)
     const secondGen = await manager.generatePlatelets(testPlateId);
-    expect(secondGen.length).toBe(firstGen.length);
+    expect(secondGen).toBe(firstGen);
 
+    throw new Error('get plaelets');
     // Check that platelets have consistent properties (but allow for different planetIds due to UUID generation)
     firstGen.forEach((platelet, index) => {
       const secondPlatelet = secondGen[index];
@@ -193,8 +194,8 @@ describe('PlateletManager', () => {
     expect(plateletsCollection).toBeDefined();
 
     // Generate platelets
-    const platelets = await manager.generatePlatelets(testPlateId);
-    expect(platelets.length).toBeGreaterThan(0);
+    const count = await manager.generatePlatelets(testPlateId);
+    expect(count).toBeGreaterThan(0);
 
     // Count platelets for this plate in the collection
     let collectionCount = 0;
@@ -208,12 +209,12 @@ describe('PlateletManager', () => {
     // The core algorithm works correctly (generates platelets with valid positions)
     // but the collection storage needs investigation
     expect(collectionCount).toBeGreaterThan(0);
-    expect(collectionCount).toBeLessThanOrEqual(platelets.length);
+    expect(collectionCount).toBeLessThanOrEqual(count);
   });
 
   it('should generate platelets with correct properties', async () => {
-    const platelets = await manager.generatePlatelets(testPlateId);
-    expect(platelets.length).toBeGreaterThan(0);
+    const count = await manager.generatePlatelets(testPlateId);
+    expect(count).toBeGreaterThan(0);
 
     const testPlate = await sim.getPlate(testPlateId);
     expect(testPlate).toBeDefined();
@@ -274,14 +275,14 @@ describe('PlateletManager', () => {
 
     // Generate platelets for each plate
     for (const p of savedData.plates) {
-      const platelets = await newManager.generatePlatelets(p.id);
-      expect(platelets.length).toBeGreaterThan(0);
+      const count = await newManager.generatePlatelets(p.id);
+      expect(count).toBeGreaterThan(0);
     }
   }, 60000); // 60 second timeout for loading 50 plates
 
   it('should have all platelets within the plate radius and match brute-force H3 cell set', async () => {
-    const platelets = await manager.generatePlatelets(testPlateId);
-    expect(platelets.length).toBeGreaterThan(0);
+    const count = await manager.generatePlatelets(testPlateId);
+    expect(count).toBeGreaterThan(0);
     const plate = await sim.getPlate(testPlateId);
     expect(plate).toBeDefined();
 

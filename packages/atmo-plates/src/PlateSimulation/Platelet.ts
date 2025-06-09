@@ -1,12 +1,12 @@
 import { Vector3 } from 'three';
 import { v4 as uuidV4 } from 'uuid';
 import type { PlateletIF } from './types.PlateSimulation';
+import { PlateletManager } from './managers/PlateletManager';
 
 export class Platelet implements PlateletIF {
   id: string;
   plateId: string;
   planetId: string;
-  private #position: Vector3;
   radius: number;
   thickness: number;
   density: number;
@@ -15,7 +15,15 @@ export class Platelet implements PlateletIF {
   neighborCellIds: string[];
 
   constructor(data: Partial<PlateletIF> = {}) {
-    this.id = data.id ?? uuidV4();
+    let id = data.id;
+    if (!id) {
+      if (data.plateId && data.h3Cell) {
+        id = PlateletManager.plateletId(data.plateId, data.h3Cell);
+      } else {
+        throw new Error('platelet requires id or plateId and h3Cell');
+      }
+    }
+    this.id = id;
     this.h3Cell = data.h3Cell; // Use h3Cell from the interface
     if (!this.h3Cell) {
       throw new Error('platelet required h3Cell');

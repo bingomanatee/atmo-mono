@@ -196,19 +196,18 @@ describe('Large Scale Platelet Generation', () => {
 
   it('should generate platelets for each plate', async () => {
     for (const plate of samplePlates) {
-      const platelets = await manager.generatePlatelets(plate.id);
-      expect(platelets.length).toBeGreaterThan(0);
-      expect(platelets.every((p) => p.plateId === plate.id)).toBe(true);
+      const count = await manager.generatePlatelets(plate.id);
+      expect(count).toBeGreaterThan(0);
     }
   }, 60000); // 60 second timeout for 50 plates
 
   it('should have a reasonable number of platelets per plate', async () => {
     const plateletCounts = [];
     for (const plate of samplePlates) {
-      const platelets = await manager.generatePlatelets(plate.id);
+      const count = await manager.generatePlatelets(plate.id);
       plateletCounts.push({
         plateId: plate.id,
-        count: platelets.length,
+        count: count,
         radius: plate.radius,
       });
     }
@@ -252,32 +251,29 @@ describe('Large Scale Platelet Generation', () => {
 
     // Generate platelets for loaded plates
     for (const plate of addedPlates) {
-      const platelets = await manager.generatePlatelets(plate.id);
-      expect(platelets.length).toBeGreaterThan(0);
-      expect(platelets.every((p) => p.plateId === plate.id)).toBe(true);
+      const count = await manager.generatePlatelets(plate.id);
+      expect(count).toBeGreaterThan(0);
     }
   }, 30000); // 30 second timeout for large-scale platelet generation
 
   it.skip('should maintain consistent platelet generation across runs', async () => {
     const firstRunCounts = [];
     for (const plate of samplePlates) {
-      const platelets = await manager.generatePlatelets(plate.id);
+      const count = await manager.generatePlatelets(plate.id);
       firstRunCounts.push({
         plateId: plate.id,
-        count: platelets.length,
-        positions: platelets.map((p) => p.position.toArray()),
+        count,
       });
     }
 
     // Clear cache and regenerate
-    manager.clearCache();
+    throw new Error('create new manager');
     const secondRunCounts = [];
     for (const plate of samplePlates) {
-      const platelets = await manager.generatePlatelets(plate.id);
+      const count = await manager.generatePlatelets(plate.id);
       secondRunCounts.push({
         plateId: plate.id,
-        count: platelets.length,
-        positions: platelets.map((p) => p.position.toArray()),
+        count,
       });
     }
 
@@ -300,11 +296,11 @@ describe('Large Scale Platelet Generation', () => {
 
   it('should generate a reasonable number of platelets for a plate', async () => {
     for (const plate of samplePlates) {
-      const platelets = await manager.generatePlatelets(plate.id);
+      const count = await manager.generatePlatelets(plate.id);
       // For plates between 2000-6000km radius, expect 2000-7000 platelets
-      console.log('---- plate', plate.id, 'count', platelets.length);
-      expect(platelets.length).toBeGreaterThan(80);
-      expect(platelets.length).toBeLessThan(8000);
+      console.log('---- plate', plate.id, 'count', count);
+      expect(count).toBeGreaterThan(80);
+      expect(count).toBeLessThan(8000);
     }
   }, 60000); // 60 second timeout for 50 plates
 
@@ -323,8 +319,8 @@ describe('Large Scale Platelet Generation', () => {
       if (plates.length > 1) {
         const counts = [];
         for (const plate of plates) {
-          const platelets = await manager.generatePlatelets(plate.id);
-          counts.push(platelets.length);
+          const count = await manager.generatePlatelets(plate.id);
+          counts.push(count);
         }
         const min = Math.min(...counts);
         const max = Math.max(...counts);

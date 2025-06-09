@@ -33,7 +33,7 @@ async function runExample() {
   const plateletManager = sim.managers.get(
     'plateletManager',
   ) as PlateletManager;
-  const platelets = plateletManager.generatePlatelets(plateId);
+  plateletManager.generatePlatelets(plateId);
 
   // console.log(`Generated ${platelets.length} platelets`);
 

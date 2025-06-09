@@ -4,7 +4,7 @@ import type {
   SunIfAsync,
 } from '@wonderlandlabs/multiverse';
 import { FIELD_TYPES } from '@wonderlandlabs/multiverse';
-import type { MutationAction } from '@wonderlandlabs/multiverse/dist';
+import type { MutationAction } from '@wonderlandlabs/multiverse';
 import type { IDBDatabase } from 'idb';
 import { type IDBPDatabase } from 'idb';
 import { Vector3 } from 'three';

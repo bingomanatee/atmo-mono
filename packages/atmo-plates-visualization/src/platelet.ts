@@ -4,20 +4,20 @@ import {
   PlateSpectrumGenerator,
   type SimPlateIF,
 } from '@wonderlandlabs/atmo-plates';
-import {EARTH_RADIUS} from '@wonderlandlabs/atmo-utils';
+import { EARTH_RADIUS } from '@wonderlandlabs/atmo-utils';
 import * as THREE from 'three';
 import { createPlateSimulation } from './utils/simulationUtils';
 
-import {PlateletVisualizer} from './PlateletVisualizer';
-import {createThreeScene} from './threeSetup';
+import { PlateletVisualizer } from './PlateletVisualizer';
+import { createThreeScene } from './threeSetup';
 
 // Setup Three.js scene, camera, renderer, controls, planet, etc.
 console.log('🎬 Setting up Three.js scene...');
-const {scene, camera, renderer, controls} = createThreeScene();
+const { scene, camera, renderer, controls } = createThreeScene();
 console.log('✅ Three.js scene setup complete');
 
 // --- Simulation Setup ---
-const NUM_PLATES = 60;
+const NUM_PLATES = 20;
 
 // Database cleanup is now handled centrally in the simulation initialization
 
@@ -180,31 +180,24 @@ async function generateAndVisualizePlatelets() {
       `Found ${invalidIds.length} plates with invalid IDs - check plate storage/retrieval`,
     );
   }
-
+  let total = 0;
   // Generate platelets for each plate individually (core architecture)
-  const allPlatelets: any[][] = [];
   for (const plateId of plateIds) {
     console.log(`🔧 Generating platelets for plate ${plateId}...`);
-    const platelets = await plateletManager.generatePlatelets(plateId);
-    allPlatelets.push(platelets);
-    console.log(
-      `✅ Generated ${platelets.length} platelets for plate ${plateId}`,
-    );
+    const count = await plateletManager.generatePlatelets(plateId);
+    console.log(`✅ Generated ${count} platelets for plate ${plateId}`);
+    total += count;
   }
 
   // Calculate total platelets and time
   const endTime = performance.now();
   const generationTime = endTime - startTime;
-  const totalPlatelets = allPlatelets.reduce(
-    (sum, platelets) => sum + platelets.length,
-    0,
-  );
 
   console.timeEnd('⏱️ Platelet Generation');
   console.log(
     `⏱️ Platelet Generation (Workers): ${generationTime.toFixed(2)} ms`,
   );
-  console.log(`🎯 Total platelets generated: ${totalPlatelets}`);
+  console.log(`🎯 Total platelets generated: ${total}`);
 
   // Update performance metrics in UI
   const generationTimeElement = document.getElementById('generation-time');
@@ -223,7 +216,7 @@ async function generateAndVisualizePlatelets() {
   }
 
   if (plateletCountElement) {
-    plateletCountElement.textContent = totalPlatelets.toString();
+    plateletCountElement.textContent = total.toString();
   }
 
   // Populate neighbor relationships between platelets
@@ -232,22 +225,15 @@ async function generateAndVisualizePlatelets() {
   await sim.populatePlateletNeighbors();
   console.timeEnd('⏱️ Neighbor Population');
 
-  // Apply edge detection to flag platelets for visualization
-  console.log(
-    '🔴 Applying edge detection to flag platelets for visualization...',
-  );
+  // NOW apply edge detection to delete platelets from the database
+  console.log('🔴 Applying edge detection to create irregular plate edges...');
   console.time('⏱️ Edge Detection');
   await sim.createIrregularPlateEdges();
   console.timeEnd('⏱️ Edge Detection');
 
-  const deletedCount = sim.getDeletedPlateletCount();
-  console.log(
-    `🔴 Flagged ${deletedCount} platelets as deleted for red visualization`,
-  );
-
-  // Create a PlateVisualizer for each plate AFTER deleting platelets
+  // Create visualizers BEFORE edge detection so they see the full platelet set
   console.time('⏱️ Visualization Creation');
-  const plateVisualizers: PlateletVisualizer[] = []; // Use PlateletVisualizer type
+  const plateVisualizers: PlateletVisualizer[] = [];
 
   for (const plate of allPlates) {
     // Pass scene, planetRadius, plate, and plateletManager to the constructor
@@ -258,8 +244,8 @@ async function generateAndVisualizePlatelets() {
       plateletManager,
     );
 
-    // Initialize platelets asynchronously
-    await visualizer.initializeAsync();
+    // Create initial mesh with current platelets (before deletion)
+    await visualizer.createInitialVisualization();
 
     // Add to scene
     visualizer.visualize();
@@ -268,19 +254,6 @@ async function generateAndVisualizePlatelets() {
   console.timeEnd('⏱️ Visualization Creation');
 
   console.log(`Created visualizers for ${plateVisualizers.length} plates.`);
-
-  // Refresh colors to show flagged platelets in red
-  if (deletedCount > 0) {
-    console.log(
-      '🎨 Refreshing visualization colors to show flagged platelets...',
-    );
-    plateVisualizers.forEach((visualizer) => {
-      visualizer.refreshColors();
-    });
-    console.log(
-      `✅ Color refresh complete - ${deletedCount} platelets should now be red`,
-    );
-  }
 
   // Add axes helper
   const axesHelper = new THREE.AxesHelper(EARTH_RADIUS * 0.5); // Make axes helper relative to Earth radius

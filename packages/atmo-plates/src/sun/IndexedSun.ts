@@ -1,12 +1,10 @@
-// Import SunMemory from the correct path or use a workaround
-// import { SunMemory } from '@wonderlandlabs/multiverse/src/sun/SunMemory';
 import { CollSync, SchemaLocal, Universe } from '@wonderlandlabs/multiverse';
-import type { Pair } from 'packages/multiverse/src/type.schema';
+import type { Pair } from '@wonderlandlabs/multiverse';
 import type {
   SendProps,
   TransportResult,
   UniverseName,
-} from 'packages/multiverse/src/types.multiverse';
+} from '@wonderlandlabs/multiverse';
 import { SunIndex } from './SunIndex';
 
 export class IndexedSun<

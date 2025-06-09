@@ -58,13 +58,7 @@ export class PlateletManager {
     return this.universe.get(COLLECTIONS.PLATELETS);
   }
 
-  async generatePlatelets(plateId: string): Promise<Platelet[]> {
-    // Get the plates collection
-
-    if (!this.platesCollection) {
-      throw new Error('plates collection not found');
-    }
-
+  async generatePlatelets(plateId: string): Promise<void> {
     // Get the plate data
     const plate: SimPlateIF = await this.platesCollection.get(plateId);
     if (!plate) {
@@ -88,61 +82,28 @@ export class PlateletManager {
     // Check H3 cell radius calculation (for validation)
     h3HexRadiusAtResolution(planetRadius, PlateletManager.PLATELET_CELL_LEVEL);
 
-    // Get the platelets collection
-
-    if (!this.plateletsCollection) {
-      throw new Error('platelets collection not found');
-    }
-
-    // Generate platelets using main thread (core version)
-    const generatedPlatelets = await this.generatePlateletsWithGridDisk(
+    // Generate platelets and write directly to collection
+    const plateletCount = await this.generatePlateletsWithGridDisk(
       plate,
       planetRadius,
       PlateletManager.PLATELET_CELL_LEVEL,
     );
 
-    // Batch write all platelets to collection for better performance
-    const batchWrites = generatedPlatelets.map((platelet) =>
-      this.plateletsCollection.set(platelet.id, platelet),
-    );
-    await Promise.all(batchWrites);
+    console.log('----- generated ', plateletCount, 'platelets --------');
+  }
 
-    return generatedPlatelets;
+  static plateletId(plateId: string, h3Cell: string) {
+    return `${plateId}-${h3Cell}`;
   }
 
   /**
-   * Generate platelets for multiple plates sequentially (core version)
-   */
-  async generatePlateletsForMultiplePlates(
-    plateIds: string[],
-  ): Promise<Map<string, Platelet[]>> {
-    return this.generatePlateletsSequentially(plateIds);
-  }
-
-  /**
-   * Sequential platelet generation method
-   */
-  private async generatePlateletsSequentially(
-    plateIds: string[],
-  ): Promise<Map<string, Platelet[]>> {
-    const plateletsByPlate = new Map<string, Platelet[]>();
-
-    for (const plateId of plateIds) {
-      const platelets = await this.generatePlatelets(plateId);
-      plateletsByPlate.set(plateId, platelets);
-    }
-
-    return plateletsByPlate;
-  }
-
-  /**
-   * Generate platelets using gridDisk expansion from plate center - much faster and simpler!
+   * Generate platelets using gridDisk expansion from plate center - writes directly to collection!
    */
   private async generatePlateletsWithGridDisk(
     plate: Plate,
     planetRadius: number,
     resolution: number,
-  ): Promise<Platelet[]> {
+  ): Promise<number> {
     // Get the central H3 cell for the plate position
     const platePosition = new Vector3().copy(plate.position);
     const { lat, lon } = pointToLatLon(platePosition, planetRadius);
@@ -191,9 +152,8 @@ export class PlateletManager {
       }
     }
 
-    const platelets: Platelet[] = [];
-
     if (validCells.length === 0) {
+      // Handle single center platelet case
       const centerPlatelet = await this.createSimplePlatelet(
         `${plate.id}-center`,
         plate,
@@ -201,34 +161,35 @@ export class PlateletManager {
         centralCell,
         planetRadius,
       );
-      platelets.push(centerPlatelet);
+      // Write directly to collection
+      await this.plateletsCollection.set(centerPlatelet.id, centerPlatelet);
+      return 1;
     } else {
-      let successCount = 0;
-      let failureCount = 0;
-
-      for (const cell of validCells) {
+      let count = 0;
+      // Create all platelets in parallel
+      const plateletPromises = validCells.map(async (cell) => {
         try {
           const cellPosition = cellToVector(cell, planetRadius);
           if (cellPosition) {
             const platelet = await this.createSimplePlatelet(
-              `${plate.id}-${cell}`,
+              PlateletManager.plateletId(plate.id, cell),
               plate,
               cellPosition,
               cell,
               planetRadius,
             );
-            platelets.push(platelet);
-            successCount++;
-          } else {
-            failureCount++;
+            await this.plateletsCollection.set(platelet.id, platelet);
+            count += 1;
+            return platelet;
           }
+          return null;
         } catch (error) {
-          failureCount++;
+          return null;
         }
-      }
+      });
+      await Promise.all(plateletPromises);
+      return count;
     }
-
-    return platelets;
   }
 
   /**
@@ -236,10 +197,10 @@ export class PlateletManager {
    */
   private async createSimplePlatelet(
     id: string,
-    plate: SimPlateIF,
+    plate: any, // Accept any plate type
     position: Vector3,
     h3Cell: string,
-    planetRadius,
+    planetRadius: number,
   ): Promise<PlateletIF> {
     const neighborCellIds = h3Cell ? await getNeighborsAsync(h3Cell) : [];
 
@@ -249,13 +210,13 @@ export class PlateletManager {
       planetId: plate.planetId,
       position: new Vector3().copy(position),
       h3Cell,
+      sector: '', // Add empty sector for now
       radius: h3HexRadiusAtResolution(
         planetRadius,
         PlateletManager.PLATELET_CELL_LEVEL,
       ),
       thickness: plate.thickness,
       density: plate.density,
-      elasticity: 0.3,
       neighborCellIds,
     };
   }

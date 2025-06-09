@@ -5,7 +5,7 @@ import {
   randomNormal,
   varyP,
 } from '@wonderlandlabs/atmo-utils';
-import { Universe } from '@wonderlandlabs/multiverse';
+import { asyncIterToMap, Universe } from '@wonderlandlabs/multiverse';
 import { shuffle } from 'lodash-es';
 import { Vector3 } from 'three';
 import { v4 as uuidV4 } from 'uuid';
@@ -999,10 +999,7 @@ export class PlateSimulation implements PlateSimulationIF, ContextProvider {
       }
       console.log('edge deletion for plate ', plateId);
 
-      await this.createIrregularEdgesForPlate(
-        plateId,
-        plate,
-      );
+      await this.createIrregularEdgesForPlate(plateId, plate);
     }
     const neCount = await plateletsCollection.count();
     console.log('---------- deleted ', neCount - startingCount, 'platelets');
@@ -1075,15 +1072,15 @@ export class PlateSimulation implements PlateSimulationIF, ContextProvider {
     }
 
     // Island detection: Remove edge platelets that have no non-destroyed neighbors
-/*    const islandPlatelets = this.findIslandPlatelets(
-      platelets,
-      allPlateletsToDelete,
-    );
+    /*    const islandPlatelets = this.findIslandPlatelets(
+          platelets,
+          allPlateletsToDelete,
+        );
 
-    // Add island platelets to deletion set
-    islandPlatelets.forEach((plateletId) => {
-      allPlateletsToDelete.add(plateletId);
-    });*/
+        // Add island platelets to deletion set
+        islandPlatelets.forEach((plateletId) => {
+          allPlateletsToDelete.add(plateletId);
+        });*/
 
     await Promise.all(
       Array.from(allPlateletsToDelete.values()).map(async (id) => {
@@ -1152,6 +1149,20 @@ export class PlateSimulation implements PlateSimulationIF, ContextProvider {
     this.deletedPlatelets.clear();
   }
 
+  private async getPlateletFor(cell: string, plateId: string) {
+    if (!(cell && plateId)) {
+      return [];
+    }
+
+    const plateletCollection = this.simUniv.get(COLLECTIONS.PLATELETS);
+
+    const candidates = await plateletCollection.find('h3Cell', cell);
+    const list = await asyncIterToMap(candidates);
+    return Array.from(list.values()).filter(
+      (platelet: PlateletIF) => platelet.plateId === plateId,
+    );
+  }
+
   /**
    * Get count of deleted platelets
    */
@@ -1215,27 +1226,44 @@ export class PlateSimulation implements PlateSimulationIF, ContextProvider {
     deletedSet: Set<string>,
     deletions: number,
   ) {
+    let startingDeletions = deletions;
+    let plateId;
     while (deletions > 0 && plateletId) {
       // Add this platelet to deletion set
       deletedSet.add(plateletId);
 
       const plateletCollection = this.simUniv.get(COLLECTIONS.PLATELETS);
       const platelet = (await plateletCollection.get(plateletId)) as PlateletIF;
-      if (!Array.isArray(platelet?.neighborCellIds)) {
+      if (!plateId) {
+        plateId = platelet.plateId;
+      }
+      if (!platelet) {
+        console.log('cannot get platelet', plateletId);
         return;
       }
-      const neighbors = await plateletCollection.getMany(
-        platelet.neighborCellIds,
-      );
-      let deletable = [];
-      for (const [id, neighbor] of neighbors.entries()) {
-        if (!deletedSet.has(id)) {
-          deletable.push(id);
-        }
+      if (!Array.isArray(platelet?.neighborCellIds)) {
+        console.log('no neighbor cell ids', platelet);
+        break;
       }
 
-      plateletId = shuffle(deletable).pop();
+      let cells = [...platelet?.neighborCellIds];
+
+      const neighbors = await Promise.all(
+        cells.map((cell) => this.getPlateletFor(cell, plateId)),
+      );
+
+      const deleteable = neighbors
+        .flat()
+        .filter((platelet) => !deletedSet.has(platelet.id))
+        .map((p) => p.id);
+
+      if (deleteable.length === 0) {
+        console.log('no undeledeted neighbors', startingDeletions - deletions);
+      }
+
+      plateletId = shuffle(deleteable).pop();
       deletions -= 1;
     }
+    console.log('deleted a crack ', startingDeletions - deletions, 'length');
   }
 }

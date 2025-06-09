@@ -7,9 +7,10 @@ import { varySpeedByRadius } from '../../utilities';
 import { ContextProvider, MANAGER_TYPES } from '../interfaces/ContextProvider';
 import type { Platelet } from '../schemas/platelet';
 import type {
+  PlateletIF,
   PlateletStepIF,
   SimPlateIF,
-  SimStepIF,
+  SimStepIF
 } from '../types.PlateSimulation';
 import { createOrbitalFrame, movePlate } from '../utils/plateMovement';
 import { PlateletManager } from './PlateletManager';
@@ -40,7 +41,7 @@ export default class PlateManager {
       const plateletManager = context.getManager<PlateletManager>(
         MANAGER_TYPES.PLATELET,
       );
-      const platelets = await plateletManager.generatePlatelets(plateId);
+      const count = await plateletManager.generatePlatelets(plateId);
       const plateletStepsCollection = this.#universe.get(
         COLLECTIONS.PLATELET_STEPS,
       );
@@ -48,8 +49,8 @@ export default class PlateManager {
       if (!plateletStepsCollection)
         throw new Error('platelet_steps collection not found');
 
-      platelets.forEach((platelet) => {
-        if (!platelet.id) {
+      plateletManager.plateletsCollection.each((platelet: PlateletIF) => {
+        if (!platelet?.id) {
           console.warn('Platelet missing id:', platelet);
           return;
         }
@@ -60,7 +61,7 @@ export default class PlateManager {
           step: 0,
           position: platelet.position,
           thickness: platelet.thickness,
-          float: platelet.elevation || 0,
+          float: platelet.elevation ??  0,
           h3Index: latLngToCell(platelet.position.y, platelet.position.x, 4),
           sector: latLngToCell(platelet.position.y, platelet.position.x, 0), // L0 cell for sector tracking
         };

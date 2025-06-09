@@ -5,7 +5,7 @@ import { PlateletManager, type SimPlateIF } from '@wonderlandlabs/atmo-plates';
 import { EARTH_RADIUS, varyP } from '@wonderlandlabs/atmo-utils';
 import { PlateVisualizerBase } from './PlateVisualizerBase';
 import { log } from './utils';
-import { asyncIterToMap } from '@wonderlandlabs/multiverse/dist'; // Import the base class
+import { asyncIterToMap } from '@wonderlandlabs/multiverse';
 
 // Define the density range and corresponding hue/lightness ranges
 const MIN_DENSITY = 2.5; // g/cm³ (typical continental crust)
@@ -117,11 +117,18 @@ export class PlateletVisualizer extends PlateVisualizerBase {
    * Update the instanced mesh with current platelet data
    */
   private async updateMeshInstances(): void {
-
     const platelets = await this.platelets();
     if (platelets.length === 0) {
       console.warn(`⚠️ No platelets to update mesh for plate ${this.plate.id}`);
       return;
+    }
+
+    // If instance count changed, recreate the mesh
+    if (this.instancedMesh && this.instancedMesh.count !== platelets.length) {
+      log(
+        `🔄 Recreating mesh: ${this.instancedMesh.count} → ${platelets.length} instances`,
+      );
+      this.recreateInstancedMesh(platelets.length);
     }
 
     if (!this.instancedMesh) {
@@ -224,7 +231,86 @@ export class PlateletVisualizer extends PlateVisualizerBase {
     }
 
     log(
-      `✅ Mesh updated: ${this.platelets.length} instances, visible: ${this.instancedMesh.visible}, count: ${this.instancedMesh.count}`,
+      `✅ Mesh updated: ${platelets.length} instances, visible: ${this.instancedMesh.visible}`,
+    );
+  }
+
+  /**
+   * Recreate the InstancedMesh with a new instance count
+   */
+  private recreateInstancedMesh(newCount: number): void {
+    if (!this.instancedMesh) {
+      log(`⚠️ No existing mesh to recreate for plate ${this.plate.id}`);
+      return;
+    }
+
+    const oldCount = this.instancedMesh.count;
+    log(
+      `🔄 Recreating mesh for plate ${this.plate.id}: ${oldCount} → ${newCount} instances`,
+    );
+
+    // Remove old mesh from orbital frame
+    this.orbitalFrame.remove(this.instancedMesh);
+    log(`   ✅ Removed old mesh from orbital frame`);
+
+    // Dispose of old resources
+    this.instancedMesh.geometry.dispose();
+    (this.instancedMesh.material as THREE.Material).dispose();
+    log(`   ✅ Disposed old geometry and material`);
+
+    // Create new geometry and material
+    const { geometry, material } = this.createGeometryAndMaterial();
+
+    // Create new InstancedMesh with correct count
+    this.instancedMesh = new THREE.InstancedMesh(geometry, material, newCount);
+    this.instancedMesh.name = `PlateletMesh_${this.plate.id}`;
+    log(`   ✅ Created new InstancedMesh with ${newCount} instances`);
+
+    // Add new mesh to orbital frame
+    this.orbitalFrame.add(this.instancedMesh);
+    log(`   ✅ Added new mesh to orbital frame`);
+
+    log(`🔄 Mesh recreation complete for plate ${this.plate.id}`);
+  }
+
+  /**
+   * Create the initial mesh (called from refreshColors if needed)
+   */
+  private async createInitialMesh(plateletCount: number): Promise<void> {
+    // Create geometry and material
+    const { geometry, material } = this.createGeometryAndMaterial();
+
+    // Create InstancedMesh with the actual platelet count
+    this.instancedMesh = new THREE.InstancedMesh(
+      geometry,
+      material,
+      plateletCount,
+    );
+    this.instancedMesh.name = `PlateletMesh_${this.plate.id}`;
+
+    // Add new mesh to orbital frame
+    this.orbitalFrame.add(this.instancedMesh);
+
+    log(`🔧 Created initial mesh with ${plateletCount} instances`);
+  }
+
+  /**
+   * Create initial visualization without regenerating platelets
+   */
+  public async createInitialVisualization(): Promise<void> {
+    const platelets = await this.platelets();
+    if (platelets.length === 0) {
+      log(
+        `⚠️ No platelets found for plate ${this.plate.id} - skipping visualization`,
+      );
+      return;
+    }
+
+    await this.createInitialMesh(platelets.length);
+    await this.updateMeshInstances();
+
+    log(
+      `✅ Created initial visualization for plate ${this.plate.id} with ${platelets.length} platelets`,
     );
   }
 
@@ -232,8 +318,10 @@ export class PlateletVisualizer extends PlateVisualizerBase {
    * Initialize platelets asynchronously and set up the mesh
    */
   public async initializeAsync(): Promise<void> {
-    // Get existing platelets from the simulation
-     await this.plateletManager.generatePlatelets(this.plate.id);
+    // Read existing platelets from the database (don't regenerate!)
+    log(
+      `🔍 Reading existing platelets for plate ${this.plate.id} from database...`,
+    );
 
     // Create geometry and material
     const { geometry, material } = this.createGeometryAndMaterial();
@@ -246,7 +334,6 @@ export class PlateletVisualizer extends PlateVisualizerBase {
       platelets.length, // Use actual count instead of hardcoded 100
     );
     this.instancedMesh.name = `PlateletMesh_${this.plate.id}`;
-    this.instancedMesh.count = platelets.length;
     return this.updateMeshInstances();
   }
 
@@ -300,67 +387,90 @@ export class PlateletVisualizer extends PlateVisualizerBase {
    * Refresh the visualization colors (call after edge detection)
    */
   public async refreshColors() {
-    if (this.instancedMesh && this.platelets.length > 0) {
-      log(`🎨 Refreshing colors for ${this.platelets.length} platelets`);
+    const platelets = await this.platelets();
+    if (platelets.length === 0) {
+      log(`⚠️ No platelets to refresh colors for plate ${this.plate.id}`);
+      return;
+    }
 
-      const platelets = await this.platelets();
-      // Re-run the color logic from updateMeshInstances
-      platelets.forEach((platelet, index) => {
-        // Check if platelet is flagged as deleted
-        const isDeleted = platelet.removed === true;
+    // If no mesh exists yet, create it (since we skipped initializeAsync)
+    if (!this.instancedMesh) {
+      log(
+        `🔧 Creating initial mesh for plate ${this.plate.id} with ${platelets.length} platelets`,
+      );
+      await this.createInitialMesh(platelets.length);
+    }
+    // If instance count changed, recreate the mesh
+    else if (this.instancedMesh.count !== platelets.length) {
+      log(
+        `🔄 Recreating mesh for color refresh: ${this.instancedMesh.count} → ${platelets.length} instances`,
+      );
+      this.recreateInstancedMesh(platelets.length);
+    }
 
-        let instanceColor: THREE.Color;
+    if (!this.instancedMesh) {
+      log(`⚠️ Failed to create instancedMesh for plate ${this.plate.id}`);
+      return;
+    }
 
-        if (isDeleted) {
-          // Color deleted platelets bright red for visualization
-          instanceColor = new THREE.Color(0xff0000); // Bright red
-          log(
-            `   🔴 Platelet ${platelet.id} is flagged as deleted - coloring red`,
-          );
-        } else {
-          // Normal density-based coloring
-          const normalizedDensity = THREE.MathUtils.mapLinear(
-            platelet.density,
-            MIN_DENSITY,
-            MAX_DENSITY,
-            0,
-            1,
-          );
+    log(`🎨 Refreshing colors for ${platelets.length} platelets`);
 
-          const hue = THREE.MathUtils.mapLinear(
-            normalizedDensity,
-            0,
-            1,
-            MIN_HUE,
-            MAX_HUE,
-          );
+    // Re-run the color logic from updateMeshInstances
+    platelets.forEach((platelet, index) => {
+      // Check if platelet is flagged as deleted
+      const isDeleted = platelet.removed === true;
 
-          const lightness = THREE.MathUtils.mapLinear(
-            normalizedDensity,
-            0,
-            1,
-            MAX_LIGHTNESS,
-            MIN_LIGHTNESS,
-          );
+      let instanceColor: THREE.Color;
 
-          const saturation = varyP({
-            max: 0.6,
-            min: 0.3,
-          });
+      if (isDeleted) {
+        // Color deleted platelets bright red for visualization
+        instanceColor = new THREE.Color(0xff0000); // Bright red
+        log(
+          `   🔴 Platelet ${platelet.id} is flagged as deleted - coloring red`,
+        );
+      } else {
+        // Normal density-based coloring
+        const normalizedDensity = THREE.MathUtils.mapLinear(
+          platelet.density,
+          MIN_DENSITY,
+          MAX_DENSITY,
+          0,
+          1,
+        );
 
-          instanceColor = new THREE.Color().setHSL(hue, saturation, lightness);
-        }
+        const hue = THREE.MathUtils.mapLinear(
+          normalizedDensity,
+          0,
+          1,
+          MIN_HUE,
+          MAX_HUE,
+        );
 
-        this.instancedMesh!.setColorAt(index, instanceColor);
-      });
+        const lightness = THREE.MathUtils.mapLinear(
+          normalizedDensity,
+          0,
+          1,
+          MAX_LIGHTNESS,
+          MIN_LIGHTNESS,
+        );
 
-      // Update the instance colors
-      if (this.instancedMesh.instanceColor) {
-        this.instancedMesh.instanceColor.needsUpdate = true;
+        const saturation = varyP({
+          max: 0.6,
+          min: 0.3,
+        });
+
+        instanceColor = new THREE.Color().setHSL(hue, saturation, lightness);
       }
 
-      log(`✅ Colors refreshed for plate ${this.plate.id}`);
-    }
+      this.instancedMesh!.setColorAt(index, instanceColor);
+    });
+
+    // Update the mesh instances with new data
+    await this.updateMeshInstances();
+
+    log(
+      `✅ Colors refreshed for plate ${this.plate.id}: ${platelets.length} instances`,
+    );
   }
 
   public clear(): void {
@@ -377,10 +487,18 @@ export class PlateletVisualizer extends PlateVisualizerBase {
    * Get existing platelets for this plate from the simulation
    */
   private async platelets(): Promise<any[]> {
-    // Use the PlateletManager to generate platelets for this plate
-    // This follows the new injectable architecture
-    const platelets = await this.plateletManager.plateletsCollection.find('plateId', this.plate.id);
+    // Read platelets directly from database (post-deletion state)
+    const platelets = await this.plateletManager.plateletsCollection.find(
+      'plateId',
+      this.plate.id,
+    );
     const map = await asyncIterToMap(platelets);
-    return Array.from(map.values());
+    const result = Array.from(map.values());
+
+    log(
+      `🔍 platelets() for plate ${this.plate.id}: found ${result.length} platelets in database`,
+    );
+
+    return result;
   }
 }
