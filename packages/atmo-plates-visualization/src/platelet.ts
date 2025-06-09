@@ -17,10 +17,7 @@ import {
 import { PlateletVisualizer } from './PlateletVisualizer';
 import { createThreeScene } from './threeSetup';
 
-// Setup Three.js scene, camera, renderer, controls, planet, etc.
-console.log('🎬 Setting up Three.js scene...');
-const { scene, camera, renderer, controls } = createThreeScene();
-console.log('✅ Three.js scene setup complete');
+// Three.js scene will be created inside the main function to avoid conflicts
 
 // --- Simulation Setup ---
 const NUM_PLATES = 20;
@@ -76,7 +73,15 @@ async function generateAndVisualizePlatelets() {
   const workerInitPromise = new Promise((resolve) => setTimeout(resolve, 1000));
 
   // Create Three.js scene
+  console.log('🎬 Creating Three.js scene...');
   const { scene, camera, renderer, controls } = createThreeScene();
+  console.log('✅ Three.js scene created:', {
+    scene: !!scene,
+    camera: !!camera,
+    renderer: !!renderer,
+    controls: !!controls,
+    rendererDomElement: !!renderer.domElement,
+  });
 
   // --- Add 20 Large Plates ---
   // Generate 20 large plates using Earth radius
@@ -314,6 +319,7 @@ async function generateAndVisualizePlatelets() {
   scene.add(axesHelper);
 
   // Animation loop
+  let frameCount = 0;
   function animate() {
     requestAnimationFrame(animate);
 
@@ -330,6 +336,16 @@ async function generateAndVisualizePlatelets() {
 
     // Render scene
     renderer.render(scene, camera);
+
+    // Log first few frames to verify animation is running
+    frameCount++;
+    if (frameCount <= 5) {
+      console.log(
+        `🎬 Animation frame ${frameCount}: rendered scene with ${plateVisualizers.length} visualizers`,
+      );
+    } else if (frameCount === 60) {
+      console.log(`🎬 Animation running smoothly - rendered 60 frames`);
+    }
   }
 
   // Handle window resize
@@ -340,7 +356,9 @@ async function generateAndVisualizePlatelets() {
   });
 
   // Start animation
+  console.log('🎬 Starting animation loop...');
   animate();
+  console.log('🎬 Animation loop started');
 
   // Cleanup function for when the page is unloaded
   window.addEventListener('beforeunload', () => {

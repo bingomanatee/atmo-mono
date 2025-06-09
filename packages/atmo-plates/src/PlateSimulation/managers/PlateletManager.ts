@@ -12,8 +12,6 @@ import { Universe } from '@wonderlandlabs/multiverse';
 import { COLLECTIONS } from '../constants';
 import { PlateletIF, SimPlateIF } from '../types.PlateSimulation';
 
-const log = console.log;
-
 // Simple types for the core PlateletManager
 interface Plate {
   id: string;
@@ -47,7 +45,6 @@ export class PlateletManager {
 
   constructor(universe: Universe) {
     this.universe = universe;
-    log('🔧 PlateletManager initialized (core version - universe injected)');
   }
 
   get platesCollection() {
@@ -88,8 +85,6 @@ export class PlateletManager {
       planetRadius,
       PlateletManager.PLATELET_CELL_LEVEL,
     );
-
-    console.log('----- generated ', plateletCount, 'platelets --------');
   }
 
   static plateletId(plateId: string, h3Cell: string) {
@@ -236,8 +231,6 @@ export class PlateletManager {
   /**
    * Clean up resources when the manager is destroyed
    */
-  cleanup(): void {
-    log('🧹 PlateletManager: Cleaning up resources (core version)');
-    log('✅ PlateletManager: Cleanup completed');
+  cleanup() {
   }
 }
