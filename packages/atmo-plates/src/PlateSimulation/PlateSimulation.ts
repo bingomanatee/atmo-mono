@@ -1089,34 +1089,6 @@ export class PlateSimulation implements PlateSimulationIF, ContextProvider {
     return allPlateletsToDelete.size;
   }
 
-  /**
-   * Check if a platelet is flagged as deleted (for visualization)
-   * This checks both the Set (for backward compatibility) and the schema
-   */
-  public isPlateletDeleted(plateletId: string): boolean {
-    return this.deletedPlatelets.has(plateletId);
-  }
-
-  /**
-   * Check if a platelet is marked as removed in the schema
-   */
-  public async isPlateletRemoved(plateletId: string): Promise<boolean> {
-    const plateletsCollection = this.simUniv.get(COLLECTIONS.PLATELETS);
-    if (!plateletsCollection) {
-      return false;
-    }
-
-    const platelet = await plateletsCollection.get(plateletId);
-    return platelet?.removed === true;
-  }
-
-  /**
-   * Clear all deleted platelet flags
-   */
-  public clearDeletedPlatelets(): void {
-    this.deletedPlatelets.clear();
-  }
-
   private async getPlateletFor(cell: string, plateId: string) {
     if (!(cell && plateId)) {
       return [];
@@ -1129,61 +1101,6 @@ export class PlateSimulation implements PlateSimulationIF, ContextProvider {
     return Array.from(list.values()).filter(
       (platelet: PlateletIF) => platelet.plateId === plateId,
     );
-  }
-
-  /**
-   * Get count of deleted platelets
-   */
-  public getDeletedPlateletCount(): number {
-    return this.deletedPlatelets.size;
-  }
-
-  /**
-   * Find island platelets - edge platelets that have no non-destroyed neighbors
-   */
-  private findIslandPlatelets(
-    platelets: any[],
-    deletedSet: Set<string>,
-  ): string[] {
-    const islandPlatelets: string[] = [];
-
-    // Check all remaining (non-deleted) platelets
-    for (const platelet of platelets) {
-      if (deletedSet.has(platelet.id) || platelet.removed) {
-        continue; // Skip already deleted or removed platelets
-      }
-
-      // Check if this platelet has any non-destroyed neighbors
-      let hasLivingNeighbor = false;
-
-      if (platelet.neighborCellIds && platelet.neighborCellIds.length > 0) {
-        for (const cellId of platelet.neighborCellIds) {
-          const neighborPlateletId = `${platelet.plateId}-${cellId}`;
-
-          // Find the neighbor platelet in our local array
-          const neighborPlatelet = platelets.find(
-            (p) => p.id === neighborPlateletId,
-          );
-
-          // If this neighbor exists, is not deleted, and is not removed, platelet is not an island
-          if (
-            neighborPlatelet &&
-            !deletedSet.has(neighborPlateletId) &&
-            !neighborPlatelet.removed
-          ) {
-            hasLivingNeighbor = true;
-            break;
-          }
-        }
-      }
-
-      // If no living neighbors, this is an island - mark for deletion
-      if (!hasLivingNeighbor) {
-        islandPlatelets.push(platelet.id);
-      }
-    }
-
-    return islandPlatelets;
   }
 
   /**
@@ -1228,5 +1145,30 @@ export class PlateSimulation implements PlateSimulationIF, ContextProvider {
       plateletId = shuffle(deleteable).pop();
       deletions -= 1;
     }
+  }
+
+  /**
+   * Complete platelet workflow: populate neighbors and create irregular edges
+   * This should be called after all platelets have been generated for all plates
+   * to ensure proper neighbor relationships and realistic plate boundaries
+   */
+  async completePlateletWorkflow(): Promise<void> {
+    console.log('🔗 Starting complete platelet workflow...');
+    console.time('⏱️ Complete Platelet Workflow');
+
+    // Step 1: Populate neighbor relationships between all platelets
+    console.log('  📊 Populating platelet neighbor relationships...');
+    console.time('  ⏱️ Neighbor Population');
+    await this.populatePlateletNeighbors();
+    console.timeEnd('  ⏱️ Neighbor Population');
+
+    // Step 2: Create irregular plate edges by removing edge platelets
+    console.log('  ✂️ Creating irregular plate edges...');
+    console.time('  ⏱️ Edge Creation');
+    await this.createIrregularPlateEdges();
+    console.timeEnd('  ⏱️ Edge Creation');
+
+    console.timeEnd('⏱️ Complete Platelet Workflow');
+    console.log('✅ Platelet workflow completed successfully');
   }
 }

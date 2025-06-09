@@ -7,6 +7,7 @@ import type {
   DataKey,
 } from './types.multiverse';
 import type { CollName } from './types.coll';
+import { isMultiverse } from './typeguards.multiverse.ts';
 
 export class Universe implements UniverseIF {
   name: UniverseName;
@@ -17,6 +18,9 @@ export class Universe implements UniverseIF {
     public multiverse?: MultiverseIF,
   ) {
     this.name = name;
+    if (!(isMultiverse(multiverse))) {
+      throw new Error('universe requires a multiverse');
+    }
     this.#colls = new Map();
     if (multiverse) {
       multiverse.add(this);

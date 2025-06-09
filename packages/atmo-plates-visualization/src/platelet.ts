@@ -58,7 +58,12 @@ async function generateAndVisualizePlatelets() {
 
   const workerConfigs = Array.from({ length: maxWorkers }, (_, index) => ({
     script: new URL('./platelet-worker.ts', import.meta.url).href,
-    tasks: ['generate-platelets'],
+    tasks: [
+      'generate-platelets',
+      'populate-neighbors',
+      'create-plate-edges',
+      'generate-mesh-data',
+    ],
   }));
 
   const workerManager = new BrowserWorkerManager({
@@ -188,6 +193,29 @@ async function generateAndVisualizePlatelets() {
       availableWorkers > 0 ? '#4CAF50' : '#FF9800'; // Green if available, orange if not
   }
 
+  // Add periodic worker status checking
+  const statusInterval = setInterval(() => {
+    const available = workerManager.workers.filter(
+      (w) => w.status === 'available',
+    ).length;
+    const working = workerManager.workers.filter(
+      (w) => w.status === 'working',
+    ).length;
+    const offline = workerManager.workers.filter(
+      (w) => w.status === 'offline',
+    ).length;
+    console.log(
+      `📊 Worker Status Check: ${available} available, ${working} working, ${offline} offline`,
+    );
+
+    if (available === 0 && working === 0) {
+      console.log('⚠️ All workers are offline - this might indicate a problem');
+    }
+  }, 3000);
+
+  // Clear interval after 30 seconds
+  setTimeout(() => clearInterval(statusInterval), 30000);
+
   let total = 0;
 
   // Create tasks for each plate (reuse planet from earlier)
@@ -197,11 +225,25 @@ async function generateAndVisualizePlatelets() {
       `📝 Creating task ${index + 1}/${plateIds.length} for plate ${plateId}`,
     );
 
+    // Get the plate data from the main thread
+    const plate = allPlates.find((p) => p.id === plateId);
+    if (!plate) {
+      console.error(`❌ Plate ${plateId} not found in allPlates array`);
+      return Promise.reject(new Error(`Plate ${plateId} not found`));
+    }
+
     return new Promise<number>((resolve, reject) => {
       const task: ITaskParams = {
         name: 'generate-platelets',
         params: {
+          name: 'generate-platelets', // Include name in params for consistency
           plateId,
+          plateData: {
+            id: plate.id,
+            center: plate.center,
+            radius: plate.radius,
+            // Include other necessary plate properties
+          },
           planetRadius: planet.radius,
           resolution: 3, // H3 resolution for platelets
           universeId: sim.universe.name,
@@ -257,6 +299,16 @@ async function generateAndVisualizePlatelets() {
       console.log(
         `✅ Task added with ID: ${addedTask.id} for plate ${plateId}`,
       );
+
+      // The TaskManager should now automatically check for available workers
+
+      // Add timeout to check if task gets processed
+      setTimeout(() => {
+        console.log(
+          `⏰ Task ${addedTask.id} status after 5 seconds:`,
+          addedTask.status,
+        );
+      }, 5000);
     });
   });
 
@@ -285,10 +337,156 @@ async function generateAndVisualizePlatelets() {
     plateletCountElement.textContent = total.toString();
   }
 
-  await sim.populatePlateletNeighbors();
-  console.timeEnd('⏱️ Neighbor Population');
+  // Complete the platelet workflow using workers for neighbor population
+  console.log('🔗 Populating platelet neighbors using workers...');
+  console.time('⏱️ Worker Neighbor Population');
 
-  await sim.createIrregularPlateEdges();
+  // Create neighbor population tasks for each plate
+  const neighborTasks = plateIds.map((plateId, index) => {
+    console.log(
+      `📝 Creating neighbor task ${index + 1}/${plateIds.length} for plate ${plateId}`,
+    );
+
+    return new Promise<number>((resolve, reject) => {
+      const task: ITaskParams = {
+        name: 'populate-neighbors',
+        params: {
+          name: 'populate-neighbors', // Include name in params too
+          plateId,
+          universeId: sim.universe.name,
+          taskType: 'populate-neighbors',
+        },
+        onSuccess: (response: any) => {
+          const { content } = response;
+          const neighborCount = content?.neighborCount || 0;
+          const executionTime = content?.executionTime || 0;
+
+          console.log(`✅ Worker SUCCESS for neighbor task ${plateId}:`, {
+            neighborCount,
+            executionTime: `${executionTime}ms`,
+            message: content?.message,
+            plateId: content?.plateId,
+          });
+
+          resolve(neighborCount);
+        },
+        onError: (error: any) => {
+          const errorMessage =
+            error.error || error.message || 'Unknown neighbor task error';
+
+          console.error(`❌ Worker ERROR for neighbor task ${plateId}:`, {
+            error: errorMessage,
+            plateId,
+            taskId: error.taskId,
+          });
+
+          reject(
+            new Error(
+              `Neighbor task failed for plate ${plateId}: ${errorMessage}`,
+            ),
+          );
+        },
+      };
+
+      console.log(
+        `➕ Adding neighbor task to TaskManager for plate ${plateId}`,
+      );
+      const addedTask = taskManager.addTask(task);
+      console.log(
+        `✅ Neighbor task added with ID: ${addedTask.id} for plate ${plateId}`,
+      );
+    });
+  });
+
+  // Wait for all neighbor population tasks to complete
+  try {
+    const neighborResults = await Promise.all(neighborTasks);
+    const totalNeighbors = neighborResults.reduce(
+      (sum, count) => sum + count,
+      0,
+    );
+    console.log(
+      `🎉 All neighbor workers completed! Total neighbors: ${totalNeighbors}`,
+    );
+  } catch (error) {
+    console.error('❌ Neighbor worker task failed:', error);
+    // Fallback to main thread neighbor population
+    console.log('🔄 Falling back to main thread neighbor population...');
+    await sim.populatePlateletNeighbors();
+  }
+
+  console.timeEnd('⏱️ Worker Neighbor Population');
+
+  // Create irregular edges using workers with real implementation
+  console.log('✂️ Creating irregular plate edges using workers...');
+  console.time('⏱️ Worker Edge Creation');
+
+  // Create edge creation tasks for each plate
+  const edgeTasks = plateIds.map((plateId, index) => {
+    console.log(
+      `📝 Creating edge task ${index + 1}/${plateIds.length} for plate ${plateId}`,
+    );
+
+    return new Promise<number>((resolve, reject) => {
+      const task: ITaskParams = {
+        name: 'create-plate-edges',
+        params: {
+          name: 'create-plate-edges',
+          plateId,
+          universeId: sim.universe.name,
+          taskType: 'create-plate-edges',
+        },
+        onSuccess: (response: any) => {
+          const { content } = response;
+          const edgeCount = content?.edgeCount || 0;
+          const executionTime = content?.executionTime || 0;
+
+          console.log(`✅ Worker SUCCESS for edge task ${plateId}:`, {
+            edgeCount,
+            executionTime: `${executionTime}ms`,
+            message: content?.message,
+            plateId: content?.plateId,
+          });
+
+          resolve(edgeCount);
+        },
+        onError: (error: any) => {
+          const errorMessage =
+            error.error || error.message || 'Unknown edge task error';
+
+          console.error(`❌ Worker ERROR for edge task ${plateId}:`, {
+            error: errorMessage,
+            plateId,
+            taskId: error.taskId,
+          });
+
+          reject(
+            new Error(`Edge task failed for plate ${plateId}: ${errorMessage}`),
+          );
+        },
+      };
+
+      console.log(`➕ Adding edge task to TaskManager for plate ${plateId}`);
+      const addedTask = taskManager.addTask(task);
+      console.log(
+        `✅ Edge task added with ID: ${addedTask.id} for plate ${plateId}`,
+      );
+    });
+  });
+
+  // Wait for all edge creation tasks to complete
+  try {
+    const edgeResults = await Promise.all(edgeTasks);
+    const totalEdges = edgeResults.reduce((sum, count) => sum + count, 0);
+    console.log(`🎉 All edge workers completed! Total edges: ${totalEdges}`);
+  } catch (error) {
+    console.error('❌ Edge worker task failed:', error);
+    // Fallback to main thread edge creation
+    console.log('🔄 Falling back to main thread edge creation...');
+    await sim.createIrregularPlateEdges();
+  }
+
+  console.timeEnd('⏱️ Worker Edge Creation');
 
   // Create visualizers BEFORE edge detection so they see the full platelet set
   console.time('⏱️ Visualization Creation');

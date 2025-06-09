@@ -283,10 +283,23 @@ export class BrowserTaskWorker implements BrowserTaskWorkerIF {
       return;
     }
 
+    console.log(
+      `🏁 BrowserTaskWorker [${this.id}]: Finishing task, emitting worker response`,
+    );
     this.browserWorkerManager?.taskManager?.emit(output);
+
     this.status = WORKER_STATUS.AVAILABLE;
+    console.log(
+      `🔄 BrowserTaskWorker [${this.id}]: Status changed to AVAILABLE, emitting WORKER_READY`,
+    );
+
     this.browserWorkerManager?.taskManager?.emit(
       Message.forWorker(TASK_MESSAGES.WORKER_UPDATED, this.id, { new: this }),
+    );
+
+    console.log(
+      `📤 BrowserTaskWorker [${this.id}]: Emitting WORKER_READY with tasks:`,
+      this.tasks,
     );
     this.browserWorkerManager?.taskManager?.emit(
       Message.forWorker(TASK_MESSAGES.WORKER_READY, this.id, this),

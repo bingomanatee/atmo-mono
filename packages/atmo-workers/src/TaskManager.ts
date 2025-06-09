@@ -104,6 +104,13 @@ export class TaskManager implements TaskManagerIF {
       Message.forTask(TASK_MESSAGES.NEW_TASK, pendingTask.id, pendingTask),
     );
     console.log(`📤 TaskManager: Emitted NEW_TASK event for ${pendingTask.id}`);
+
+    // Immediately check if any available workers can handle this new task
+    console.log(
+      `🔍 TaskManager: Checking for immediate assignment of new task ${pendingTask.id}`,
+    );
+    this.#checkForImmediateAssignment(pendingTask);
+
     return pendingTask;
   }
 
@@ -128,6 +135,20 @@ export class TaskManager implements TaskManagerIF {
     } else {
       console.warn('cannot get task ', taskId);
     }
+  }
+
+  #checkForImmediateAssignment(newTask: TaskRequest) {
+    console.log(
+      `🔍 TaskManager: Looking for available workers for task ${newTask.id} (${newTask.name})`,
+    );
+
+    // Emit TASK_AVAILABLE message so workers can claim the task immediately
+    console.log(
+      `📤 TaskManager: Emitting TASK_AVAILABLE for immediate assignment of ${newTask.id}`,
+    );
+    this.emit(
+      Message.forTask(TASK_MESSAGES.TASK_AVAILABLE, newTask.id, newTask),
+    );
   }
 
   #onEvent(e: MessageIF) {
@@ -179,6 +200,16 @@ export class TaskManager implements TaskManagerIF {
           (task) =>
             task.status === TASK_STATUS.NEW && tasks.includes(task.name),
         );
+
+        // Debug: Show task matching details
+        console.log(`🔍 TaskManager: Task matching analysis:`, {
+          workerSupportedTasks: tasks,
+          allTaskNames: taskList.map((t) => t.name),
+          newTaskNames: taskList
+            .filter((t) => t.status === TASK_STATUS.NEW)
+            .map((t) => t.name),
+          matchingTaskNames: openTasks.map((t) => t.name),
+        });
 
         console.log(
           `📊 TaskManager: Found ${openTasks.length} open tasks matching worker capabilities`,

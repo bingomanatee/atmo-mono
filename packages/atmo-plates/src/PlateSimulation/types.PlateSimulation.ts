@@ -71,6 +71,9 @@ export interface PlateSimulationIF {
   populatePlateletNeighbors(): Promise<void>;
   refreshNeighbors(): Promise<void>;
   createIrregularPlateEdges(): Promise<void>;
+
+  // Complete platelet workflow (neighbors + edges)
+  completePlateletWorkflow(): Promise<void>;
 }
 
 // Simulation step interface

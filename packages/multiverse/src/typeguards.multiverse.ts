@@ -1,6 +1,6 @@
 import { MUTATION_ACTIONS_VALUES } from './constants';
 import type { FieldBaseIF } from './type.schema';
-import type { MutationAction } from './types.multiverse';
+import type { MultiverseIF, MutationAction } from './types.multiverse';
 import type { CollIF } from './types.coll';
 import { CollBase } from './collections/CollBase';
 
@@ -55,4 +55,13 @@ export function isColl(obj: any): obj is CollIF {
   if (typeof obj.delete !== 'function') return false;
 
   return true;
+}
+
+export function isMultiverse(o: any) : o is MultiverseIF {
+  if (!isObj(o)) return false;
+  const obj = o as object;
+
+  return ['add', 'has', 'transport', 'transportGenerator'].every((key) => (
+    key in obj && typeof obj[key] === 'function'
+  ))
 }

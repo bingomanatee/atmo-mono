@@ -58,6 +58,9 @@ export class BrowserWorkerManager implements BrowserWorkerManagerIF {
         break;
 
       case TASK_MESSAGES.TASK_AVAILABLE:
+        console.log(
+          `🔔 BrowserWorkerManager: Received TASK_AVAILABLE for task ${msg.taskId}`,
+        );
         this.onTask(msg.content);
         break;
 
@@ -68,20 +71,53 @@ export class BrowserWorkerManager implements BrowserWorkerManagerIF {
       case TASK_MESSAGES.WORKER_RESPONSE:
         this.#activateWorker(msg.workerId!);
         break;
+
+      default:
+        console.log(
+          `📨 BrowserWorkerManager: Unhandled message type: ${msg.message}`,
+        );
     }
   }
 
   onTask(task: TaskIF) {
-    const capableWorkers = Array.from(this.#workers.values()).filter(
+    console.log(
+      `🎯 BrowserWorkerManager: Received task ${task.id} (${task.name})`,
+    );
+
+    const allWorkers = Array.from(this.#workers.values());
+    console.log(
+      `🔍 BrowserWorkerManager: Checking ${allWorkers.length} workers for task ${task.name}`,
+    );
+
+    allWorkers.forEach((w, index) => {
+      console.log(
+        `   Worker ${index + 1}: ${w.id}, status: ${w.status}, tasks: [${w.tasks.join(', ')}], supports ${task.name}: ${w.tasks.includes(task.name)}`,
+      );
+    });
+
+    const capableWorkers = allWorkers.filter(
       (w) =>
         w.tasks.includes(task.name) &&
         w.status === WORKER_STATUS.AVAILABLE &&
         w.status !== WORKER_STATUS.CLOSED,
     );
 
+    console.log(
+      `✅ BrowserWorkerManager: Found ${capableWorkers.length} capable workers for task ${task.name}`,
+    );
+
     if (capableWorkers.length) {
       const worker = shuffle(capableWorkers).pop();
-      if (worker) worker.claim(task);
+      if (worker) {
+        console.log(
+          `🎯 BrowserWorkerManager: Assigning task ${task.id} to worker ${worker.id}`,
+        );
+        worker.claim(task);
+      }
+    } else {
+      console.log(
+        `❌ BrowserWorkerManager: No capable workers found for task ${task.name}`,
+      );
     }
   }
 
