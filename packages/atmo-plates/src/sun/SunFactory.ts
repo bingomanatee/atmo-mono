@@ -3,7 +3,7 @@ import {
   memoryAsyncSunF,
   SchemaLocalIF,
 } from '@wonderlandlabs/multiverse';
-import { log } from '../../utils/utils';
+import { log } from '../utils/utils';
 import { IDBSun } from './IDBSun';
 
 interface IDBSunFactoryOptions {

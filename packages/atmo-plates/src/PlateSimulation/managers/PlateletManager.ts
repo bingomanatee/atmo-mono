@@ -2,9 +2,10 @@ import { Vector3 } from 'three';
 import { isValidCell, latLngToCell } from 'h3-js';
 import {
   cellToVector,
-  getCellsInRange, getNeighborsAsync,
+  getCellsInRange,
+  getNeighborsAsync,
   h3HexRadiusAtResolution,
-  pointToLatLon
+  pointToLatLon,
 } from '@wonderlandlabs/atmo-utils';
 import { Universe } from '@wonderlandlabs/multiverse';
 
@@ -49,15 +50,23 @@ export class PlateletManager {
     log('🔧 PlateletManager initialized (core version - universe injected)');
   }
 
+  get platesCollection() {
+    return this.universe.get(COLLECTIONS.PLATES);
+  }
+
+  get plateletsCollection() {
+    return this.universe.get(COLLECTIONS.PLATELETS);
+  }
+
   async generatePlatelets(plateId: string): Promise<Platelet[]> {
     // Get the plates collection
-    const platesCollection = this.universe.get(COLLECTIONS.PLATES);
-    if (!platesCollection) {
+
+    if (!this.platesCollection) {
       throw new Error('plates collection not found');
     }
 
     // Get the plate data
-    const plate: SimPlateIF = await platesCollection.get(plateId);
+    const plate: SimPlateIF = await this.platesCollection.get(plateId);
     if (!plate) {
       console.warn(`Plate ${plateId} not found. Cannot generate platelets.`);
       return [];
@@ -80,8 +89,8 @@ export class PlateletManager {
     h3HexRadiusAtResolution(planetRadius, PlateletManager.PLATELET_CELL_LEVEL);
 
     // Get the platelets collection
-    const plateletsCollection = this.universe.get(COLLECTIONS.PLATELETS);
-    if (!plateletsCollection) {
+
+    if (!this.plateletsCollection) {
       throw new Error('platelets collection not found');
     }
 
@@ -94,7 +103,7 @@ export class PlateletManager {
 
     // Batch write all platelets to collection for better performance
     const batchWrites = generatedPlatelets.map((platelet) =>
-      plateletsCollection.set(platelet.id, platelet),
+      this.plateletsCollection.set(platelet.id, platelet),
     );
     await Promise.all(batchWrites);
 
@@ -190,7 +199,7 @@ export class PlateletManager {
         plate,
         new Vector3().copy(plate.position),
         centralCell,
-        planetRadius
+        planetRadius,
       );
       platelets.push(centerPlatelet);
     } else {
@@ -206,7 +215,7 @@ export class PlateletManager {
               plate,
               cellPosition,
               cell,
-              planetRadius
+              planetRadius,
             );
             platelets.push(platelet);
             successCount++;
@@ -232,8 +241,7 @@ export class PlateletManager {
     h3Cell: string,
     planetRadius,
   ): Promise<PlateletIF> {
-
-    const neighborCellIds = h3Cell ? await getNeighborsAsync(h3Cell) : []
+    const neighborCellIds = h3Cell ? await getNeighborsAsync(h3Cell) : [];
 
     return {
       id,
@@ -241,11 +249,14 @@ export class PlateletManager {
       planetId: plate.planetId,
       position: new Vector3().copy(position),
       h3Cell,
-      radius: h3HexRadiusAtResolution(planetRadius, PlateletManager.PLATELET_CELL_LEVEL),
+      radius: h3HexRadiusAtResolution(
+        planetRadius,
+        PlateletManager.PLATELET_CELL_LEVEL,
+      ),
       thickness: plate.thickness,
       density: plate.density,
       elasticity: 0.3,
-      neighborCellIds
+      neighborCellIds,
     };
   }
 

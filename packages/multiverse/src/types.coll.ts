@@ -14,35 +14,38 @@ import type {
 // ------------------- collection nodes -------------------
 
 export interface CollBaseIF<RecordType = DataRecord, KeyType = DataKey> {
-  name: CollName;
+  [Symbol.iterator](): any;
+
+  count?(): any;
+
   debug?: boolean;
-  schema: SchemaLocalIF;
-  isAsync: boolean;
+
+  delete(key: KeyType): any;
 
   // Use any for methods that differ between sync/async
-  find(...query: any[]): any; // Generator | AsyncGenerator
-  findCount(...query: any[]): any; // number | Promise<number>
-  values(): any; // Generator | AsyncGenerator
-  getMany(keys: KeyType[]): any; // Map | Promise<Map>
-  get(key: KeyType): any; // RecordType | undefined | Promise<RecordType | undefined>
+  each?(callback: any): any; // Generator | AsyncGenerator
+  find(...query: any[]): any; // number | Promise<number>
+  findCount(...query: any[]): any; // Generator | AsyncGenerator
+  get(key: KeyType): any; // Map | Promise<Map>
+  getMany(keys: KeyType[]): any; // RecordType | undefined | Promise<RecordType | undefined>
   has(key: KeyType): any; // boolean | Promise<boolean>
-  send(key: KeyType, target: UniverseName): any; // TransportResult | Promise<TransportResult>
-  sendAll(props: any): any; // TransportResult | Promise<TransportResult>
-  sendMany(keys: KeyType[], props: any): any; // TransportResult | Promise<TransportResult>
-  set(key: KeyType, value: RecordType, skipValidate?: boolean): any; // void | Promise<void>
-  setMany(values: Map<KeyType, RecordType>): any; // void | Promise<void>
-  delete(key: KeyType): any; // void | Promise<void>
-  [Symbol.iterator](): any; // Iterator | AsyncIterator
+  isAsync: boolean; // TransportResult | Promise<TransportResult>
+  map?(mapper: any, noTransaction?: boolean): any; // TransportResult | Promise<TransportResult>
+  mutate?(key: KeyType, mutator: any): any; // TransportResult | Promise<TransportResult>
+  name: CollName; // void | Promise<void>
+  schema: SchemaLocalIF; // void | Promise<void>
+  send(key: KeyType, target: UniverseName): any; // void | Promise<void>
+  sendAll(props: any): any; // Iterator | AsyncIterator
 
   // Sun can be either sync or async
-  sun: any; // SunIF | SunIFSync | SunIfAsync
+  sendMany(keys: KeyType[], props: any): any; // SunIF | SunIFSync | SunIfAsync
 
   // Methods that might exist in subclasses
-  count?(): any; // number | Promise<number>
-  each?(callback: any): any; // void | Promise<void>
-  map?(mapper: any, noTransaction?: boolean): any; // Map | Promise<Map>
-  mutate?(key: KeyType, mutator: any): any; // RecordType | Promise<RecordType>
-  validate?<R = RecordType>(record: R): void;
+  set(key: KeyType, value: RecordType, skipValidate?: boolean): any; // number | Promise<number>
+  setMany(values: Map<KeyType, RecordType>): any; // void | Promise<void>
+  sun: any; // Map | Promise<Map>
+  validate?<R = RecordType>(record: R): void; // RecordType | Promise<RecordType>
+  values(): any;
 }
 
 export interface CollSyncIF<RecordType = DataRecord, KeyType = DataKey>

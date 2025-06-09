@@ -1,13 +1,12 @@
 import {
   cellToVector,
   EARTH_RADIUS,
-  getCellsInRange,
   getNeighborsAsync,
   randomNormal,
+  varyP,
 } from '@wonderlandlabs/atmo-utils';
 import { Universe } from '@wonderlandlabs/multiverse';
 import { shuffle } from 'lodash-es';
-import type { Vector3Like } from 'three';
 import { Vector3 } from 'three';
 import { v4 as uuidV4 } from 'uuid';
 import { PlateSpectrumGenerator } from '../generator/PlateSpectrumGenerator';
@@ -23,7 +22,6 @@ import { COLLECTIONS } from './constants';
 import { ContextProvider, MANAGER_TYPES } from './interfaces/ContextProvider';
 import { PlateletManager } from './managers/PlateletManager';
 import PlateManager from './managers/PlateManager';
-import { PlateletCollisionManager } from './managers/PlateletCollisionManager';
 import { Planet } from './Planet';
 import { Plate } from './Plate';
 import type {
@@ -36,12 +34,6 @@ import type {
 } from './types.PlateSimulation';
 import { createPlateletFromCell } from './utils/plateletUtils';
 
-// Define manager keys
-export const MANAGERS = {
-  PLATE: 'plateManager',
-  PLATELET: 'plateletManager',
-};
-
 export class PlateSimulation implements PlateSimulationIF, ContextProvider {
   // Static property to control force-directed layout strength (0-1 scale)
   public static fdStrength: number = 0.33;
@@ -52,6 +44,7 @@ export class PlateSimulation implements PlateSimulationIF, ContextProvider {
   get universe(): Universe {
     return this.simUniv;
   }
+
   public simulationId?: string;
   #defaultSimId: string | undefined;
   readonly managers: Map<string, any>; // Map to store manager instances
@@ -87,10 +80,7 @@ export class PlateSimulation implements PlateSimulationIF, ContextProvider {
 
     // Initialize managers with injected universe
     this.managers = new Map<string, any>();
-    this.managers.set(
-      MANAGER_TYPES.PLATE,
-      new PlateManager(simUniv),
-    );
+    this.managers.set(MANAGER_TYPES.PLATE, new PlateManager(simUniv));
     this.managers.set(MANAGER_TYPES.PLATELET, new PlateletManager(simUniv));
 
     // Store maxPlateRadius
@@ -310,8 +300,12 @@ export class PlateSimulation implements PlateSimulationIF, ContextProvider {
   async addSimulation(props: SimProps): string {
     let { name, id, radius, planetId, plateCount = 0, maxPlateRadius } = props; // Extract maxPlateRadius
 
-    if (!id) id = uuidV4();
-    if (!name) name = `sim-${id}`;
+    if (!id) {
+      id = uuidV4();
+    }
+    if (!name) {
+      name = `sim-${id}`;
+    }
 
     // If planetId is provided, verify it exists
     if (planetId) {
@@ -395,10 +389,14 @@ export class PlateSimulation implements PlateSimulationIF, ContextProvider {
     } = props;
 
     // Generate ID if not provided
-    if (!id) id = uuidV4();
+    if (!id) {
+      id = uuidV4();
+    }
 
     // Generate name if not provided
-    if (!name) name = `plate-${id}`;
+    if (!name) {
+      name = `plate-${id}`;
+    }
 
     // If planetId is provided, verify it exists
     if (planetId) {
@@ -517,13 +515,17 @@ export class PlateSimulation implements PlateSimulationIF, ContextProvider {
 
   async getPlate(id: string): Promise<Plate> {
     const plate = await this.simUniv.get(COLLECTIONS.PLATES).get(id);
-    if (!plate) throw new Error('cannot find plate ' + id);
+    if (!plate) {
+      throw new Error('cannot find plate ' + id);
+    }
     return plate as Plate; // filterRecord ensures this is a Plate instance
   }
 
   async getPlanet(id: string): Promise<Planet> {
     const planetData = await this.simUniv.get(COLLECTIONS.PLANETS).get(id);
-    if (!planetData) throw new Error('cannot find planet ' + id);
+    if (!planetData) {
+      throw new Error('cannot find planet ' + id);
+    }
     return Planet.fromJSON(planetData);
   }
 
@@ -633,7 +635,9 @@ export class PlateSimulation implements PlateSimulationIF, ContextProvider {
           const totalMass = plate1.mass + plate2.mass;
 
           // Avoid division by zero if total mass is somehow 0 or undefined
-          if (!totalMass || totalMass === 0) continue;
+          if (!totalMass || totalMass === 0) {
+            continue;
+          }
 
           // Mass ratio for how much force plate1 *receives* (scaled by plate2's mass)
           const massRatio1 = plate2.mass / totalMass;
@@ -902,22 +906,6 @@ export class PlateSimulation implements PlateSimulationIF, ContextProvider {
   }
 
   /**
-   * Write neighbor updates to the collection in batch
-   */
-  private async writeNeighborUpdates(
-    neighborUpdates: Array<{ id: string; platelet: any; neighbors: string[] }>,
-    plateletsCollection: any,
-  ): Promise<void> {
-    const writePromises = neighborUpdates.map(({ id, platelet, neighbors }) =>
-      plateletsCollection.set(id, {
-        ...platelet,
-        neighbors,
-      }),
-    );
-    await Promise.all(writePromises);
-  }
-
-  /**
    * Refresh neighbor relationships by validating neighborCellIds
    * This ensures all H3 cell IDs in neighborCellIds correspond to existing platelets
    * and removes references to platelets that have been marked as removed
@@ -990,6 +978,7 @@ export class PlateSimulation implements PlateSimulationIF, ContextProvider {
    */
   async createIrregularPlateEdges(): Promise<void> {
     const plateletsCollection = this.simUniv.get(COLLECTIONS.PLATELETS);
+    let startingCount = await plateletsCollection.count();
     if (!plateletsCollection) {
       throw new Error('platelets collection not found');
     }
@@ -997,45 +986,27 @@ export class PlateSimulation implements PlateSimulationIF, ContextProvider {
     // Refresh neighbor relationships BEFORE edge detection to ensure accurate neighbor counts
     await this.refreshNeighbors();
 
-    // First collect all platelets to avoid transaction timeout
-    const allPlatelets: any[] = [];
-    for await (const [_, platelet] of plateletsCollection.values()) {
-      allPlatelets.push(platelet);
-    }
-
-    // Group platelets by plate
-    const plateletsByPlate = new Map<string, any[]>();
-    for (const platelet of allPlatelets) {
-      const plateId = platelet.plateId;
-      if (!plateletsByPlate.has(plateId)) {
-        plateletsByPlate.set(plateId, []);
-      }
-      plateletsByPlate.get(plateId)!.push(platelet);
-    }
-
     let totalDeleted = 0;
 
-    // Shuffle the plates to randomize processing order
-    const plateEntries = Array.from(plateletsByPlate.entries());
-    const shuffledPlateEntries = shuffle(plateEntries);
-
     // Process each plate individually in random order
-    for (const [plateId, platelets] of shuffledPlateEntries) {
-      const plateSize = platelets.length;
+    const planet = await this.planet();
 
-      if (plateSize <= 30) {
+    const plates = this.simUniv.get(COLLECTIONS.PLATES);
+    for await (const [plateId, plate] of plates.find('planetId', planet.id)) {
+      if (plate.simId !== this.simulationId) {
+        console.log('ignoring plate', plate, 'not in sim', this.simulationId);
         continue;
       }
+      console.log('edge deletion for plate ', plateId);
 
-      const deletedCount = await this.createIrregularEdgesForPlate(
+      await this.createIrregularEdgesForPlate(
         plateId,
-        platelets,
+        plate,
       );
-      totalDeleted += deletedCount;
     }
-
-    // Refresh neighbor relationships AFTER deletion to clean up any orphaned references
-    await this.refreshNeighbors();
+    const neCount = await plateletsCollection.count();
+    console.log('---------- deleted ', neCount - startingCount, 'platelets');
+    return startingCount - neCount;
   }
 
   /**
@@ -1043,102 +1014,68 @@ export class PlateSimulation implements PlateSimulationIF, ContextProvider {
    */
   private async createIrregularEdgesForPlate(
     plateId: string,
-    platelets: any[],
+    plate: PlateIF,
   ): Promise<number> {
     const plateletsCollection = this.simUniv.get(COLLECTIONS.PLATELETS);
     if (!plateletsCollection) {
       throw new Error('platelets collection not found');
     }
+    const platelets = await this.simUniv
+      .get(COLLECTIONS.PLATELETS)
+      .find('plateId', plateId);
 
-    const plateSize = platelets.length;
-
-    // Get platelets for this specific plate and count their neighbors
-    const plateletNeighborCounts: Array<{
-      id: string;
-      neighborCount: number;
-      platelet: any;
-    }> = [];
-
-    platelets.forEach((platelet: any) => {
-      const neighborCount = platelet.neighborCellIds
-        ? platelet.neighborCellIds.length
-        : 0;
-      plateletNeighborCounts.push({
-        id: platelet.id,
-        neighborCount,
-        platelet,
-      });
-    });
-
-    // Sort by neighbor count (ascending) to find edge platelets
-    plateletNeighborCounts.sort((a, b) => a.neighborCount - b.neighborCount);
-
-    // Find edge platelets (those with fewer neighbors than average)
-    // For these large, densely connected plates, we need a higher threshold
-    const avgNeighborCount =
-      plateletNeighborCounts.reduce(
-        (sum, item) => sum + item.neighborCount,
-        0,
-      ) / plateletNeighborCounts.length;
-
-    // Use 80% of average neighbor count as the edge threshold (more inclusive)
-    const EDGE_NEIGHBOR_THRESHOLD = Math.floor(avgNeighborCount * 0.8);
-
-    // Get edge platelets and add some randomness to break up uniform patterns
-    let edgePlatelets = plateletNeighborCounts.filter(
-      (item) => item.neighborCount <= EDGE_NEIGHBOR_THRESHOLD,
-    );
-
-    // If we have too many edge platelets, randomly select a subset to create more varied patterns
-    if (edgePlatelets.length > plateSize * 0.4) {
-      const shuffledEdges = shuffle(edgePlatelets);
-      edgePlatelets = shuffledEdges.slice(0, Math.floor(plateSize * 0.4));
-    }
-
-    if (edgePlatelets.length === 0) {
-      return 0;
+    const edgePlateletIDs: string[] = [];
+    let plateSize = 0;
+    for await (const [id, platelet] of platelets) {
+      plateSize += 1;
+      if (platelet.neighborCellIds.length < 6) {
+        edgePlateletIDs.push(id);
+      }
     }
 
     // Shuffle the edge platelets for random selection
-    const shuffledEdgePlatelets = shuffle(edgePlatelets);
     const allPlateletsToDelete = new Set<string>();
 
     // Calculate maximum allowed deletions (25% of total plate size for much better visualization)
-    const maxAllowedDeletions = Math.max(2, Math.floor(plateSize * 0.25));
+    const maxAllowedDeletions = Math.max(
+      2,
+      Math.floor(edgePlateletIDs.length * 0.25),
+    );
 
     if (plateSize >= 40) {
       // For large plates (40+ platelets): Use cascading deletion only (no initial edge accretion)
       const deleteCount = Math.min(
-        Math.max(1, Math.floor(shuffledEdgePlatelets.length * 0.2)), // Reduced to 20% of edge platelets
+        Math.max(2, Math.floor(edgePlateletIDs.length * 0.2)), // Reduced to 20% of edge platelets
         maxAllowedDeletions,
       );
-      const plateletsToDelete = shuffledEdgePlatelets.slice(0, deleteCount);
+      const idsToDelete = shuffle(edgePlateletIDs).slice(0, deleteCount);
 
       // For each selected edge platelet, apply cascading deletion to neighbors
-      plateletsToDelete.forEach((item) => {
-        this.limitedDeleteNeighbors(
-          item.id,
+      for (const id of idsToDelete) {
+        await this.limitedDeleteNeighbors(
+          id,
           allPlateletsToDelete,
-          platelets,
-          maxAllowedDeletions,
+          varyP({ min: 2, max: 8 }),
         );
-      });
+      }
     } else {
       // For medium plates (30-39 platelets): Use edge accretion only
       const deleteCount = Math.min(
-        Math.max(2, Math.floor(shuffledEdgePlatelets.length * 0.4)), // Reduced to 40% of edge platelets
+        Math.max(2, Math.floor(edgePlateletIDs.length * 0.4)), // Reduced to 40% of edge platelets
         maxAllowedDeletions,
       );
-      const plateletsToDelete = shuffledEdgePlatelets.slice(0, deleteCount);
+      const plateletIDsToDelete = shuffle(edgePlateletIDs).slice(
+        0,
+        deleteCount,
+      );
 
-      // For medium plates, just delete the edge platelets themselves (no cascading)
-      plateletsToDelete.forEach((item) => {
-        allPlateletsToDelete.add(item.id);
+      plateletIDsToDelete.forEach((id) => {
+        allPlateletsToDelete.add(id);
       });
     }
 
     // Island detection: Remove edge platelets that have no non-destroyed neighbors
-    const islandPlatelets = this.findIslandPlatelets(
+/*    const islandPlatelets = this.findIslandPlatelets(
       platelets,
       allPlateletsToDelete,
     );
@@ -1146,21 +1083,44 @@ export class PlateSimulation implements PlateSimulationIF, ContextProvider {
     // Add island platelets to deletion set
     islandPlatelets.forEach((plateletId) => {
       allPlateletsToDelete.add(plateletId);
-    });
+    });*/
 
-    // Instead of deleting, flag platelets as "removed" in the schema
-    for (const plateletId of allPlateletsToDelete) {
-      await plateletsCollection.mutate(plateletId, (draft: any) => {
-        if (draft) {
-          draft.removed = true;
+    await Promise.all(
+      Array.from(allPlateletsToDelete.values()).map(async (id) => {
+        // prepare to delete the platelet
+        const platelet = await plateletsCollection.get(id);
+        if (!platelet) {
+          return;
         }
-        return draft;
-      });
-      // Also add to the Set for backward compatibility with visualization
-      this.deletedPlatelets.add(plateletId);
-    }
+        const { neighborCellIds } = platelet as PlateletIF;
 
-    // Return the number of flagged platelets for this plate
+        // remove the deleted ids from each neighbor of the deleted cell;
+        await Promise.all(
+          neighborCellIds.map(async (id) => {
+            try {
+              await plateletsCollection.mutate(id, (nPlatelet: PlateletIF) => {
+                if (!nPlatelet) {
+                  return;
+                }
+                const { neighborCellIds } = nPlatelet as PlateletIF;
+                if (!Array.isArray(neighborCellIds)) {
+                  return nPlatelet;
+                }
+                const newNeighbors = neighborCellIds.filter(
+                  (nCell) => !allPlateletsToDelete.has(nCell),
+                );
+                nPlatelet.neighborCellIds = newNeighbors;
+                return nPlatelet;
+              });
+            } catch (err) {
+              console.error('error in deleting neighbors:', err);
+            }
+          }),
+        );
+      }),
+    );
+
+    await plateletsCollection.deleteMany(Array.from(allPlateletsToDelete));
     return allPlateletsToDelete.size;
   }
 
@@ -1250,53 +1210,32 @@ export class PlateSimulation implements PlateSimulationIF, ContextProvider {
   /**
    * Limited deletion of neighbors with hard cap on total deletions
    */
-  private limitedDeleteNeighbors(
+  private async limitedDeleteNeighbors(
     plateletId: string,
     deletedSet: Set<string>,
-    platelets: any[],
-    maxAllowedDeletions: number,
-  ): void {
-    // Add this platelet to deletion set
-    deletedSet.add(plateletId);
+    deletions: number,
+  ) {
+    while (deletions > 0 && plateletId) {
+      // Add this platelet to deletion set
+      deletedSet.add(plateletId);
 
-    // Stop if we've reached the maximum allowed deletions
-    if (deletedSet.size >= maxAllowedDeletions) {
-      return;
-    }
+      const plateletCollection = this.simUniv.get(COLLECTIONS.PLATELETS);
+      const platelet = (await plateletCollection.get(plateletId)) as PlateletIF;
+      if (!Array.isArray(platelet?.neighborCellIds)) {
+        return;
+      }
+      const neighbors = await plateletCollection.getMany(
+        platelet.neighborCellIds,
+      );
+      let deletable = [];
+      for (const [id, neighbor] of neighbors.entries()) {
+        if (!deletedSet.has(id)) {
+          deletable.push(id);
+        }
+      }
 
-    // Find the platelet in our local array
-    const platelet = platelets.find((p) => p.id === plateletId);
-    if (!platelet || !platelet.neighborCellIds) {
-      return;
-    }
-
-    // Convert H3 cell IDs to platelet IDs and filter out already deleted or removed ones
-    const neighbors = platelet.neighborCellIds
-      .map((cellId: string) => `${platelet.plateId}-${cellId}`)
-      .filter((neighborId: string) => {
-        if (deletedSet.has(neighborId)) return false;
-        // Also check if the neighbor is marked as removed in the platelets array
-        const neighborPlatelet = platelets.find((p) => p.id === neighborId);
-        return neighborPlatelet && !neighborPlatelet.removed;
-      });
-
-    // Calculate how many more we can delete
-    const remainingDeletions = maxAllowedDeletions - deletedSet.size;
-
-    // Delete at most 30% of neighbors for better cascading effect
-    const neighborsToDelete = Math.min(
-      Math.ceil(neighbors.length * 0.3),
-      remainingDeletions,
-    );
-
-    if (neighborsToDelete > 0) {
-      const shuffledNeighbors = shuffle(neighbors);
-      const selectedNeighbors = shuffledNeighbors.slice(0, neighborsToDelete);
-
-      // Add selected neighbors to deletion set
-      selectedNeighbors.forEach((neighborId: string) => {
-        deletedSet.add(neighborId);
-      });
+      plateletId = shuffle(deletable).pop();
+      deletions -= 1;
     }
   }
 }

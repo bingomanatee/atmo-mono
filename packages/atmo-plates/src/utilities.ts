@@ -16,7 +16,7 @@ import {
   createSharedDexieSun,
   createIDBSun,
   getStorageCapabilities,
-} from './PlateSimulation/sun';
+} from './sun';
 import { Plate } from './PlateSimulation/Plate';
 import { Platelet } from './PlateSimulation/Platelet';
 import {

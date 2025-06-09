@@ -9,7 +9,7 @@ export { PlateletManager } from './PlateSimulation/managers/PlateletManager';
 export { PlateSpectrumGenerator } from './generator/PlateSpectrumGenerator';
 export * from './constants';
 export * from './PlateSimulation/constants';
-export * from './PlateSimulation/sun';
+export * from './sun';
 export * from './schema';
 export * from './utilities'
 // Export types

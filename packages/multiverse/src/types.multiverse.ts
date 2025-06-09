@@ -48,7 +48,7 @@ export interface SunIF<RecordType = DataRecord, KeyType = DataKey> {
   map?(mapper: any, noTransaction?: boolean): any; // Map | Promise<Map>
   getMany?(keys: KeyType[]): any; // Generator | AsyncGenerator | Map | Promise<Map>
   setMany?(recordMap: Map<KeyType, RecordType>): any; // number | Promise<number>
-  deleteMany?(keys: KeyType[]): any; // void | Promise<void>
+  deleteMany(keys: KeyType[]): any; // void | Promise<void>
   [Symbol.iterator](): any; // Iterator | AsyncIterator
 }
 
@@ -109,7 +109,7 @@ export interface SunIFSync<RecordType = DataRecord, KeyType = DataKey>
    * Delete multiple records by their keys
    * @param keys Array of record keys to delete
    */
-  deleteMany?(keys: KeyType[]): void;
+  deleteMany(keys: KeyType[]): void;
 
   /**
    * Optional method to get all keys in the collection
@@ -168,7 +168,7 @@ export interface SunIfAsync<RecordType = DataRecord, KeyType = DataKey>
    * Delete multiple records by their keys
    * @param keys Array of record keys to delete
    */
-  deleteMany?(keys: KeyType[]): Promise<void>;
+  deleteMany(keys: KeyType[]): Promise<void>;
 
   /**
    * Optional method to get all keys in the collection

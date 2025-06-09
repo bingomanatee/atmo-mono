@@ -97,6 +97,13 @@ export class SunMemoryImmer<RecordType, KeyType = string> extends SunMemory<
     }
     super.clear();
   }
+
+  deleteMany(keys: KeyType[]): void {
+    if (this.#locked && !this._isMutating) {
+      throw new Error('Cannot delete many while locked');
+    }
+    super.deleteMany(keys);
+  }
 }
 
 export default function memoryImmerSunF<R, K>(

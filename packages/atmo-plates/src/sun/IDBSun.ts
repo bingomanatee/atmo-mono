@@ -6,7 +6,7 @@ import type {
 import { FIELD_TYPES } from '@wonderlandlabs/multiverse';
 import type { MutationAction } from '@wonderlandlabs/multiverse/dist';
 import type { IDBDatabase } from 'idb';
-import { type IDBPDatabase, openDB } from 'idb';
+import { type IDBPDatabase } from 'idb';
 import { Vector3 } from 'three';
 
 interface IDBSunOptions {
@@ -33,8 +33,7 @@ export class IDBSun<
     this.schema = options.schema;
   }
 
-  async init(): Promise<void> {
-  }
+  async init(): Promise<void> {}
 
   private serializeField(data: any, fieldName: string): any {
     if (data === null || data === undefined) {
@@ -68,7 +67,6 @@ export class IDBSun<
     }
     return data;
   }
-
 
   private serialize(data: any): any {
     if (data === null || data === undefined) {
@@ -225,6 +223,24 @@ export class IDBSun<
     }
 
     await this.db.delete(this.tableName, key);
+  }
+
+  deleteMany(keys: (string | number)[]) {
+    if (!this.db) {
+      throw new Error(`IDBSun not ready for table ${this.tableName}`);
+    }
+
+    const tx = this.db.transaction(this.tableName, 'readwrite');
+    const store = tx.objectStore(this.tableName);
+
+    for (const key of keys) {
+      store.delete(key);
+    }
+
+    return new Promise<void>((resolve, reject) => {
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
   }
 
   async clear(): Promise<void> {

@@ -1,7 +1,7 @@
 import { AsyncSunIF, SchemaLocalIF } from '@wonderlandlabs/multiverse';
 import Dexie from 'dexie';
 import { Vector3 } from 'three';
-import { log } from '../../utils/utils';
+import { log } from '../utils/utils';
 
 interface PassiveDexieSunOptions {
   dbName: string;
