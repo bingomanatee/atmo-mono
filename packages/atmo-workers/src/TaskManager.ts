@@ -21,6 +21,21 @@ export class TaskManager implements TaskManagerIF {
     this.id = uuidV4();
     const self = this;
     this.#sub = this.events$.subscribe((e) => self.#onEvent(e));
+
+    // Global events$ subscriber to log ALL messages flowing through TaskManager
+    this.events$.subscribe((e) => {
+      console.log(`🌊 TaskManager Events$: ${e.message}`, {
+        taskId: e.taskId,
+        workerId: e.workerId,
+        managerId: e.managerId,
+        seq: e.seq,
+        content: e.content
+          ? typeof e.content === 'object'
+            ? Object.keys(e.content)
+            : e.content
+          : 'none',
+      });
+    });
   }
 
   #seq = 0;
@@ -81,9 +96,14 @@ export class TaskManager implements TaskManagerIF {
 
     const pendingTask = new TaskRequest(task);
     this.#tasks.set(pendingTask.id, pendingTask);
+    console.log(
+      `📋 TaskManager: Added task ${pendingTask.id} (${task.name}) - Total tasks: ${this.#tasks.size}`,
+    );
+
     this.emit(
       Message.forTask(TASK_MESSAGES.NEW_TASK, pendingTask.id, pendingTask),
     );
+    console.log(`📤 TaskManager: Emitted NEW_TASK event for ${pendingTask.id}`);
     return pendingTask;
   }
 
@@ -141,8 +161,18 @@ export class TaskManager implements TaskManagerIF {
   }
 
   #workerReady(e: MessageIF) {
+    console.log(
+      `🔔 TaskManager: Received WORKER_READY from ${e.workerId}:`,
+      e.content,
+    );
+
     if (Array.isArray(e.content?.tasks)) {
       const { tasks } = e.content;
+      console.log(
+        `🔍 TaskManager: Worker ${e.workerId} supports tasks:`,
+        tasks,
+      );
+
       if (tasks.length) {
         const taskList = Array.from(this.#tasks.values());
         const openTasks = taskList.filter(
@@ -150,8 +180,42 @@ export class TaskManager implements TaskManagerIF {
             task.status === TASK_STATUS.NEW && tasks.includes(task.name),
         );
 
+        console.log(
+          `📊 TaskManager: Found ${openTasks.length} open tasks matching worker capabilities`,
+        );
+        console.log(
+          `📊 TaskManager: Total tasks: ${taskList.length}, Open tasks: ${taskList.filter((t) => t.status === TASK_STATUS.NEW).length}`,
+        );
+
+        // Debug: Show all tasks and their details
+        console.log(
+          `🔍 TaskManager: All tasks in manager:`,
+          taskList.map((t) => ({
+            id: t.id,
+            name: t.name,
+            status: t.status,
+            assignedWorker: t.assignedWorker,
+          })),
+        );
+
+        console.log(
+          `🔍 TaskManager: Open tasks details:`,
+          openTasks.map((t) => ({
+            id: t.id,
+            name: t.name,
+            status: t.status,
+          })),
+        );
+
         if (openTasks.length) {
           const [openTask] = openTasks;
+          console.log(
+            `🎯 TaskManager: Assigning task ${openTask.id} (${openTask.name}) to worker ${e.workerId}`,
+          );
+
+          console.log(
+            `🚀 TaskManager: About to emit TASK_AVAILABLE for ${openTask.id}...`,
+          );
           this.emit(
             Message.forTask(
               TASK_MESSAGES.TASK_AVAILABLE,
@@ -159,20 +223,49 @@ export class TaskManager implements TaskManagerIF {
               openTask,
             ),
           );
+          console.log(
+            `📤 TaskManager: Successfully emitted TASK_AVAILABLE for ${openTask.id}`,
+          );
+        } else {
+          console.log(
+            `⏸️ TaskManager: No matching open tasks for worker ${e.workerId}`,
+          );
         }
       }
+    } else {
+      console.log(
+        `❌ TaskManager: Invalid worker-ready message from ${e.workerId} - no tasks array`,
+      );
     }
   }
 
   #resolveClaim(e: MessageIF) {
     const { taskId, workerId } = e;
+    console.log(
+      `🤝 TaskManager: Received TASK_CLAIM from worker ${workerId} for task ${taskId}`,
+    );
+
     if (!(taskId && workerId)) {
+      console.log(`❌ TaskManager: Invalid claim - missing taskId or workerId`);
       return;
     }
+
     const task = this.task(taskId!);
-    if (task?.assignedWorker) {
+    if (!task) {
+      console.log(`❌ TaskManager: Task ${taskId} not found for claim`);
       return;
     }
+
+    if (task?.assignedWorker) {
+      console.log(
+        `⚠️ TaskManager: Task ${taskId} already assigned to worker ${task.assignedWorker}`,
+      );
+      return;
+    }
+
+    console.log(
+      `✅ TaskManager: Granting task ${taskId} to worker ${workerId}`,
+    );
     this.updateTask(taskId!, {
       status: TASK_STATUS.WORKING,
       assignedWorker: workerId,
@@ -186,6 +279,9 @@ export class TaskManager implements TaskManagerIF {
         workingTask,
         workerId,
       ),
+    );
+    console.log(
+      `📤 TaskManager: Emitted TASK_CLAIM_GRANTED for ${taskId} to worker ${workerId}`,
     );
   }
 }

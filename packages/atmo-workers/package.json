@@ -5,25 +5,29 @@
   "main": "dist/index.js",
   "module": "dist/index.js",
   "types": "dist/types/index.d.ts",
+  "type": "module",
   "exports": {
     ".": {
-      "types": "./dist/types/index.d.ts",
       "import": "./dist/index.js",
-      "require": "./dist/index.js"
+      "types": "./dist/types/index.d.ts"
+    },
+    "./browser": {
+      "import": "./dist/index.browser.js",
+      "types": "./dist/types/index.browser.d.ts"
     }
   },
   "files": [
     "dist"
   ],
   "scripts": {
-    "build": "npm run build:clean && npm run build:js && npm run build:types",
-    "build:clean": "rm -rf dist",
-    "build:js": "vite build",
+    "build": "vite build",
+    "build:all": "yarn build && yarn build:browser && yarn build:types",
+    "build:browser": "vite build --config vite.browser.config.ts",
     "build:types": "tsc --emitDeclarationOnly --outDir dist/types",
     "test": "vitest run",
     "test:watch": "vitest --watch",
     "test:ui": "vitest --ui",
-    "prepublishOnly": "npm run build",
+    "prepublishOnly": "yarn build:all",
     "generate-worker": "node scripts/generate-worker.js"
   },
   "keywords": [

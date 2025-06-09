@@ -37,6 +37,7 @@ export default defineConfig({
           'atmo-libs': [
             '@wonderlandlabs/atmo-plates',
             '@wonderlandlabs/atmo-three-orbit',
+            '@wonderlandlabs/atmo-workers',
             '@wonderlandlabs/atmo-utils',
           ],
           // Separate vendor libraries

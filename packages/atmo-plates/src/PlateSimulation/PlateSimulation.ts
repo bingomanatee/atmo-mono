@@ -221,10 +221,6 @@ export class PlateSimulation implements PlateSimulationIF, ContextProvider {
         if (planet) {
           // Planet exists, no need to set anything - we'll use simulation.planetId
         } else {
-          // If the planet doesn't exist but the simulation references it, create a new one
-          console.warn(
-            `Planet ${simulation.planetId} referenced in simulation ${this.#defaultSimId} not found. Creating a new planet.`,
-          );
           const newPlanet = this.makePlanet();
 
           // Update the simulation with the new planet ID
@@ -291,7 +287,7 @@ export class PlateSimulation implements PlateSimulationIF, ContextProvider {
     const planetId = this.simulation?.planetId;
     if (!planetId) {
       console.warn('no planet for simulation', this.simulation);
-      throw new Error('no plnanet id in simulation');
+      throw new Error('no planet id in simulation');
     }
     const planetsCollection = this.simUniv.get(COLLECTIONS.PLANETS);
     return planetsCollection.get(planetId)!;
@@ -423,8 +419,7 @@ export class PlateSimulation implements PlateSimulationIF, ContextProvider {
         try {
           planetId = this.simulation.planetId;
         } catch (error) {
-          // If there's an error getting the simulation, continue without a planetId
-          console.warn('Error getting default simulation:', error);
+          console.error('Error getting default simulation:', error);
         }
       }
 
@@ -738,22 +733,13 @@ export class PlateSimulation implements PlateSimulationIF, ContextProvider {
       'planetId',
       this.simulation.planetId,
     )) {
-      console.log(`Processing neighbors for plate ${plateId}...`);
-
       const result = await this.addEdgePlatelets(plateId, plate);
 
       totalPlateletsProcessed += result.plateletCount;
       totalPlatesProcessed++;
-
-      console.log(
-        `  Completed neighbors for plate ${plateId} (${result.plateletCount} platelets)`,
-      );
     }
 
     console.timeEnd('  🔗 Computing neighbor relationships');
-    console.log(
-      `Neighbor relationships populated: ${totalPlatesProcessed} plates, ${totalPlateletsProcessed} platelets processed`,
-    );
   }
 
   /**
@@ -775,15 +761,6 @@ export class PlateSimulation implements PlateSimulationIF, ContextProvider {
 
       // Perform gap-filling for this platelet
       await this.validUnrealizedPlateletNeighbors(currentPlatelet, plate);
-    }
-
-    console.log(`  Found ${plateletCount} platelets for plate ${plateId}`);
-
-    if (plateletCount < 2) {
-      console.log(
-        `  Skipping plate ${plateId} - not enough platelets for neighbor relationships`,
-      );
-      return { plateletCount };
     }
 
     // Gap-filling is complete for this plate
@@ -967,10 +944,6 @@ export class PlateSimulation implements PlateSimulationIF, ContextProvider {
         }
       }
     }
-
-    console.log(
-      `🔗 Refreshed neighbors: cleaned ${totalCleaned} platelets, removed ${totalNeighborsRemoved} neighbor references`,
-    );
   }
 
   /**
@@ -994,16 +967,11 @@ export class PlateSimulation implements PlateSimulationIF, ContextProvider {
     const plates = this.simUniv.get(COLLECTIONS.PLATES);
     for await (const [plateId, plate] of plates.find('planetId', planet.id)) {
       if (plate.simId !== this.simulationId) {
-        console.log('ignoring plate', plate, 'not in sim', this.simulationId);
         continue;
       }
-      console.log('edge deletion for plate ', plateId);
 
       await this.createIrregularEdgesForPlate(plateId, plate);
     }
-    const neCount = await plateletsCollection.count();
-    console.log('---------- deleted ', neCount - startingCount, 'platelets');
-    return startingCount - neCount;
   }
 
   /**
@@ -1238,11 +1206,11 @@ export class PlateSimulation implements PlateSimulationIF, ContextProvider {
         plateId = platelet.plateId;
       }
       if (!platelet) {
-        console.log('cannot get platelet', plateletId);
+        console.warn('cannot get platelet', plateletId);
         return;
       }
       if (!Array.isArray(platelet?.neighborCellIds)) {
-        console.log('no neighbor cell ids', platelet);
+        console.warn('no neighbor cell ids', platelet);
         break;
       }
 
@@ -1257,13 +1225,8 @@ export class PlateSimulation implements PlateSimulationIF, ContextProvider {
         .filter((platelet) => !deletedSet.has(platelet.id))
         .map((p) => p.id);
 
-      if (deleteable.length === 0) {
-        console.log('no undeledeted neighbors', startingDeletions - deletions);
-      }
-
       plateletId = shuffle(deleteable).pop();
       deletions -= 1;
     }
-    console.log('deleted a crack ', startingDeletions - deletions, 'length');
   }
 }

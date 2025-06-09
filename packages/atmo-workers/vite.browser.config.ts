@@ -4,13 +4,13 @@ import { resolve } from 'path';
 export default defineConfig({
   build: {
     lib: {
-      entry: resolve(__dirname, 'src/index.ts'),
-      name: 'atmoWorkers',
-      fileName: 'index',
+      entry: resolve(__dirname, 'src/index.browser.ts'),
+      name: 'atmoWorkersBrowser',
+      fileName: 'index.browser',
       formats: ['es'],
     },
     outDir: 'dist',
-    emptyOutDir: true,
+    emptyOutDir: false, // Don't empty since main build runs first
     sourcemap: true,
     rollupOptions: {
       external: [

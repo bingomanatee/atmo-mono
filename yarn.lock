@@ -822,7 +822,6 @@ __metadata:
     "@types/lodash-es": "npm:^4"
     "@types/three": "npm:^0"
     "@wonderlandlabs/atmo-utils": "workspace:*"
-    "@wonderlandlabs/atmo-workers-browser": "workspace:*"
     "@wonderlandlabs/multiverse": "workspace:*"
     dexie: "npm:^4.0.11"
     h3-js: "npm:^4.2.1"
@@ -866,7 +865,7 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@wonderlandlabs/atmo-workers-browser@workspace:*, @wonderlandlabs/atmo-workers-browser@workspace:packages/atmo-workers-browser":
+"@wonderlandlabs/atmo-workers-browser@workspace:packages/atmo-workers-browser":
   version: 0.0.0-use.local
   resolution: "@wonderlandlabs/atmo-workers-browser@workspace:packages/atmo-workers-browser"
   dependencies:
@@ -1032,6 +1031,7 @@ __metadata:
     "@wonderlandlabs/atmo-plates": "workspace:*"
     "@wonderlandlabs/atmo-three-orbit": "workspace:*"
     "@wonderlandlabs/atmo-utils": "workspace:*"
+    "@wonderlandlabs/atmo-workers": "workspace:*"
     three: "npm:^0.162.0"
     typescript: "npm:^5.0.0"
     vite: "npm:^5.0.0"

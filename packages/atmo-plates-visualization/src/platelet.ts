@@ -7,6 +7,12 @@ import {
 import { EARTH_RADIUS } from '@wonderlandlabs/atmo-utils';
 import * as THREE from 'three';
 import { createPlateSimulation } from './utils/simulationUtils';
+import {
+  TaskManager,
+  BrowserWorkerManager,
+  TASK_STATUS,
+  type ITaskParams,
+} from '@wonderlandlabs/atmo-workers/browser';
 
 import { PlateletVisualizer } from './PlateletVisualizer';
 import { createThreeScene } from './threeSetup';
@@ -42,6 +48,35 @@ async function generateAndVisualizePlatelets() {
     storageTypeElement.textContent = 'IDBSun (Shared IndexedDB)';
     storageTypeElement.style.color = '#4CAF50'; // Green color to indicate success
   }
+
+  // Setup worker system early (before plate generation)
+  console.log('🤖 Setting up worker system...');
+  const taskManager = new TaskManager();
+
+  // Start with a reasonable number of workers (we'll adjust later based on plate count)
+  const maxWorkers = Math.min(navigator.hardwareConcurrency || 4, 8);
+  console.log(
+    `🤖 Creating ${maxWorkers} workers (will adjust based on plate count later)`,
+  );
+
+  const workerConfigs = Array.from({ length: maxWorkers }, (_, index) => ({
+    script: new URL('./platelet-worker.ts', import.meta.url).href,
+    tasks: ['generate-platelets'],
+  }));
+
+  const workerManager = new BrowserWorkerManager({
+    configs: workerConfigs,
+  });
+
+  // Connect task manager to worker manager
+  workerManager.assignTaskManager(taskManager);
+
+  // Start worker initialization in parallel with plate setup
+  console.log('⏳ Starting worker initialization in parallel...');
+  const workerInitPromise = new Promise((resolve) => setTimeout(resolve, 1000));
+
+  // Create Three.js scene
+  const { scene, camera, renderer, controls } = createThreeScene();
 
   // --- Add 20 Large Plates ---
   // Generate 20 large plates using Earth radius
@@ -112,43 +147,131 @@ async function generateAndVisualizePlatelets() {
   // Create PlateletManager with injectable architecture
   const plateletManager = new PlateletManager(sim.universe);
 
-  // Update worker status in UI - workers will be handled in visualization layer
-  const workerStatusElement = document.getElementById('worker-status');
-  if (workerStatusElement) {
-    workerStatusElement.textContent = 'Core Module (No Workers)';
-    workerStatusElement.style.color = '#2196F3'; // Blue color to indicate core module
-  }
-
-  // Generate platelets for all plates first
-  console.log('Generating platelets for all plates...');
+  // Generate platelets for all plates using workers
+  console.log('🤖 Generating platelets using workers...');
   console.time('⏱️ Platelet Generation');
 
-  // Generate platelets for each plate using core injectable architecture
   const plateIds = allPlates.map((plate) => plate.id);
   console.log('🔍 Plate IDs for platelet generation:', plateIds);
-  console.log(
-    '🔍 First few plates:',
-    allPlates.slice(0, 3).map((p) => ({ id: p.id, hasId: !!p.id })),
-  );
 
-  // Examine the actual plate objects to see what properties they have
-  console.log('🔍 Detailed examination of first plate:');
-  if (allPlates.length > 0) {
-    const firstPlate = allPlates[0];
-    console.log('  Full plate object:', firstPlate);
-    console.log('  Plate keys:', Object.keys(firstPlate));
-    console.log('  Plate.id:', firstPlate.id);
-    console.log('  Plate.name:', firstPlate.name);
-    console.log('  Plate.radius:', firstPlate.radius);
-    console.log('  Has id property:', 'id' in firstPlate);
-    console.log('  Type of id:', typeof firstPlate.id);
+  // Wait for workers to finish initializing (they started earlier)
+  console.log('⏳ Waiting for workers to finish initialization...');
+  await workerInitPromise;
+
+  // Determine optimal number of workers based on actual plate count
+  const numWorkers = Math.min(maxWorkers, plateIds.length); // Don't use more workers than plates
+  console.log(`🤖 Using ${numWorkers} workers for ${plateIds.length} plates`);
+
+  console.log(
+    `🤖 Worker status: ${workerManager.workers.length} workers available`,
+  );
+  workerManager.workers.forEach((worker, index) => {
+    console.log(
+      `   Worker ${index + 1}: ${worker.id}, status: ${worker.status}, tasks: ${worker.tasks.join(', ')}`,
+    );
+  });
+
+  // Update worker status in UI
+  const workerStatusElement = document.getElementById('worker-status');
+  if (workerStatusElement) {
+    const availableWorkers = workerManager.workers.filter(
+      (w) => w.status === 'available',
+    ).length;
+    const totalWorkers = workerManager.workers.length;
+    workerStatusElement.textContent = `Workers: ${availableWorkers}/${totalWorkers} available (${numWorkers} cores)`;
+    workerStatusElement.style.color =
+      availableWorkers > 0 ? '#4CAF50' : '#FF9800'; // Green if available, orange if not
   }
 
   let total = 0;
-  // Generate platelets for each plate individually (core architecture)
-  for (const plateId of plateIds) {
-    const count = await plateletManager.generatePlatelets(plateId);
-    total += count;
+
+  // Create tasks for each plate (reuse planet from earlier)
+  console.log(`🔧 Creating ${plateIds.length} worker tasks...`);
+  const plateletTasks = plateIds.map((plateId, index) => {
+    console.log(
+      `📝 Creating task ${index + 1}/${plateIds.length} for plate ${plateId}`,
+    );
+
+    return new Promise<number>((resolve, reject) => {
+      const task: ITaskParams = {
+        name: 'generate-platelets',
+        params: {
+          plateId,
+          planetRadius: planet.radius,
+          resolution: 3, // H3 resolution for platelets
+          universeId: sim.universe.name,
+          dontClear: true,
+        },
+        onSuccess: (response: any) => {
+          const { content } = response;
+          const plateletCount = content?.plateletCount || 0;
+          const executionTime = content?.executionTime || 0;
+
+          console.log(`✅ Worker SUCCESS for plate ${plateId}:`, {
+            plateletCount,
+            executionTime: `${executionTime}ms`,
+            message: content?.message,
+            plateId: content?.plateId,
+          });
+
+          // Update UI with progress
+          const statusElement = document.getElementById('worker-status');
+          if (statusElement) {
+            statusElement.textContent = `Generated ${plateletCount} platelets for plate ${plateId}`;
+          }
+
+          resolve(plateletCount);
+        },
+        onError: (error: any) => {
+          const errorMessage =
+            error.error || error.message || 'Unknown worker error';
+          const errorDetails = error.errorDetails || {};
+
+          console.error(`❌ Worker ERROR for plate ${plateId}:`, {
+            error: errorMessage,
+            details: errorDetails,
+            plateId,
+            taskId: error.taskId,
+          });
+
+          // Update UI with error
+          const statusElement = document.getElementById('worker-status');
+          if (statusElement) {
+            statusElement.textContent = `❌ Worker failed for plate ${plateId}: ${errorMessage}`;
+            statusElement.style.color = '#F44336'; // Red color for error
+          }
+
+          reject(
+            new Error(`Worker failed for plate ${plateId}: ${errorMessage}`),
+          );
+        },
+      };
+
+      console.log(`➕ Adding task to TaskManager for plate ${plateId}`);
+      const addedTask = taskManager.addTask(task);
+      console.log(
+        `✅ Task added with ID: ${addedTask.id} for plate ${plateId}`,
+      );
+    });
+  });
+
+  console.log(
+    `🎯 Created ${plateletTasks.length} promises, waiting for completion...`,
+  );
+
+  // Wait for all platelet generation tasks to complete
+  try {
+    const results = await Promise.all(plateletTasks);
+    total = results.reduce((sum, count) => sum + count, 0);
+    console.log(`🎉 All workers completed! Total platelets: ${total}`);
+  } catch (error) {
+    console.error('❌ Worker task failed:', error);
+    // Fallback to main thread generation
+    console.log('🔄 Falling back to main thread generation...');
+    for (const plateId of plateIds) {
+      const count = await plateletManager.generatePlatelets(plateId);
+      total += count;
+    }
   }
 
   const plateletCountElement = document.getElementById('platelet-count');
@@ -218,6 +341,13 @@ async function generateAndVisualizePlatelets() {
 
   // Start animation
   animate();
+
+  // Cleanup function for when the page is unloaded
+  window.addEventListener('beforeunload', () => {
+    console.log('🧹 Cleaning up workers...');
+    workerManager.close();
+    taskManager.close();
+  });
 }
 
 // Call the async function with detailed error handling

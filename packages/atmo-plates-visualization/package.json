@@ -11,6 +11,7 @@
     "@wonderlandlabs/atmo-plates": "workspace:*",
     "@wonderlandlabs/atmo-three-orbit": "workspace:*",
     "@wonderlandlabs/atmo-utils": "workspace:*",
+    "@wonderlandlabs/atmo-workers": "workspace:*",
     "three": "^0.162.0"
   },
   "devDependencies": {
