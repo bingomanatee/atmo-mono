@@ -109,27 +109,6 @@ async function generateAndVisualizePlatelets() {
     plateResult = await plateGenerator.next();
   }
 
-  console.log(`Found ${allPlates.length} plates in the simulation.`);
-
-  // CRITICAL: Verify plates are actually in the database
-  console.log(`🔍 VERIFYING PLATES ARE IN DATABASE...`);
-  const platesCollectionVerify = sim.simUniv.get('plates');
-  const plateCount = await platesCollectionVerify.count();
-  console.log(`📊 Database reports ${plateCount} plates stored`);
-
-  if (plateCount === 0) {
-    console.error(
-      `🚨 CRITICAL: Database shows 0 plates but we found ${allPlates.length} in memory!`,
-    );
-    console.error(
-      `🚨 This confirms plates are NOT being written to persistent storage!`,
-    );
-  } else {
-    console.log(
-      `✅ Database verification: ${plateCount} plates confirmed in storage`,
-    );
-  }
-
   // Create PlateletManager with injectable architecture
   const plateletManager = new PlateletManager(sim.universe);
 
@@ -143,9 +122,6 @@ async function generateAndVisualizePlatelets() {
   // Generate platelets for all plates first
   console.log('Generating platelets for all plates...');
   console.time('⏱️ Platelet Generation');
-
-  // Track start time for more precise measurement
-  const startTime = performance.now();
 
   // Generate platelets for each plate using core injectable architecture
   const plateIds = allPlates.map((plate) => plate.id);
@@ -168,68 +144,23 @@ async function generateAndVisualizePlatelets() {
     console.log('  Type of id:', typeof firstPlate.id);
   }
 
-  // Check for any undefined/null IDs
-  const invalidIds = plateIds.filter((id) => !id);
-  if (invalidIds.length > 0) {
-    console.error('❌ Found plates with invalid IDs:', invalidIds);
-    console.error(
-      '❌ This suggests plates are being retrieved without proper IDs',
-    );
-    console.error('❌ Need to check plate storage/retrieval process');
-    throw new Error(
-      `Found ${invalidIds.length} plates with invalid IDs - check plate storage/retrieval`,
-    );
-  }
   let total = 0;
   // Generate platelets for each plate individually (core architecture)
   for (const plateId of plateIds) {
-    console.log(`🔧 Generating platelets for plate ${plateId}...`);
     const count = await plateletManager.generatePlatelets(plateId);
-    console.log(`✅ Generated ${count} platelets for plate ${plateId}`);
     total += count;
   }
 
-  // Calculate total platelets and time
-  const endTime = performance.now();
-  const generationTime = endTime - startTime;
-
-  console.timeEnd('⏱️ Platelet Generation');
-  console.log(
-    `⏱️ Platelet Generation (Workers): ${generationTime.toFixed(2)} ms`,
-  );
-  console.log(`🎯 Total platelets generated: ${total}`);
-
-  // Update performance metrics in UI
-  const generationTimeElement = document.getElementById('generation-time');
   const plateletCountElement = document.getElementById('platelet-count');
-
-  if (generationTimeElement) {
-    generationTimeElement.textContent = `${generationTime.toFixed(2)} ms`;
-    // Color based on performance (green for fast, yellow for medium, red for slow)
-    if (generationTime < 5000) {
-      generationTimeElement.style.color = '#4CAF50'; // Green for fast
-    } else if (generationTime < 15000) {
-      generationTimeElement.style.color = '#FFC107'; // Yellow for medium
-    } else {
-      generationTimeElement.style.color = '#F44336'; // Red for slow
-    }
-  }
 
   if (plateletCountElement) {
     plateletCountElement.textContent = total.toString();
   }
 
-  // Populate neighbor relationships between platelets
-  console.log('Populating platelet neighbor relationships...');
-  console.time('⏱️ Neighbor Population');
   await sim.populatePlateletNeighbors();
   console.timeEnd('⏱️ Neighbor Population');
 
-  // NOW apply edge detection to delete platelets from the database
-  console.log('🔴 Applying edge detection to create irregular plate edges...');
-  console.time('⏱️ Edge Detection');
   await sim.createIrregularPlateEdges();
-  console.timeEnd('⏱️ Edge Detection');
 
   // Create visualizers BEFORE edge detection so they see the full platelet set
   console.time('⏱️ Visualization Creation');
@@ -258,10 +189,6 @@ async function generateAndVisualizePlatelets() {
   // Add axes helper
   const axesHelper = new THREE.AxesHelper(EARTH_RADIUS * 0.5); // Make axes helper relative to Earth radius
   scene.add(axesHelper);
-
-  console.log('📷 Camera position:', camera.position);
-  console.log('📷 Camera is looking at:', controls.target);
-  console.log('🌍 Earth radius:', EARTH_RADIUS);
 
   // Animation loop
   function animate() {
